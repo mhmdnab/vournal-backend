@@ -8,6 +8,12 @@ generator client {
   provider             = "prisma-client-py"
   interface            = "asyncio"
   recursive_type_depth = 5
+  // Ship BOTH Linux OpenSSL engine variants alongside the local one. Render's
+  // native Python host has a libssl that prisma-client-py's auto-detected target
+  // (debian-openssl-3.0.x) couldn't execute; with both present, ensure() picks
+  // whichever variant actually runs on the host (it runs `engine --version` and
+  // selects the one that succeeds). "native" keeps local dev (macOS) working.
+  binaryTargets        = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
 }
 
 enum EntrySource {
