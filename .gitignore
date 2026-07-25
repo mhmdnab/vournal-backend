@@ -1,0 +1,26 @@
+# Environment / secrets — ignore every .env variant (incl. .env.bak-portmove)
+# EXCEPT the committed, secret-free template.
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Prisma generated client (regenerated via `prisma generate`)
+.prisma/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Audio (dev) — keep the samples README, ignore the recordings + uploads
+uploads/
+samples/*
+!samples/README.md

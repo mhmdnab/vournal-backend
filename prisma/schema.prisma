@@ -1,0 +1,167 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // pooled (Supavisor transaction, port 6543)
+  directUrl = env("DIRECT_URL")   // direct/session (port 5432) — migrations use this
+}
+
+generator client {
+  provider             = "prisma-client-py"
+  interface            = "asyncio"
+  recursive_type_depth = 5
+}
+
+enum EntrySource {
+  TEXT
+  VOICE
+}
+
+enum ProcessingStatus {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  // Nullable so `db push` accepts the pre-auth demo row, and so future
+  // OAuth-only accounts (Apple/Google, a later step) can exist without a
+  // password. Registration always sets it; login rejects null-password users.
+  passwordHash String?
+  // IANA timezone name (e.g. "Asia/Beirut"), sent by the client on register.
+  // null = UTC fallback. Used to compose spoken clock times into the correct UTC
+  // instant and to bucket the mood trend by the user's local day.
+  timezone     String?
+  // Usage metering (Step 11). Rolls at the calendar month: usagePeriodStart is
+  // the UTC first-of-month for the current window, usagePeriodEntries is how many
+  // entries have been created in it. Bounds per-user cost.
+  usagePeriodStart   DateTime?
+  usagePeriodEntries Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt @default(now())
+
+  entries       Entry[]
+  todos         Todo[]
+  topics        Topic[]
+  people        Person[]
+  refreshTokens RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+}
+
+// Password-reset tokens (Step 11). Like refresh tokens, only the SHA-256 hash is
+// stored (never the token). Single-use (usedAt) and short-lived (expiresAt).
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// Opaque refresh tokens, stored as a SHA-256 hash (never the token itself) so
+// they can be revoked (logout) and rotated (refresh). Access tokens are stateless
+// JWTs; only refresh tokens live here.
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Entry {
+  id            String           @id @default(cuid())
+  userId        String
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source        EntrySource      @default(TEXT)
+  audioUrl      String?
+  durationSec   Int?
+  rawTranscript String
+  summary       String?
+  moodScore     Int? // 1 (very negative) .. 5 (very positive)
+  moodLabel     String?
+  emotions      String[]
+  status        ProcessingStatus @default(PENDING)
+  processedAt   DateTime?
+  error         String?
+  // Actual resources consumed by this entry (Step 11) — turns unit-economics
+  // estimates into data. sttSeconds: audio seconds sent to STT (VOICE only);
+  // llmInTokens/llmOutTokens: extraction (or merged) token usage.
+  sttSeconds    Float?
+  llmInTokens   Int?
+  llmOutTokens  Int?
+  createdAt     DateTime         @default(now())
+
+  todos  Todo[]
+  topics EntryTopic[]
+  people EntryPerson[]
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+}
+
+model Todo {
+  id        String    @id @default(cuid())
+  entryId   String
+  entry     Entry     @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  text      String
+  dueDate   DateTime? // the DAY the task is for (day-precision), if any
+  startAt   DateTime? // dueDate + a spoken time; null = untimed. Timed items are
+  //           the ones that become calendar events (next step).
+  done      Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  @@index([userId, done])
+  @@index([userId, startAt])
+}
+
+model Topic {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name   String
+
+  entries EntryTopic[]
+
+  @@unique([userId, name])
+}
+
+model EntryTopic {
+  entryId String
+  entry   Entry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  topicId String
+  topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@id([entryId, topicId])
+}
+
+model Person {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name   String
+
+  entries EntryPerson[]
+
+  @@unique([userId, name])
+}
+
+model EntryPerson {
+  entryId  String
+  entry    Entry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  personId String
+  person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@id([entryId, personId])
+}

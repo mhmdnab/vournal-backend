@@ -1,0 +1,22 @@
+fastapi>=0.111,<1.0
+uvicorn[standard]>=0.30,<1.0
+prisma>=0.13,<1.0
+anthropic>=0.40,<1.0
+python-dotenv>=1.0,<2.0
+
+# Speech-to-text (Step 2)
+openai>=1.51,<3.0
+mutagen>=1.47,<2.0
+python-multipart>=0.0.9,<1.0  # multipart/form-data for audio upload
+
+# Speechmatics + Supabase Storage REST (Step 10/11). httpx is already pulled in
+# transitively by openai/anthropic; pin it directly since we call it ourselves.
+httpx>=0.27,<1.0
+
+# Auth (Step 5). bcrypt directly (passlib is unmaintained since 2020 and warns
+# against bcrypt 4.1+); PyJWT for stateless access tokens.
+bcrypt>=4.1,<5.0
+PyJWT>=2.8,<3.0
+
+# Rate limiting (Step 11). In-memory per-IP; resets on deploy (single-instance ok).
+slowapi>=0.1.9,<1.0
