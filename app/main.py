@@ -466,9 +466,10 @@ async def create_audio_entry(
             detail=f"Unsupported audio format '.{ext}'. Supported: {sorted(SUPPORTED_FORMATS)}",
         )
 
-    # Cost protection — ALL before any upload/STT. Order: cheapest check first
-    # (length, from the client-provided duration), then the whole-app kill switch.
-    reject_if_recording_too_long(durationSec)
+    # Cost protection — ALL before any upload/STT, keyed off the user's effective
+    # plan. Order: cheapest check first (length, from the client-provided
+    # duration), then the whole-app kill switch, then the per-user monthly cap.
+    reject_if_recording_too_long(durationSec, current)
 
     data = await file.read()
     if not data:

@@ -117,10 +117,26 @@ class TokenResponse(BaseModel):
     tokenType: str = "bearer"
 
 
+class UsageOut(BaseModel):
+    """Live entitlement usage for the plan/usage surface — all derived from the
+    effective plan (app.quota.usage_snapshot), so it matches what's enforced."""
+    monthlyLimit: int
+    monthlyUsed: int
+    maxRecordingSeconds: int
+    resetAt: str  # ISO8601 Z — start of next calendar month (when the count rolls)
+
+
 class UserOut(BaseModel):
     id: str
     email: str
     timezone: Optional[str] = None
+    # The EFFECTIVE plan (via app.entitlements.effective_plan) — what the user is
+    # entitled to right now, so the clients can gate. planExpiresAt is null when
+    # the effective plan is free (nothing to show).
+    plan: str = "free"
+    planExpiresAt: Optional[datetime] = None
+    # Live usage/limits for the plan surface (null only on older serializations).
+    usage: Optional[UsageOut] = None
     createdAt: datetime
 
 

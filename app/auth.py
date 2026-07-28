@@ -21,6 +21,8 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
 from app import email, security
 from app.db import db
+from app.entitlements import effective_plan
+from app.quota import usage_snapshot
 from app.rate_limit import limiter, rate_limited
 from app.storage import delete_audio
 from app.schemas import (
@@ -33,6 +35,7 @@ from app.schemas import (
     ResetPasswordRequest,
     TokenResponse,
     UpdateMeRequest,
+    UsageOut,
     UserOut,
 )
 
@@ -157,14 +160,24 @@ async def logout(body: LogoutRequest):
     return {"ok": True}
 
 
+def _user_out(user) -> UserOut:
+    """Serialize a user, resolving the EFFECTIVE plan and hiding a stale expiry
+    once the entitlement has lapsed to free."""
+    plan = effective_plan(user)
+    return UserOut(
+        id=user.id,
+        email=user.email,
+        timezone=user.timezone,
+        plan=plan,
+        planExpiresAt=user.planExpiresAt if plan != "free" else None,
+        usage=UsageOut(**usage_snapshot(user)),
+        createdAt=user.createdAt,
+    )
+
+
 @router.get("/me", response_model=UserOut)
 async def me(current=Depends(get_current_user)):
-    return UserOut(
-        id=current.id,
-        email=current.email,
-        timezone=current.timezone,
-        createdAt=current.createdAt,
-    )
+    return _user_out(current)
 
 
 @router.patch("/me", response_model=UserOut)
@@ -175,12 +188,7 @@ async def update_me(body: UpdateMeRequest, current=Depends(get_current_user)):
     updated = await db.user.update(
         where={"id": current.id}, data={"timezone": body.timezone}
     )
-    return UserOut(
-        id=updated.id,
-        email=updated.email,
-        timezone=updated.timezone,
-        createdAt=updated.createdAt,
-    )
+    return _user_out(updated)
 
 
 @router.delete("/me", status_code=204)

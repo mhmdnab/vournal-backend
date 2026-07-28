@@ -28,6 +28,16 @@ enum ProcessingStatus {
   FAILED
 }
 
+// Subscription tiers (Step 14a-fix — final pricing). Lowercase to match what the
+// API returns and the clients gate on. `free` is the default for everyone;
+// `daily` is the $3/mo · $30/yr plan; `reflection` is the $10/mo · $96/yr plan the
+// premium AI features gate on.
+enum Plan {
+  free
+  daily
+  reflection
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -44,6 +54,15 @@ model User {
   // entries have been created in it. Bounds per-user cost.
   usagePeriodStart   DateTime?
   usagePeriodEntries Int      @default(0)
+  // Subscription entitlement (Step 14a). `plan` is the granted tier and
+  // `planExpiresAt` when it lapses; access is ALWAYS resolved through
+  // app.entitlements.effective_plan(), which falls back to `free` once the expiry
+  // passes (fail-safe) — nothing reads `plan` directly. The paddle* ids are added
+  // now so the later Paddle payment step needs no second migration; unused today.
+  plan                 Plan      @default(free)
+  planExpiresAt        DateTime?
+  paddleCustomerId     String?
+  paddleSubscriptionId String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt @default(now())
 

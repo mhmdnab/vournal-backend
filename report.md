@@ -1177,6 +1177,65 @@ mobile app's copy), verified by bundling every route chunk and confirming a sing
 with zero web-app leakage. `disableHierarchicalLookup` was the wrong lever — it broke the
 `@shared` absolute-path resolution.
 
+## 6k. Step 13 — Retire the web client → marketing landing
+
+The Next.js web *journaling client* had done its job as the parity reference through
+Step 12, but the product ships mobile-first to TestFlight and a second full client is
+maintenance the beta doesn't need. So the web app was **archived to a git branch**
+(recoverable, not deleted) and its origin now serves a **one-page marketing landing**
+(`frontend-web-app` rebuilt as a static Next.js site). Branding settled as lowercase
+**"vournal"** across the app and the landing. The finalized **Privacy Policy** and
+**Terms of Service** — naming the four data processors: Speechmatics **Melia** (STT),
+**Anthropic** (extraction), **Supabase** (DB + audio storage), **Resend** (email) —
+now ship in three places that must agree for App Store review: the landing footer, a
+mobile **`/legal`** route, and the mobile **Profile** view. The provided icon became the
+web favicon and the app icon (background removed). **No backend changes**; pushed to its
+own repo (`vournal-landing`).
+
+## 6l. Step 14 — Subscription entitlements (foundation + final pricing)
+
+The machinery to know what a user is entitled to **right now**, with no payment provider
+yet (Paddle is Step 14b). Two design commitments carry the whole thing: a **single source
+of truth**, and **fail-safe** access.
+
+- **`app/entitlements.py` is the only place that decides access.** Nothing reads
+  `User.plan` directly — everything goes through **`effective_plan(user)`**, which returns
+  the granted tier *only while the entitlement is live* (`planExpiresAt` null or in the
+  future) and otherwise **falls back to `free`**. That fail-safe is the point: whatever
+  grants a plan later can never leave access stuck-granted — it lapses to `free` the moment
+  the entitlement expires. `is_paid()` and the `PLANS` / `PAID_PLANS` tuples live here too.
+- **Schema.** A `Plan` enum (`free` / `daily` / `reflection`, lowercase to match the API
+  and client gating) plus `plan`, `planExpiresAt`, and `paddleCustomerId` /
+  `paddleSubscriptionId` on `User` — the Paddle ids added now so Step 14b needs no second
+  migration.
+- **`GET /auth/me` returns the *effective* plan** (and `planExpiresAt`, nulled when it
+  resolves to free), so clients gate on the live entitlement, never a stale stored field.
+  Mobile carries a `Plan` type + `AuthUser.plan`.
+- **Plan-aware quotas.** `app/quota.py`'s monthly-entry and max-recording caps key off
+  `effective_plan` — superseding Step 11's flat beta caps (§6i Phase 3).
+- **Dev-only `scripts/set_plan.py`** grants a test account any plan/expiry directly against
+  the DB — never an API endpoint, never reachable in prod — the manual stand-in until the
+  Paddle webhook writes these same fields.
+
+**14a-fix — final pricing.** Once pricing landed, the middle tier was renamed
+**`unlimited` → `daily`** (`$3/mo · $30/yr`; `reflection` is `$10/mo · $96/yr`) via a
+hand-written migration — `ALTER TYPE "Plan" RENAME VALUE`, which preserves every row and
+runs in a transaction (no enum drop/recreate, no data migration). The flat free/paid caps
+became **per-plan** lookups:
+
+| plan | monthly entries | max recording |
+| --- | --- | --- |
+| free | 15 | 90 s |
+| daily | 150 | 120 s |
+| reflection | 150 | 300 s |
+
+Unknown or expired plans fall to the tightest (free) caps. Verified live: `/auth/me`
+returns `daily`; the length guard `413`s per plan (free >90 s, daily >120 s, reflection
+>300 s) **before any provider call**; the monthly cap `429`s (free at 15, daily at 150)
+**before any DB write**; and an expired `daily` grant resolves to `free`. The premium **AI
+features that `reflection` gates** come in a later step — today the tiers differ only by
+these caps.
+
 ## 7. Environment decisions worth knowing
 
 These are setup facts that aren't obvious from the code:
@@ -1304,7 +1363,7 @@ CORS allows `http://localhost:3000` and `http://127.0.0.1:3000` (incl. the
 - **Timed vs. untimed is a real product distinction (Step 8), only as good as extraction.** The pipeline only sets a time when one is spoken, which is what will keep the future calendar honest — but a missed or hallucinated time propagates. Verified correct on the gate's discriminating cases (including "tonight" → day-only, dialect times), not on a large corpus.
 - **Duration precision.** `Entry.durationSec` is an integer (rounded from the transcription's float seconds).
 - **Auth hardened across the stack (Steps 5 + 11).** Bearer token on every data endpoint; rate limiting; **password reset**; **in-app account deletion**; **refresh-token reuse detection** (family revocation). The demo account (`demo@voicejournal.local`) still exists and **must be removed at cutover** (`scripts/remove_demo_account.py`). Still open: web tokens live in `localStorage` (mitigated by reuse detection + 30-min access token; httpOnly cookies are the post-launch fix), social login, and email verification on register.
-- **Frontend gaps.** Delete now exists (entries, todos, recordings, whole account). Remaining: the timeline loads up to 50 entries with no pagination, and it does not auto-refresh after a capture. Every navigation refetches (no server-state cache — TanStack Query is the post-launch fix). Mood trend/calendar bucket by the user's local day now (Step 9).
+- **Frontend gaps.** Delete now exists (entries, todos, recordings, whole account). Remaining: the timeline loads up to 50 entries with no pagination, and it does not auto-refresh after a capture. Server-state caching landed in Step 12 (§6j) — revisits now render from cache instead of refetching every navigation. Mood trend/calendar bucket by the user's local day now (Step 9).
 - **Word-level STT accuracy — still not solved, now handled inside extraction (Step 10, §6h).** Melia mishears dialect words too (جدّد → جدة); the **merged** Sonnet extraction corrects them in-context and extracts in one call. Verified end-to-end (the جدة clip → "renew passport" todo), but still on a handful of clips from one speaker — evidence, not a benchmark. Harnesses: `benchmark_stt.py`, `benchmark_repair.py`, `test_merged_extraction.py` (and the older `test_dialect_grid.py` for the Whisper+primer path).
 - **Merged audio extraction runs on Sonnet 5.** One model call (down from repair+extract two), but all audio extraction is now Sonnet — more exposed to the end of Sonnet's introductory pricing (2026-08-31) than the old Haiku-extraction split. Thinking is disabled to keep output tokens (and cost) down.
 - **The correction is not surfaced.** `rawTranscript` is stored exactly as heard; the dialect fix happens *inside* the merged call and is never emitted, so a bad extraction can't be traced to a repaired transcript. (The old two-call path also discarded the repaired text in production — only the debug harness ever showed it.)
