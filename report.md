@@ -1236,6 +1236,74 @@ returns `daily`; the length guard `413`s per plan (free >90 s, daily >120 s, ref
 features that `reflection` gates** come in a later step — today the tiers differ only by
 these caps.
 
+## 6m. Step 15 — Toward TestFlight: entitlement UI, deploy wiring, build prep
+
+Step 14 built entitlements in the backend but left them invisible: the clients
+gated on nothing and a hit limit only surfaced as a raw error. This step makes the
+tiers **visible and gracefully enforced**, then does the unglamorous work of making
+the whole thing deployable. Three scope decisions framed it (all deliberately
+narrowing to a *testing* beta):
+
+- **Free-only for TestFlight.** iOS requires **Apple In-App Purchase (StoreKit)**
+  for digital subscriptions — Paddle/Stripe web-checkout inside the app risks a
+  3.1.1 rejection. Since a TestFlight beta tests the app, not the checkout, payments
+  are deferred: everyone is `free`, the upgrade CTA reads "coming soon." StoreKit
+  (or a web/Android Paddle path) is a later decision, not a launch blocker.
+- **Caps-only tiers.** `reflection`'s premium AI features stay unbuilt; the tiers
+  differ only by limits until testers validate the core loop.
+- **Apple enrollment pending**, so the build pipeline is *scaffolded* to be one
+  command once the account exists.
+
+### The entitlement client surface
+
+- **`/auth/me` now carries a live `usage` block** — `{ monthlyLimit, monthlyUsed,
+  maxRecordingSeconds, resetAt }`, all from `quota.usage_snapshot()`, itself derived
+  from the effective plan so it can never drift from what's enforced. The used count
+  is window-aware: a stale month reads `0` (it rolls on the next write), so the
+  number shown matches the number enforced.
+- **Profile → PLAN section** (mobile): tier name, "Entries this month X of N"
+  (warm-red at the cap), the recording ceiling, the reset date, and a quiet "Paid
+  plans coming soon" for free users.
+- **Client-side recording auto-stop** at the plan's max length, so a long ramble is
+  **saved at the cap** instead of rejected by the server (`413`) and lost — with a
+  faint "Records up to N" hint while recording. Falls back to the longest any plan
+  allows (5 min) until usage loads, so a paid user is never cut short. The calm
+  limit-state copy (`captureErrorMessage`, from Step 11) was corrected for the new
+  sub-minute caps ("90 seconds", not "1 minutes").
+
+### Deploy wiring — prod is a config chain, not code (`PROD_CONFIG.md`)
+
+The reset flow works end-to-end only when three dashboards agree, and the code was
+already correct — the gaps were all environment. `PROD_CONFIG.md` documents the exact
+chain: **Render** (backend) needs `WEB_BASE_URL` (the reset-email link origin) and
+`CORS_ORIGINS`; **Vercel** (landing) needs `NEXT_PUBLIC_API_BASE_URL` pointed at the
+Render backend and the `vournal.app` domain (with TLS, which is why the link is
+`https`); **Resend** needs the sender domain verified.
+
+A worked example proved the point during testing: the live reset page failed with
+"Couldn't reach the server." The browser console showed the real cause — the request
+from origin `https://www.vournal.app` was **CORS-blocked** (preflight `400`, no
+`Access-Control-Allow-Origin`) because Render's `CORS_ORIGINS` didn't include the
+site's origin. The fix was one Render env var — `CORS_ORIGINS=https://vournal.app,https://www.vournal.app`
+(**both** www and non-www, since the site redirects between them) — no code change.
+The lesson is written into the doc: the two easy-to-miss vars are `WEB_BASE_URL` and
+`CORS_ORIGINS`, and the allowlist must match the *exact* serving origin.
+
+Aside on the reset token in the URL (a fair question that came up): it's the standard
+pattern and safe here — the token is **hashed at rest, single-use, 30-min TTL**, sent
+only over **HTTPS**, and the reset page sets `Referrer-Policy: strict-origin-when-cross-origin`
+with zero third-party resources, so it can't leak via `Referer`. Browser-history/log
+exposure is the only residual, and single-use + short TTL neutralize it.
+
+### Build prep
+
+`eas.json` (build profiles with the prod API URL baked into `env`, since a local
+`.env` isn't bundled into an EAS build) and `app.json` (iOS `bundleIdentifier`
+`app.vournal.mobile` — permanent once shipped, flagged for confirmation; the mic
+usage string was already present). What remains is entirely off-machine: the Render/
+Vercel/Resend env values, Apple Developer enrollment, then `eas build -p ios
+--profile production` → `eas submit`.
+
 ## 7. Environment decisions worth knowing
 
 These are setup facts that aren't obvious from the code:
@@ -1411,9 +1479,13 @@ left. Roughly in dependency order:
    proper fix at scale.
 5. **Production database — done (Step 11).** On Supabase Postgres (Frankfurt) with
    a real migration history (moved off `prisma db push`).
-6. **Deploy (Phase 6, pending).** Render (backend) → Vercel (web + privacy/terms) →
-   EAS/TestFlight, and run `remove_demo_account.py` at cutover. All prep is done
-   (CORS/docs/headers env-gated, `.gitignore`, `expo-file-system` direct dep).
+6. **Deploy — mostly live (Step 15, §6m).** Backend is on **Render** as native
+   Python (`vournal-backend.onrender.com`); the marketing landing + reset pages are
+   on **Vercel** at `vournal.app`; the password-reset flow is verified end-to-end
+   after wiring `CORS_ORIGINS`/`WEB_BASE_URL` (see `PROD_CONFIG.md`). **Remaining:**
+   Apple Developer enrollment → `eas build`/`eas submit` to **TestFlight**, run
+   `remove_demo_account.py` at cutover, and (optional) a paid Render instance to kill
+   the free-tier ~60 s cold start.
 
 ### Quality work, in expected order of payoff
 

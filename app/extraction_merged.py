@@ -40,9 +40,11 @@ from anthropic import AsyncAnthropic
 
 from app.extraction import (
     SYSTEM_PROMPT as _EXTRACT_SYS,
+    KNOWN_NAMES_ADDENDUM as _KNOWN_ADDENDUM,
     MAX_TOKENS,
     _empty_result,
     _format_now,
+    _known_block,
     _normalize,
     _strip_and_parse,
     _user_message,
@@ -72,16 +74,20 @@ that was not said.
 
 Output only the JSON object, nothing else."""
 
-MERGED_SYSTEM_PROMPT = _EXTRACT_SYS + _REPAIR_ADDENDUM
+# core extraction + dialect-repair + entity continuity (Step 17). All static, so
+# the whole system prompt stays cacheable across calls.
+MERGED_SYSTEM_PROMPT = _EXTRACT_SYS + _REPAIR_ADDENDUM + _KNOWN_ADDENDUM
 
 
 async def extract_merged(
     transcript: str,
     now: Optional[datetime] = None,
     model: Optional[str] = None,
+    known: Optional[dict[str, list[str]]] = None,
 ) -> tuple[dict[str, Any], Optional[dict[str, int]]]:
     """Repair-then-extract in a single model call. Returns (result, usage) — same
-    contract as extraction.extract(); never raises on a malformed response."""
+    contract as extraction.extract(); never raises on a malformed response. `known`
+    is the user's existing people/topics for entity continuity (see extract())."""
     if now is None:
         now = datetime.now(timezone.utc)
     if not transcript or not transcript.strip():
@@ -97,7 +103,12 @@ async def extract_merged(
         # Off by default on Sonnet 5 it is NOT — disable it explicitly; thinking
         # tokens bill as output and defeat the whole point (see module docstring).
         thinking={"type": "disabled"},
-        messages=[{"role": "user", "content": _user_message(transcript, _format_now(now))}],
+        messages=[
+            {
+                "role": "user",
+                "content": _user_message(transcript, _format_now(now), _known_block(known)),
+            }
+        ],
     )
     text = "".join(b.text for b in response.content if getattr(b, "type", None) == "text")
     return _normalize(_strip_and_parse(text)), usage_of(response)

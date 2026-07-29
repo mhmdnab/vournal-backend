@@ -182,6 +182,20 @@ class TodoListItem(BaseModel):
     entryId: str
 
 
+ThreadKind = Literal["people", "topics", "places"]
+
+
+class EntityChip(BaseModel):
+    """A tappable person/topic/place on an entry (Step 17, Phase 4). Carries the
+    entity id + kind so the chip can open its thread; `ambiguous` is true when this
+    surface form is shared by 2+ entities of the kind, so the client can offer a
+    disambiguation sheet instead of navigating."""
+    id: str
+    kind: ThreadKind
+    name: str
+    ambiguous: bool = False
+
+
 class EntryOut(BaseModel):
     id: str
     userId: str
@@ -190,8 +204,9 @@ class EntryOut(BaseModel):
     summary: Optional[str] = None
     mood: Mood
     todos: List[TodoOut] = []
-    topics: List[str] = []
-    people: List[str] = []
+    topics: List[EntityChip] = []
+    people: List[EntityChip] = []
+    places: List[EntityChip] = []
     audioUrl: Optional[str] = None
     durationSec: Optional[int] = None
     rawTranscript: str
@@ -222,3 +237,72 @@ class InsightsOut(BaseModel):
     topTopics: List[NameCount] = []
     topPeople: List[NameCount] = []
     openTodos: int
+
+
+# ---- Threads (the life index, Step 17) ---------------------------------------
+# (ThreadKind is defined above, near EntityChip.)
+
+
+class ThreadSummary(BaseModel):
+    """One row of the life index — a person/topic/place and the shape of its arc."""
+    id: str
+    kind: ThreadKind
+    name: str
+    momentCount: int
+    firstDate: datetime
+    lastDate: datetime
+    # Mood scores over time (chronological, nulls dropped), capped for a sparkline.
+    moodSeries: List[int] = []
+
+
+class ThreadMoment(BaseModel):
+    """One appearance of a thread — an entry it was mentioned in."""
+    entryId: str
+    date: datetime
+    moodScore: Optional[int] = None
+    summary: str
+
+
+class ThreadDetail(BaseModel):
+    """One thread opened up: its span, average mood, and ordered moments."""
+    id: str
+    kind: ThreadKind
+    name: str
+    momentCount: int
+    firstDate: datetime
+    lastDate: datetime
+    averageMood: Optional[float] = None
+    moments: List[ThreadMoment] = []
+
+
+# ---- Correction (Step 17, Phase 4) ------------------------------------------
+
+
+class DisambiguationCandidate(BaseModel):
+    """One entity a shared surface form could mean — with context that actually
+    distinguishes it (so "Which Karim?" is answerable)."""
+    id: str
+    name: str
+    momentCount: int
+    topTopics: List[str] = []
+    lastMoment: Optional[datetime] = None
+
+
+class DisambiguationOut(BaseModel):
+    kind: ThreadKind
+    name: str  # the shared surface form
+    candidates: List[DisambiguationCandidate] = []
+    suggestedName: str  # a distinct default for "Someone new" (e.g. "Karim · work")
+
+
+class MergeRequest(BaseModel):
+    intoId: str  # absorb this thread INTO intoId; both surface forms survive
+
+
+class MoveMomentRequest(BaseModel):
+    """Reassign one moment (entry) off this thread onto another. Exactly one of
+    toId (an existing thread) or toName (create/find one) — with an optional alias
+    to attach (the surface form being split off, so ambiguity forms correctly)."""
+    toId: Optional[str] = None
+    toName: Optional[str] = None
+    alias: Optional[str] = None

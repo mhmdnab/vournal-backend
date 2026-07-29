@@ -25,6 +25,7 @@ MAX_TOKENS = 1024
 # Caps applied during normalization.
 MAX_EMOTIONS = 4
 MAX_TOPICS = 6
+MAX_PLACES = 6
 
 # The core of the product — do not rewrite. Passed verbatim as the system prompt.
 SYSTEM_PROMPT = """You are the extraction engine for a voice-journaling app. The user speaks freely into their phone about their day, thoughts, and plans. You receive the raw transcript and turn it into clean structured data.
@@ -42,28 +43,46 @@ Return ONLY a single JSON object, no markdown, no code fences, no commentary bef
   },
   "todos": [
     {
-      "text": string,         // a concrete action the speaker intends to do
+      "text": string,         // a task the speaker intends, OR a meeting/appointment/plan they have
       "dueDate": string|null, // "YYYY-MM-DD" — the DAY, if a day is stated or implied, else null
       "time": string|null     // "HH:MM" 24-hour — ONLY if a specific clock time is spoken, else null
     }
   ],
   "topics": string[],         // 1-6 recurring themes, see rules
-  "people": string[]          // names/handles of people mentioned, [] if none
+  "people": string[],         // names/handles of people mentioned, [] if none
+  "places": string[]          // specific named locations mentioned, [] if none
 }
 
 Rules:
 - summary: write it in the SAME language as the entry, in the FIRST PERSON — the speaker's own voice, as if they wrote it in their own journal (e.g. "I have a meeting tomorrow", "عندي اجتماع بكرا"). Do NOT describe the speaker in the third person. This also keeps gendered languages like Arabic neutral: use first-person forms ("عندي", "بدي", "لازم", "جواز سفري"), NEVER third-person ("عندها"/"عندو", "بدها"/"بدو", "سفرها"/"سفرو") — never assume or infer the speaker's gender. Keep it to one sentence. Describe, don't judge.
 - mood.score: judge the OVERALL emotional tone of the whole entry, not the last sentence. If genuinely neutral or unreadable, use 3.
 - mood.label and mood.emotions: write these in ENGLISH so they stay consistent for trend charts. emotions are single lowercase words (e.g. "tired", "grateful", "frustrated"). Only include emotions the speaker actually expressed; never pad the list.
-- todos: extract ONLY genuine intentions the speaker voiced — phrasings like "I need to", "I have to", "remind me to", "don't forget", "I should". Do NOT invent tasks, and do NOT turn past events into todos. Rewrite each into a short clear action — an imperative or a verbal noun, NOT a full sentence about the speaker. English: "Call the landlord about the leak", "Renew passport". Arabic: a neutral form like "الاتصال بصاحب البيت" or "تجديد جواز السفر" — NEVER a gendered sentence like "بدها تجدد جواز سفرها". If none, return [].
+- todos: extract two kinds of forward-looking items the speaker actually voiced: (1) TASKS they intend to do — "I need to", "I have to", "I should", "remind me to", "don't forget"; and (2) SCHEDULED COMMITMENTS or PLANS they have or intend — a meeting, an appointment, an event, or seeing someone ("I have a meeting with…", "I have a doctor's appointment", "we're meeting…", "I'm seeing…", "I might go see…", "dinner with…", "flight on…"). Include a plan even when softly stated ("might", "thinking of", "planning to"), but NOT pure hypotheticals ("if I get time maybe…"), and NEVER a past event. Do NOT invent anything. Rewrite each into a short clear label — an imperative, a verbal noun, or for a meeting/appointment a short "Meeting with X" / "Coffee with Y" form — NOT a full sentence about the speaker. English: "Call the landlord about the leak", "Renew passport", "Meeting with Ahmad", "Coffee with Bilal". Arabic: a neutral form like "الاتصال بصاحب البيت", "تجديد جواز السفر", "اجتماع مع أحمد" — NEVER a gendered sentence like "بدها تجدد جواز سفرها". If none, return [].
 - dueDate: the DAY the task is for. Set it only when a day is stated or clearly implied. Resolve relative day expressions ("tomorrow", "next Monday", "in two days", "end of the month", "tonight") against the CURRENT DATE AND TIME provided below. Otherwise null.
 - time: the specific clock time in "HH:MM" 24-hour form. Set it ONLY when the speaker actually states a time — e.g. "at 2pm" -> "14:00", "at 10" -> "10:00", "at 8 tonight" -> "20:00", "half past 9" -> "09:30", "in an hour" / "in 30 minutes" (compute it from the current time). If you set a time, you MUST also set dueDate to the day that time falls on. NEVER invent a time: a task with only a day ("call the dentist tomorrow") or only a vague reference ("later", "soon", "sometime", "this week") has time = null. When am/pm is unstated, use common sense — an appointment, meeting, or errand is normally during the day.
 - Dialect / Arabizi times: understand spoken Lebanese/Arabic times too. "el sa3a 3" = at 3 o'clock; "bukra el sa3a 3" = tomorrow at 3:00; "el se3a 8 el masa" / "8 bil lél" = 20:00; "ba3d sa3a" = in an hour; "ba3d nos sa3a" = in half an hour; "el lela" / "el layle" = tonight; "bukra" = tomorrow; "ba3d bukra" = the day after tomorrow.
 - topics: normalize to general, reusable ENGLISH nouns so they aggregate across days. Prefer "work", "sleep", "health", "family", "money", "relationship" over hyper-specific phrases. This is what powers "you talked about sleep 5 times this week", so favor stable labels.
 - people: use the name as spoken. If the speaker refers to someone only by role ("my boss", "my sister") and no name, you may include that role. Skip vague references. [] if none.
+- places: SPECIFIC named locations the speaker was at, went to, or is going to — a city, neighborhood, venue, or a named personal place ("Beirut", "Hamra", "the gym", "the office", "Mom's"). Use the name as spoken (keep the original language). Do NOT include vague or generic locations ("home", "outside", "there", "somewhere"), and do NOT invent a place that was not mentioned. [] if none.
 - If the transcript is empty or has no real content, return the object with an empty summary, mood.score 3, and empty arrays.
 
 Output the JSON object and nothing else."""
+
+
+# Appended to the system prompt (Step 17). Turns the known-names list in the user
+# message into entity continuity — the model reuses an existing record instead of
+# minting a near-duplicate, INCLUDING across scripts (بلال -> Bilal), while biasing
+# conservative so it never fuses two different people. Static, so it stays cacheable.
+KNOWN_NAMES_ADDENDUM = """
+
+ENTITY CONTINUITY (people & topics):
+The user's message may include a KNOWN PEOPLE list and a KNOWN TOPICS list — names and themes from their past entries. When this entry clearly refers to one of them, reuse the EXACT spelling from the list in your "people"/"topics" output, so it links to the existing record instead of creating a duplicate. This INCLUDES the same name written in a different script or spelling — Arabic "بلال" and Latin "Bilal" are the same person, so output "Bilal" if it is on the list.
+Reuse ONLY when it is clearly the same person or theme. If you are unsure whether it is the same one, do NOT reuse — use the name as spoken and let a new record be created. Over-merging two different people corrupts a personal record and is far worse than a duplicate. Never collapse two clearly-different people onto one name.
+
+Output only the JSON object, nothing else."""
+
+# The full system prompt for plain extraction (text entries): core + continuity.
+EXTRACT_SYSTEM_PROMPT = SYSTEM_PROMPT + KNOWN_NAMES_ADDENDUM
 
 
 def _format_now(now: datetime) -> str:
@@ -79,8 +98,36 @@ def _format_now(now: datetime) -> str:
     return now.strftime(f"%Y-%m-%d %H:%M (%A, {zone}{offset})")
 
 
-def _user_message(transcript: str, now_str: str) -> str:
-    return f'CURRENT DATE AND TIME: {now_str}\n\nTRANSCRIPT:\n"""\n{transcript}\n"""'
+def _known_block(known: Optional[dict[str, list[str]]]) -> str:
+    """Render the user's known people/topics for the prompt, or "" if none. The
+    display names are echoed verbatim so the model can reuse an exact spelling."""
+    if not known:
+        return ""
+    parts: list[str] = []
+    people = [p for p in (known.get("people") or []) if p]
+    topics = [t for t in (known.get("topics") or []) if t]
+    places = [pl for pl in (known.get("places") or []) if pl]
+    if people:
+        parts.append(
+            "KNOWN PEOPLE (reuse the exact spelling when this entry refers to the same "
+            "person, across scripts too):\n" + ", ".join(people)
+        )
+    if topics:
+        parts.append(
+            "KNOWN TOPICS (reuse the exact label when this entry is about the same theme):\n"
+            + ", ".join(topics)
+        )
+    if places:
+        parts.append(
+            "KNOWN PLACES (reuse the exact spelling when this entry refers to the same "
+            "location, across scripts too):\n" + ", ".join(places)
+        )
+    return "\n\n".join(parts)
+
+
+def _user_message(transcript: str, now_str: str, known_block: str = "") -> str:
+    kb = f"{known_block}\n\n" if known_block else ""
+    return f'CURRENT DATE AND TIME: {now_str}\n\n{kb}TRANSCRIPT:\n"""\n{transcript}\n"""'
 
 
 def _strip_and_parse(text: str) -> dict[str, Any]:
@@ -201,9 +248,10 @@ def _normalize(raw: dict[str, Any]) -> dict[str, Any]:
             due = due.strip() if isinstance(due, str) and due.strip() else None
             todos.append({"text": text, "dueDate": due, "time": _clean_time(item.get("time"))})
 
-    # topics / people
+    # topics / people / places
     topics = _clean_str_list(raw.get("topics"), cap=MAX_TOPICS)
     people = _clean_str_list(raw.get("people"))
+    places = _clean_str_list(raw.get("places"), cap=MAX_PLACES)
 
     return {
         "summary": summary,
@@ -211,6 +259,7 @@ def _normalize(raw: dict[str, Any]) -> dict[str, Any]:
         "todos": todos,
         "topics": topics,
         "people": people,
+        "places": places,
     }
 
 
@@ -230,7 +279,9 @@ def usage_of(response) -> dict[str, int]:
 
 
 async def extract(
-    transcript: str, now: Optional[datetime] = None
+    transcript: str,
+    now: Optional[datetime] = None,
+    known: Optional[dict[str, list[str]]] = None,
 ) -> tuple[dict[str, Any], Optional[dict[str, int]]]:
     """Extract structured data from a transcript.
 
@@ -238,6 +289,9 @@ async def extract(
         transcript: the raw spoken transcript (plain text for now).
         now: the current datetime used to resolve BOTH relative dates and times
             ("in an hour", "tonight at 8"). Defaults to now (UTC).
+        known: the user's existing {"people": [...], "topics": [...]} display names
+            (Step 17, Layer 2). Fed to the model so it reuses an existing record for
+            the same person/theme — including across scripts — instead of a near-dup.
 
     Returns:
         (result, usage) — result is a normalized dict with keys: summary,
@@ -259,8 +313,13 @@ async def extract(
     response = await client.messages.create(
         model=model,
         max_tokens=MAX_TOKENS,
-        system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": _user_message(transcript, _format_now(now))}],
+        system=EXTRACT_SYSTEM_PROMPT,
+        messages=[
+            {
+                "role": "user",
+                "content": _user_message(transcript, _format_now(now), _known_block(known)),
+            }
+        ],
     )
 
     # Concatenate any text blocks in the response.

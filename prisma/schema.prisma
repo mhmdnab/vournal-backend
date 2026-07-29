@@ -70,6 +70,7 @@ model User {
   todos         Todo[]
   topics        Topic[]
   people        Person[]
+  places        Place[]
   refreshTokens RefreshToken[]
   passwordResetTokens PasswordResetToken[]
 }
@@ -129,6 +130,7 @@ model Entry {
   todos  Todo[]
   topics EntryTopic[]
   people EntryPerson[]
+  places EntryPlace[]
 
   @@index([userId, createdAt])
   @@index([userId, status])
@@ -156,10 +158,19 @@ model Topic {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   name   String
+  // Comparison key (app.entities.normalize_name): case/whitespace/Arabic-variant
+  // folded. (userId, normalizedName) is the real uniqueness — the same surface form
+  // can't make two rows. `name` stays the display form.
+  normalizedName String
+  // Alternate display surfaces this entity also answers to (Step 17, Phase 4). A
+  // merge folds the absorbed entity's name+aliases in here so both surface forms
+  // survive; when a surface form is an alias of 2+ entities, its chip reads as
+  // ambiguous. Display strings — normalization is applied on the fly.
+  aliases String[] @default([])
 
   entries EntryTopic[]
 
-  @@unique([userId, name])
+  @@unique([userId, normalizedName])
 }
 
 model EntryTopic {
@@ -169,6 +180,7 @@ model EntryTopic {
   topic   Topic  @relation(fields: [topicId], references: [id], onDelete: Cascade)
 
   @@id([entryId, topicId])
+  @@index([topicId]) // reverse lookup: a topic's moments (thread queries)
 }
 
 model Person {
@@ -176,10 +188,13 @@ model Person {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   name   String
+  // See Topic.normalizedName — same folding, same (userId, normalizedName) key.
+  normalizedName String
+  aliases        String[] @default([]) // see Topic.aliases (Step 17, Phase 4)
 
   entries EntryPerson[]
 
-  @@unique([userId, name])
+  @@unique([userId, normalizedName])
 }
 
 model EntryPerson {
@@ -189,4 +204,31 @@ model EntryPerson {
   person   Person @relation(fields: [personId], references: [id], onDelete: Cascade)
 
   @@id([entryId, personId])
+  @@index([personId]) // reverse lookup: a person's moments (thread queries)
+}
+
+// Places mirror Person/Topic exactly (Step 17): same normalizedName folding, same
+// (userId, normalizedName) uniqueness, same known-list continuity. Forward-only —
+// old entries have no places; they populate as new entries mention locations.
+model Place {
+  id             String @id @default(cuid())
+  userId         String
+  user           User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  normalizedName String
+  aliases        String[] @default([]) // see Topic.aliases (Step 17, Phase 4)
+
+  entries EntryPlace[]
+
+  @@unique([userId, normalizedName])
+}
+
+model EntryPlace {
+  entryId String
+  entry   Entry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  placeId String
+  place   Place  @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+  @@id([entryId, placeId])
+  @@index([placeId]) // reverse lookup: a place's moments (thread queries)
 }

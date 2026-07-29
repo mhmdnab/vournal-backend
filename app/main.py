@@ -22,6 +22,14 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from app import db as database
 from app.auth import get_current_user, router as auth_router
+from app.entities import (
+    ambiguous_norm_sets,
+    known_names,
+    link_person,
+    link_place,
+    link_topic,
+)
+from app.threads import router as threads_router
 from app.extraction import extract
 from app.extraction_merged import extract_merged
 from app.quota import (
@@ -39,6 +47,7 @@ from app.storage import (
 from app.transcription import MAX_BYTES, SUPPORTED_FORMATS, looks_like_audio, transcribe
 from app.schemas import (
     CreateEntryRequest,
+    EntityChip,
     EntryOut,
     InsightsOut,
     Mood,
@@ -61,6 +70,7 @@ _ENTRY_INCLUDE = {
     "todos": True,
     "topics": {"include": {"topic": True}},
     "people": {"include": {"person": True}},
+    "places": {"include": {"place": True}},
 }
 
 
@@ -157,6 +167,7 @@ app.add_middleware(
 
 # /auth/register, /login, /refresh, /logout, /me
 app.include_router(auth_router)
+app.include_router(threads_router)
 
 
 @app.get("/health")
@@ -240,10 +251,32 @@ async def _owned_entry_or_404(entry_id: str, user_id: str):
     return entry
 
 
-def _to_entry_out(entry: Any) -> EntryOut:
-    """Assemble an EntryOut from a Prisma entry (with relations included)."""
-    topics = [et.topic.name for et in (entry.topics or []) if et.topic]
-    people = [ep.person.name for ep in (entry.people or []) if ep.person]
+def _chips(links, attr: str, kind: str, ambiguous: set[str]) -> list[EntityChip]:
+    """Turn included join rows into tappable chips. A chip is ambiguous when its
+    entity's normalized name is shared by 2+ entities of the kind (`ambiguous`)."""
+    out: list[EntityChip] = []
+    for link in links or []:
+        ent = getattr(link, attr, None)
+        if ent is None:
+            continue
+        out.append(
+            EntityChip(
+                id=ent.id,
+                kind=kind,
+                name=ent.name,
+                ambiguous=ent.normalizedName in ambiguous,
+            )
+        )
+    return out
+
+
+def _to_entry_out(entry: Any, ambiguous: dict[str, set[str]] | None = None) -> EntryOut:
+    """Assemble an EntryOut from a Prisma entry (with relations included).
+
+    `ambiguous` (from entities.ambiguous_norm_sets) marks chips whose surface form
+    is shared by 2+ entities; pass it on the endpoints that render chips (detail,
+    create) and omit it where they aren't shown (the timeline list)."""
+    amb = ambiguous or {}
     todos = [
         TodoOut(id=t.id, text=t.text, dueDate=t.dueDate, startAt=t.startAt, done=t.done)
         for t in (entry.todos or [])
@@ -260,8 +293,9 @@ def _to_entry_out(entry: Any) -> EntryOut:
             emotions=entry.emotions or [],
         ),
         todos=todos,
-        topics=topics,
-        people=people,
+        topics=_chips(entry.topics, "topic", "topics", amb.get("topics", set())),
+        people=_chips(entry.people, "person", "people", amb.get("people", set())),
+        places=_chips(entry.places, "place", "places", amb.get("places", set())),
         audioUrl=entry.audioUrl,
         durationSec=entry.durationSec,
         rawTranscript=entry.rawTranscript,
@@ -303,9 +337,14 @@ async def process_transcript(
     user = await db.user.find_unique(where={"id": user_id})
     tz = _user_tz(user.timezone if user else None)
 
+    # Feed the user's existing people/topics to the model (Step 17, Layer 2) so it
+    # reuses an existing record for the same person/theme — including across scripts
+    # (بلال -> Bilal) — instead of minting a near-duplicate.
+    known = await known_names(db, user_id)
+
     extract_fn = extract_merged if use_merged else extract
     try:
-        result, usage = await extract_fn(transcript, now=datetime.now(tz))
+        result, usage = await extract_fn(transcript, now=datetime.now(tz), known=known)
     except Exception as exc:  # noqa: BLE001 — record any failure, never crash the caller
         await db.entry.update(
             where={"id": entry_id},
@@ -341,21 +380,17 @@ async def process_transcript(
             }
         )
 
-    # Upsert topics (per-user unique) and link them to this entry.
+    # Upsert topics/people by their NORMALIZED key (Step 17, Layer 1) and link them
+    # to this entry. Normalization folds case/whitespace/Arabic variants so the same
+    # surface form can't fragment into two rows.
     for name in result["topics"]:
-        topic = await db.topic.upsert(
-            where={"userId_name": {"userId": user_id, "name": name}},
-            data={"create": {"userId": user_id, "name": name}, "update": {"name": name}},
-        )
-        await db.entrytopic.create(data={"entryId": entry_id, "topicId": topic.id})
+        await link_topic(db, user_id, entry_id, name)
 
-    # Upsert people (per-user unique) and link them to this entry.
     for name in result["people"]:
-        person = await db.person.upsert(
-            where={"userId_name": {"userId": user_id, "name": name}},
-            data={"create": {"userId": user_id, "name": name}, "update": {"name": name}},
-        )
-        await db.entryperson.create(data={"entryId": entry_id, "personId": person.id})
+        await link_person(db, user_id, entry_id, name)
+
+    for name in result.get("places", []):
+        await link_place(db, user_id, entry_id, name)
 
 
 async def process_audio_entry(entry_id: str) -> None:
@@ -444,7 +479,9 @@ async def create_entry(body: CreateEntryRequest, current=Depends(get_current_use
     # audio path (POST /entries/audio) runs it in the background instead.
     await process_transcript(entry.id, body.transcript)
 
-    return _to_entry_out(await _load_entry(entry.id))
+    return _to_entry_out(
+        await _load_entry(entry.id), await ambiguous_norm_sets(db, current.id)
+    )
 
 
 @app.post("/entries/audio", response_model=EntryOut)
@@ -519,7 +556,8 @@ async def list_entries(limit: int = 20, current=Depends(get_current_user)):
 
 @app.get("/entries/{entry_id}", response_model=EntryOut)
 async def get_entry(entry_id: str, current=Depends(get_current_user)):
-    return _to_entry_out(await _owned_entry_or_404(entry_id, current.id))
+    entry = await _owned_entry_or_404(entry_id, current.id)
+    return _to_entry_out(entry, await ambiguous_norm_sets(db, current.id))
 
 
 @app.delete("/entries/{entry_id}", status_code=204)
@@ -571,7 +609,9 @@ async def delete_entry_audio(entry_id: str, current=Depends(get_current_user)):
     if entry.audioUrl:
         await delete_audio(entry.audioUrl)
         await db.entry.update(where={"id": entry_id}, data={"audioUrl": None})
-    return _to_entry_out(await _load_entry(entry_id))
+    return _to_entry_out(
+        await _load_entry(entry_id), await ambiguous_norm_sets(db, current.id)
+    )
 
 
 # ---- Todos -------------------------------------------------------------------
