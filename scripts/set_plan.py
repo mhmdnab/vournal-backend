@@ -9,7 +9,7 @@ automatically.
 Usage:
     python scripts/set_plan.py <email> <plan> [days]
 
-    plan   free | daily | reflection
+    plan   free | plus
     days   optional integer offset for planExpiresAt (now + days).
              - omit        -> no expiry (a lifetime/manual grant)
              - 30          -> expires in 30 days
@@ -17,8 +17,8 @@ Usage:
            Ignored for `free`, which clears the plan + expiry.
 
 Examples:
-    python scripts/set_plan.py demo@voicejournal.local reflection 30
-    python scripts/set_plan.py demo@voicejournal.local daily 30
+    python scripts/set_plan.py demo@voicejournal.local plus 30
+    python scripts/set_plan.py demo@voicejournal.local plus
     python scripts/set_plan.py demo@voicejournal.local free
 """
 

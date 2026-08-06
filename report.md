@@ -1236,6 +1236,10 @@ returns `daily`; the length guard `413`s per plan (free >90 s, daily >120 s, ref
 features that `reflection` gates** come in a later step — today the tiers differ only by
 these caps.
 
+> **Superseded (Step 17, §6n):** this three-tier split was later collapsed to **two**
+> — `free` (now 40 entries) + `plus` (~$4/mo) — since the premium AI features that
+> justified a third tier aren't built yet. The entitlement machinery is unchanged.
+
 ## 6m. Step 15 — Toward TestFlight: entitlement UI, deploy wiring, build prep
 
 Step 14 built entitlements in the backend but left them invisible: the clients
@@ -1303,6 +1307,103 @@ exposure is the only residual, and single-use + short TTL neutralize it.
 usage string was already present). What remains is entirely off-machine: the Render/
 Vercel/Resend env values, Apple Developer enrollment, then `eas build -p ios
 --profile production` → `eas submit`.
+
+## 6n. Step 17 — The life index (self-structuring threads)
+
+The differentiator, and the reason to use Vournal over a chatbot: a persistent,
+browsable record of the **people, topics, and places** in one life — every mention
+becomes a **thread** you can open (its moments, the arc of how you felt), with **no
+manual tagging, ever**. The graph already existed in the DB (`Topic`/`Person` +
+join tables + per-entry mood); this step made it trustworthy, added Places, and
+surfaced it. Four phases, each to a STOP; shipped to prod. Now live end to end.
+
+### Phase 1 — Entity resolution (do it first — threads are worthless on fragmented data)
+
+If "bilal", "Bilal", and "بِلال" become three people, every thread splits and every
+count lies. Two layers:
+- **Layer 1 — deterministic normalization** (`app/entities.normalize_name`): NFKC →
+  lowercase → strip Arabic tashkeel/tatweel → fold Arabic letter variants → collapse
+  whitespace. `(userId, normalizedName)` becomes the unique key, so the same surface
+  form can't make two rows. Migrated **expand → backfill → contract** (migrations 5–6
+  + `scripts/backfill_normalized_names.py`, which uses the *same* Python normalizer,
+  so a SQL `lower()` backfill can't disagree with runtime and spawn duplicates). It
+  can't merge across scripts (بلال and Bilal normalize differently) — that's Layer 2.
+- **Layer 2 — the model reuses known names.** Each extraction is fed the user's
+  existing people/topics/places (top ~40 by frequency+recency) as a *known list*,
+  instructed to reuse an existing name on a clear match — **including across scripts**
+  (بلال → the existing `Bilal`) — and to bias conservative (a duplicate is far better
+  than fusing two real people). Verified: an Arabic بلال with only Latin `Bilal` known
+  routes onto `Bilal`; a genuinely new name still creates a new entity.
+
+### Phase 2 — Threads API
+
+**Places became first-class** (migration 7: `Place` + `EntryPlace` mirroring
+`Person`/`Topic`, same normalization/known-list machinery; extraction extended to
+capture named locations), plus **reverse indexes** on the join FKs so per-thread
+queries don't scan. Two endpoints, user-scoped, grouped (no N+1): `GET /threads`
+(the index — each thread's span, moment count, and a mood-series sparkline, sorted
+by relevance) and `GET /threads/{kind}/{id}` (one thread — span, average mood, and
+ordered moments). Places are forward-only (old entries have none).
+
+### Phase 3 — The Life screen + nav restructure
+
+Bottom nav is now **Home · Journal · Life · To-Do · Calendar**; **Profile moved off
+the bar to a header avatar** (a single door, not a burger). **Insights folded into
+the top of Life** (mood trend first). The Life index is a **People / Topics /
+Places** segmented list — name, span, and a mood sparkline; threads under ~3 moments
+are hidden as noise. The signature visual is the **thread's mood line**: a smooth
+Catmull-Rom curve, one dot per moment coloured by that entry's mood, no axes — the
+*shape of a relationship*, not a chart; tapping a dot scrolls to that moment, and the
+timeline below opens the entry.
+
+### Phase 4 — Tappable chips + correction (non-blocking)
+
+Every person/topic/place chip is **tappable app-wide** (entry detail, capture reveal)
+→ opens its thread; the entry now serialises chips as `{id, kind, name, ambiguous}`.
+Correction is available, never demanded (the entry always saved with the AI's best
+guess):
+- **Aliases** (migration 8, `String[]` on each entity) let one person answer to more
+  than one surface form; a form shared by 2+ entities marks its chip **ambiguous**
+  (dashed border + `?`).
+- Tapping an ambiguous chip opens a **disambiguation sheet** — candidates with
+  distinguishing context (moment count, top topics, most recent), plus "Someone new"
+  and "They're the same — merge".
+- From a thread, **long-press a moment → move it to another thread**.
+- **All correction is non-destructive** — merge/move/split reassign the join links
+  and never touch an entry; a merge folds the absorbed name in as an alias so both
+  surface forms survive.
+
+### Alongside — two fixes that came out of testing
+
+- **Appointment capture.** The extractor was intention-only ("I need to…"), so
+  "I have a meeting with Ahmad today" produced no todo and nothing on the calendar.
+  Broadened it to also capture **scheduled commitments/plans** (meetings, appointments,
+  seeing someone) as dated items — with a time if one is spoken — while keeping the
+  restraint (no past events, no hypotheticals, no invention). Verified: that entry now
+  yields "Meeting with Ahmad" (today) + "Coffee with Bilal" (tomorrow).
+- **Each screen stands on its own.** The bottom tabs were being *pushed* onto the
+  stack, so the iOS left-edge swipe popped back into the previously-visited tab. Fixed
+  with `gestureEnabled: false` + tab navigation via `replace` (no accumulated tab
+  history). Detail screens keep their explicit "← Journal"/"← Life" links.
+
+### Pricing — simplified to two tiers
+
+The three-tier plan (free / daily / reflection) was over-engineered for a product
+whose premium AI features aren't built yet, so it was **collapsed to two** (migration
+9, enum `{free, plus}` — any old daily/reflection user maps to `plus`):
+
+| tier | entries/mo | recording | price |
+| --- | --- | --- | --- |
+| **free** | 40 | 90 s | $0 |
+| **plus** | 150 | 300 s (5 min) | **~$4/mo** |
+
+`free` is deliberately generous (40 ≈ a daily habit) because the life index only
+becomes compelling once it has volume — capping too low blocks the very behaviour
+that converts. `plus` is the single paid plan; the entitlement machinery is unchanged
+(`effective_plan` + `plan`/`planExpiresAt`), so wiring payments later is just a
+webhook that sets `plus`. Measured API cost is **~1¢ per voice entry** (Sonnet
+extraction dominates, STT is minor), so ~40 entries × 10 users ≈ **$4–5/month** —
+one `plus` subscriber covers it.
 
 ## 7. Environment decisions worth knowing
 

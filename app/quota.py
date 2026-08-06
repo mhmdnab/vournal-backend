@@ -21,36 +21,32 @@ from datetime import datetime, timezone
 
 from fastapi import HTTPException
 
-from app.entitlements import DAILY, FREE, REFLECTION, effective_plan
+from app.entitlements import FREE, PLUS, effective_plan
 
 log = logging.getLogger("vournal.quota")
 
-# Per-user monthly entry limits, by EFFECTIVE plan (Step 14a-fix — final pricing):
-#   free       — a low cap, so the free tier can't run up cost.
-#   daily      — sized for one entry a day with headroom; a fair-use CEILING, not
-#                a target, that stops a bot/heavy recorder from inverting economics.
-#   reflection — same generous ceiling as daily (its edge is AI features + length).
-FREE_MONTHLY_ENTRY_LIMIT = int(os.environ.get("FREE_MONTHLY_ENTRY_LIMIT", "15"))
-DAILY_MONTHLY_ENTRY_LIMIT = int(os.environ.get("DAILY_MONTHLY_ENTRY_LIMIT", "150"))
-REFLECTION_MONTHLY_ENTRY_LIMIT = int(os.environ.get("REFLECTION_MONTHLY_ENTRY_LIMIT", "150"))
+# Per-user monthly entry limits, by EFFECTIVE plan:
+#   free — generous enough to form a ~daily habit and let the life index fill up
+#          (that's what converts), while still bounding cost.
+#   plus — a fair-use CEILING, not a target: high enough to feel unlimited, low
+#          enough to stop a bot/heavy recorder from inverting unit economics.
+FREE_MONTHLY_ENTRY_LIMIT = int(os.environ.get("FREE_MONTHLY_ENTRY_LIMIT", "40"))
+PLUS_MONTHLY_ENTRY_LIMIT = int(os.environ.get("PLUS_MONTHLY_ENTRY_LIMIT", "150"))
 
-# Longest recording accepted (seconds), rejected before any provider call — per
-# plan: free a short ceiling, daily a bit longer, reflection the longest.
+# Longest recording accepted (seconds), rejected before any provider call — free a
+# short ceiling, plus the long one.
 FREE_MAX_RECORDING_SECONDS = int(os.environ.get("FREE_MAX_RECORDING_SECONDS", "90"))  # 1.5 min
-DAILY_MAX_RECORDING_SECONDS = int(os.environ.get("DAILY_MAX_RECORDING_SECONDS", "120"))  # 2 min
-REFLECTION_MAX_RECORDING_SECONDS = int(os.environ.get("REFLECTION_MAX_RECORDING_SECONDS", "300"))  # 5 min
+PLUS_MAX_RECORDING_SECONDS = int(os.environ.get("PLUS_MAX_RECORDING_SECONDS", "300"))  # 5 min
 
 # Per-plan lookup tables (keyed by the effective plan string; FREE is the fallback
 # for any unexpected value — fail to the tightest caps).
 _MONTHLY_ENTRY_LIMIT = {
     FREE: FREE_MONTHLY_ENTRY_LIMIT,
-    DAILY: DAILY_MONTHLY_ENTRY_LIMIT,
-    REFLECTION: REFLECTION_MONTHLY_ENTRY_LIMIT,
+    PLUS: PLUS_MONTHLY_ENTRY_LIMIT,
 }
 _MAX_RECORDING_SECONDS = {
     FREE: FREE_MAX_RECORDING_SECONDS,
-    DAILY: DAILY_MAX_RECORDING_SECONDS,
-    REFLECTION: REFLECTION_MAX_RECORDING_SECONDS,
+    PLUS: PLUS_MAX_RECORDING_SECONDS,
 }
 
 # Whole-app daily cap on NEW audio entries — the kill switch (plan-independent).

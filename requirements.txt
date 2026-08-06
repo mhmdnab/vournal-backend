@@ -13,6 +13,9 @@ python-multipart>=0.0.9,<1.0  # multipart/form-data for audio upload
 # transitively by openai/anthropic; pin it directly since we call it ourselves.
 httpx>=0.27,<1.0
 
+# Cloudflare R2 (S3-compatible) for audio storage — SigV4 signing + presigned URLs.
+boto3>=1.34,<2.0
+
 # Auth (Step 5). bcrypt directly (passlib is unmaintained since 2020 and warns
 # against bcrypt 4.1+); PyJWT for stateless access tokens.
 bcrypt>=4.1,<5.0

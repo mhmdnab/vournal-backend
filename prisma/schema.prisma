@@ -28,14 +28,13 @@ enum ProcessingStatus {
   FAILED
 }
 
-// Subscription tiers (Step 14a-fix — final pricing). Lowercase to match what the
-// API returns and the clients gate on. `free` is the default for everyone;
-// `daily` is the $3/mo · $30/yr plan; `reflection` is the $10/mo · $96/yr plan the
-// premium AI features gate on.
+// Subscription tiers. Lowercase to match what the API returns and the clients gate
+// on. Two tiers only: `free` (the default for everyone) and `plus` — the single
+// paid plan (~$4/mo: longer recordings, higher caps, and the premium AI features
+// when they land). Collapsed from the old free/daily/reflection split.
 enum Plan {
   free
-  daily
-  reflection
+  plus
 }
 
 model User {

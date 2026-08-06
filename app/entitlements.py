@@ -14,16 +14,15 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 # The tiers. Keep in lockstep with the Prisma `Plan` enum.
-#   free       — $0
-#   daily      — $3/mo · $30/yr
-#   reflection — $10/mo · $96/yr (gates the AI features, built later)
+#   free — $0, the default for everyone
+#   plus — ~$4/mo: the single paid plan (longer recordings, higher caps, and the
+#          premium AI features when they land)
 FREE = "free"
-DAILY = "daily"
-REFLECTION = "reflection"
-PLANS = (FREE, DAILY, REFLECTION)
+PLUS = "plus"
+PLANS = (FREE, PLUS)
 
-# The paid tiers (both lift the free caps).
-PAID_PLANS = (DAILY, REFLECTION)
+# The paid tier (lifts the free caps).
+PAID_PLANS = (PLUS,)
 
 
 def _plan_str(value) -> str:
