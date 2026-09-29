@@ -609,9 +609,9 @@ probe whether someone else's id exists.
   `RefreshToken` model (`tokenHash @unique`, `expiresAt`, `revoked`).
 - **The demo account was converted into a real login, not deleted** — its ~29
   test entries are preserved, and it's signable-in as
-  `demo@voicejournal.local` / `vournal-demo-2026` (via
-  `scripts/set_demo_password.py`). This is the spec's "attach existing data to a
-  real account" option.
+  `demo@voicejournal.local` with a password set by
+  `scripts/set_demo_password.py` (the password is not recorded in this repo).
+  This is the spec's "attach existing data to a real account" option.
 - Fixing this needed `prisma generate`, which surfaced the **stale venv
   shebangs** — so those were **permanently repaired** (the long-standing
   housekeeping item); `.venv/bin/uvicorn`, `prisma`, etc. now work directly.
@@ -700,8 +700,9 @@ entries** (bearer token attached by the shared client), Arabic right-aligned.
 
 ### Notes / follow-ups from Step 5
 
-- **Demo account converted to a real login** (see §7): `demo@voicejournal.local` /
-  `vournal-demo-2026` — a dev default; change or delete before real use.
+- **Demo account converted to a real login** (see §7): `demo@voicejournal.local`.
+  Its original password was committed to this repo and must be treated as
+  public: change it or delete the account before real use.
 - The mobile tsconfig's broad `include` was pulling the **web-only**
   `tokenStore.ts` into the RN typecheck; removed it — `@shared` imports are still
   checked transitively.
