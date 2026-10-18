@@ -85,6 +85,16 @@ Output only the JSON object, nothing else."""
 EXTRACT_SYSTEM_PROMPT = SYSTEM_PROMPT + KNOWN_NAMES_ADDENDUM
 
 
+def _enhanced_prompt(base: str) -> str:
+    from app.enhancements import enabled
+
+    if not enabled():
+        return base
+    from app.task_intelligence import PROMPT
+
+    return base + PROMPT
+
+
 def _format_now(now: datetime) -> str:
     """A human, model-friendly reference for resolving relative dates AND times,
     e.g. "2026-07-20 14:30 (Monday, Asia/Beirut, UTC+03:00)". The weekday helps
@@ -127,7 +137,9 @@ def _known_block(known: Optional[dict[str, list[str]]]) -> str:
 
 def _user_message(transcript: str, now_str: str, known_block: str = "") -> str:
     kb = f"{known_block}\n\n" if known_block else ""
-    return f'CURRENT DATE AND TIME: {now_str}\n\n{kb}TRANSCRIPT:\n"""\n{transcript}\n"""'
+    return (
+        f'CURRENT DATE AND TIME: {now_str}\n\n{kb}TRANSCRIPT:\n"""\n{transcript}\n"""'
+    )
 
 
 def _strip_and_parse(text: str) -> dict[str, Any]:
@@ -164,7 +176,9 @@ def _strip_and_parse(text: str) -> dict[str, Any]:
     return {}
 
 
-def _clean_str_list(value: Any, *, lower: bool = False, cap: Optional[int] = None) -> list[str]:
+def _clean_str_list(
+    value: Any, *, lower: bool = False, cap: Optional[int] = None
+) -> list[str]:
     """Coerce an arbitrary value into a clean list of non-empty strings."""
     if not isinstance(value, list):
         return []
@@ -246,7 +260,25 @@ def _normalize(raw: dict[str, Any]) -> dict[str, Any]:
                 continue
             due = item.get("dueDate")
             due = due.strip() if isinstance(due, str) and due.strip() else None
-            todos.append({"text": text, "dueDate": due, "time": _clean_time(item.get("time"))})
+            todo = {"text": text, "dueDate": due, "time": _clean_time(item.get("time"))}
+            from app.enhancements import enabled
+
+            if enabled():
+                # Preserve the model's evidence only until transcript-bound validation.
+                todo.update(
+                    {
+                        key: item.get(key)
+                        for key in (
+                            "sourceText",
+                            "kind",
+                            "category",
+                            "location",
+                            "recurrence",
+                            "recurrenceInterval",
+                        )
+                    }
+                )
+            todos.append(todo)
 
     # topics / people / places
     topics = _clean_str_list(raw.get("topics"), cap=MAX_TOPICS)
@@ -313,11 +345,13 @@ async def extract(
     response = await client.messages.create(
         model=model,
         max_tokens=MAX_TOKENS,
-        system=EXTRACT_SYSTEM_PROMPT,
+        system=_enhanced_prompt(EXTRACT_SYSTEM_PROMPT),
         messages=[
             {
                 "role": "user",
-                "content": _user_message(transcript, _format_now(now), _known_block(known)),
+                "content": _user_message(
+                    transcript, _format_now(now), _known_block(known)
+                ),
             }
         ],
     )

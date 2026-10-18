@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import List, Literal, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # Deliberately permissive — real validation is the DB unique constraint + login.
 # Using our own regex avoids pulling in pydantic's EmailStr / email-validator dep.
@@ -51,7 +51,9 @@ class RegisterRequest(BaseModel):
     @classmethod
     def _valid_password(cls, v: str) -> str:
         if len(v) < MIN_PASSWORD_LEN:
-            raise ValueError(f"Password must be at least {MIN_PASSWORD_LEN} characters.")
+            raise ValueError(
+                f"Password must be at least {MIN_PASSWORD_LEN} characters."
+            )
         return v
 
     @field_validator("timezone")
@@ -94,7 +96,9 @@ class ResetPasswordRequest(BaseModel):
     @classmethod
     def _valid_password(cls, v: str) -> str:
         if len(v) < MIN_PASSWORD_LEN:
-            raise ValueError(f"Password must be at least {MIN_PASSWORD_LEN} characters.")
+            raise ValueError(
+                f"Password must be at least {MIN_PASSWORD_LEN} characters."
+            )
         return v
 
 
@@ -115,11 +119,33 @@ class TokenResponse(BaseModel):
     accessToken: str
     refreshToken: str
     tokenType: str = "bearer"
+    recoveryCodes: Optional[List[str]] = None
+
+
+class AuthChallengeOut(BaseModel):
+    challengeToken: str
+    step: Literal["verify_email", "enroll_totp", "verify_totp"]
+    expiresAt: datetime
+    secret: Optional[str] = None
+    provisioningUri: Optional[str] = None
+
+
+class VerifyChallengeRequest(BaseModel):
+    challengeToken: str
+    code: str
+
+    @field_validator("code")
+    @classmethod
+    def _bound_code(cls, value: str) -> str:
+        if len(value) > 100:
+            raise ValueError("Code too long")
+        return value.strip()
 
 
 class UsageOut(BaseModel):
     """Live entitlement usage for the plan/usage surface — all derived from the
     effective plan (app.quota.usage_snapshot), so it matches what's enforced."""
+
     monthlyLimit: int
     monthlyUsed: int
     maxRecordingSeconds: int
@@ -154,6 +180,57 @@ class UpdateTodoRequest(BaseModel):
     done: bool
 
 
+class TaskDetailsRequest(BaseModel):
+    date: Optional[str] = None
+    time: Optional[str] = None
+    urgency: Optional[int] = Field(default=None, ge=0, le=3)
+    category: Optional[
+        Literal[
+            "work", "health", "family", "finance", "personal", "learning", "errands"
+        ]
+    ] = None
+    location: Optional[str] = Field(default=None, max_length=200)
+    recurrence: Optional[Literal["daily", "weekly", "monthly", "yearly"]] = None
+    recurrenceInterval: Optional[int] = Field(default=None, ge=1, le=365)
+    recurrenceUntil: Optional[datetime] = None
+    calendarRequested: Optional[bool] = None
+    remindersRequested: Optional[bool] = None
+    dismiss: List[Literal["date", "time", "urgency", "recurrence"]] = []
+
+    @field_validator("date")
+    @classmethod
+    def _date(cls, v):
+        if v is not None:
+            from datetime import date
+
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
+                raise ValueError("Use YYYY-MM-DD")
+            date.fromisoformat(v)
+        return v
+
+    @field_validator("time")
+    @classmethod
+    def _time(cls, v):
+        if v is not None and not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", v):
+            raise ValueError("Use HH:MM (24 hour)")
+        return v
+
+    @field_validator("recurrenceUntil")
+    @classmethod
+    def _aware(cls, v):
+        if v is not None and v.tzinfo is None:
+            raise ValueError("recurrenceUntil needs a timezone")
+        return v
+
+    @model_validator(mode="after")
+    def _no_null_values(self):
+        nullable = {"date", "time", "location", "recurrence", "recurrenceUntil"}
+        for name in self.model_fields_set - nullable:
+            if getattr(self, name) is None:
+                raise ValueError(f"{name} cannot be null")
+        return self
+
+
 # ---- Responses ---------------------------------------------------------------
 
 
@@ -163,7 +240,20 @@ class Mood(BaseModel):
     emotions: List[str] = []
 
 
-class TodoOut(BaseModel):
+class TaskMetadata(BaseModel):
+    kind: str = "task"
+    urgency: int = 0
+    category: str = "personal"
+    location: Optional[str] = None
+    recurrence: Optional[str] = None
+    recurrenceInterval: int = 1
+    recurrenceUntil: Optional[datetime] = None
+    calendarRequested: bool = False
+    remindersRequested: bool = False
+    followUps: List[dict] = []
+
+
+class TodoOut(TaskMetadata):
     id: str
     text: str
     dueDate: Optional[datetime] = None
@@ -171,7 +261,7 @@ class TodoOut(BaseModel):
     done: bool
 
 
-class TodoListItem(BaseModel):
+class TodoListItem(TaskMetadata):
     """A todo in the standalone list — carries its source entry for linking."""
 
     id: str
@@ -190,6 +280,7 @@ class EntityChip(BaseModel):
     entity id + kind so the chip can open its thread; `ambiguous` is true when this
     surface form is shared by 2+ entities of the kind, so the client can offer a
     disambiguation sheet instead of navigating."""
+
     id: str
     kind: ThreadKind
     name: str
@@ -245,6 +336,7 @@ class InsightsOut(BaseModel):
 
 class ThreadSummary(BaseModel):
     """One row of the life index — a person/topic/place and the shape of its arc."""
+
     id: str
     kind: ThreadKind
     name: str
@@ -257,6 +349,7 @@ class ThreadSummary(BaseModel):
 
 class ThreadMoment(BaseModel):
     """One appearance of a thread — an entry it was mentioned in."""
+
     entryId: str
     date: datetime
     moodScore: Optional[int] = None
@@ -265,6 +358,7 @@ class ThreadMoment(BaseModel):
 
 class ThreadDetail(BaseModel):
     """One thread opened up: its span, average mood, and ordered moments."""
+
     id: str
     kind: ThreadKind
     name: str
@@ -281,6 +375,7 @@ class ThreadDetail(BaseModel):
 class DisambiguationCandidate(BaseModel):
     """One entity a shared surface form could mean — with context that actually
     distinguishes it (so "Which Karim?" is answerable)."""
+
     id: str
     name: str
     momentCount: int
@@ -303,6 +398,7 @@ class MoveMomentRequest(BaseModel):
     """Reassign one moment (entry) off this thread onto another. Exactly one of
     toId (an existing thread) or toName (create/find one) — with an optional alias
     to attach (the surface form being split off, so ambiguity forms correctly)."""
+
     toId: Optional[str] = None
     toName: Optional[str] = None
     alias: Optional[str] = None

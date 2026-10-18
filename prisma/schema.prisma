@@ -44,6 +44,11 @@ model User {
   // OAuth-only accounts (Apple/Google, a later step) can exist without a
   // password. Registration always sets it; login rejects null-password users.
   passwordHash String?
+  emailVerifiedAt DateTime?
+  twoFactorSecret String?
+  twoFactorEnabled Boolean @default(false)
+  twoFactorLastStep Int @default(-1)
+  recoveryCodeHashes String[] @default([])
   // IANA timezone name (e.g. "Asia/Beirut"), sent by the client on register.
   // null = UTC fallback. Used to compose spoken clock times into the correct UTC
   // instant and to bucket the mood trend by the user's local day.
@@ -72,6 +77,39 @@ model User {
   places        Place[]
   refreshTokens RefreshToken[]
   passwordResetTokens PasswordResetToken[]
+  authChallenges AuthChallenge[]
+  externalIdentities ExternalIdentity[]
+}
+
+// Prepared for credentialed provider adapters; identity is issuer+subject,
+// never an email address or a client-asserted user id.
+model ExternalIdentity {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  issuer String
+  subject String
+  createdAt DateTime @default(now())
+
+  @@unique([issuer, subject])
+  @@index([userId])
+}
+
+// Local enhancement challenges. Raw tokens/codes are never stored here.
+model AuthChallenge {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String @unique
+  purpose String
+  codeHash String?
+  pendingSecret String?
+  attempts Int @default(0)
+  expiresAt DateTime
+  usedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, purpose])
 }
 
 // Password-reset tokens (Step 11). Like refresh tokens, only the SHA-256 hash is
@@ -98,6 +136,7 @@ model RefreshToken {
   tokenHash String   @unique
   expiresAt DateTime
   revoked   Boolean  @default(false)
+  mfaVerified Boolean @default(false)
   createdAt DateTime @default(now())
 
   @@index([userId])
@@ -146,6 +185,18 @@ model Todo {
   startAt   DateTime? // dueDate + a spoken time; null = untimed. Timed items are
   //           the ones that become calendar events (next step).
   done      Boolean   @default(false)
+  kind String @default("task")
+  urgency Int @default(0)
+  urgencyUnclear Boolean @default(false)
+  category String @default("personal")
+  location String?
+  recurrence String?
+  recurrenceUnclear Boolean @default(false)
+  recurrenceInterval Int @default(1)
+  recurrenceUntil DateTime?
+  calendarRequested Boolean @default(false)
+  remindersRequested Boolean @default(false)
+  dismissedQuestions String[] @default([])
   createdAt DateTime  @default(now())
 
   @@index([userId, done])

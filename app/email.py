@@ -33,7 +33,13 @@ async def _send(to: str, subject: str, html: str, text: str) -> bool:
             resp = await client.post(
                 RESEND_ENDPOINT,
                 headers={"Authorization": f"Bearer {api_key}"},
-                json={"from": sender, "to": [to], "subject": subject, "html": html, "text": text},
+                json={
+                    "from": sender,
+                    "to": [to],
+                    "subject": subject,
+                    "html": html,
+                    "text": text,
+                },
             )
         if resp.status_code >= 400:
             log.error("Resend send failed (%s): %s", resp.status_code, resp.text[:300])
@@ -64,3 +70,8 @@ async def send_password_reset(to: str, reset_url: str, ttl_minutes: int) -> bool
         "</div>"
     )
     return await _send(to, subject, html, text)
+
+
+async def send_verification_code(to: str, code: str) -> bool:
+    text = f"Your Vournal verification code is {code}. It expires in 10 minutes."
+    return await _send(to, "Verify your Vournal email", f"<p>{text}</p>", text)

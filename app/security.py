@@ -87,13 +87,14 @@ def verify_password(password: str, password_hash: Optional[str]) -> bool:
 # ---- Access tokens (JWT) -----------------------------------------------------
 
 
-def create_access_token(user_id: str) -> str:
+def create_access_token(user_id: str, mfa_verified: bool = False) -> str:
     now = _now()
     payload = {
         "sub": user_id,
         "type": "access",
         "iat": now,
         "exp": now + _access_ttl(),
+        "amr": ["pwd", "otp"] if mfa_verified else ["pwd"],
     }
     return jwt.encode(payload, _secret(), algorithm=_JWT_ALG)
 
@@ -105,6 +106,10 @@ def decode_access_token(token: str) -> Optional[str]:
     except jwt.PyJWTError:
         return None
     if payload.get("type") != "access":
+        return None
+    from app.enhancements import enabled
+
+    if enabled() and payload.get("amr") != ["pwd", "otp"]:
         return None
     sub = payload.get("sub")
     return sub if isinstance(sub, str) else None

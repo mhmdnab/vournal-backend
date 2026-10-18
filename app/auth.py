@@ -20,6 +20,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
 from app import email, security
+from app.enhancements import enabled, require_enabled
 from app.db import db
 from app.entitlements import effective_plan
 from app.quota import usage_snapshot
@@ -37,6 +38,8 @@ from app.schemas import (
     UpdateMeRequest,
     UsageOut,
     UserOut,
+    AuthChallengeOut,
+    VerifyChallengeRequest,
 )
 
 # Password-reset token lifetime, and the web app base used to build reset links.
@@ -45,6 +48,7 @@ RESET_TTL_MIN = int(os.environ.get("RESET_TOKEN_TTL_MIN", "30"))
 
 def _web_base() -> str:
     return (os.environ.get("WEB_BASE_URL") or "http://localhost:3000").rstrip("/")
+
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -72,23 +76,185 @@ async def get_current_user(authorization: Optional[str] = Header(default=None)):
     return user
 
 
-async def _issue_tokens(user_id: str) -> TokenResponse:
+async def _issue_tokens(
+    user_id: str, mfa_verified: bool = False, client=None
+) -> TokenResponse:
     """Mint an access JWT and persist a new (hashed) refresh token."""
+    if enabled() and not mfa_verified:
+        raise HTTPException(
+            403, "Complete email verification and two-factor authentication."
+        )
     raw_refresh = security.generate_refresh_token()
-    await db.refreshtoken.create(
+    await (client or db).refreshtoken.create(
         data={
             "userId": user_id,
             "tokenHash": security.hash_refresh_token(raw_refresh),
             "expiresAt": security.refresh_expiry(),
+            **({"mfaVerified": True} if mfa_verified else {}),
         }
     )
     return TokenResponse(
-        accessToken=security.create_access_token(user_id),
+        accessToken=security.create_access_token(user_id, mfa_verified),
         refreshToken=raw_refresh,
     )
 
 
-@router.post("/register", response_model=TokenResponse)
+async def _begin_challenge(user) -> AuthChallengeOut:
+    from app import mfa
+
+    raw = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    # Only the latest challenge per account is valid, including across processes.
+    async with db.tx() as tx:
+        await tx.query_raw('SELECT id FROM "User" WHERE id = $1 FOR UPDATE', user.id)
+        user = await tx.user.find_unique(where={"id": user.id})
+        if user is None:
+            raise HTTPException(401, "Invalid email or password.")
+        step = (
+            "verify_email"
+            if user.emailVerifiedAt is None
+            else "verify_totp" if user.twoFactorEnabled else "enroll_totp"
+        )
+        secret = mfa.new_secret() if step == "enroll_totp" else None
+        code = f"{secrets.randbelow(1_000_000):06d}" if step == "verify_email" else None
+        await tx.authchallenge.update_many(
+            where={"userId": user.id, "usedAt": None}, data={"usedAt": now}
+        )
+        await tx.authchallenge.create(
+            data={
+                "userId": user.id,
+                "tokenHash": security.hash_refresh_token(raw),
+                "purpose": step,
+                "expiresAt": now + timedelta(minutes=10),
+                "codeHash": mfa.digest(f"{raw}:{code}", "email") if code else None,
+                "pendingSecret": mfa.encrypt(secret) if secret else None,
+            }
+        )
+    if code:
+        # Local runner replaces delivery with a private local mailbox file.
+        sent = await email.send_verification_code(user.email, code)
+        if not sent:
+            raise HTTPException(
+                503, "Verification email could not be sent. Sign in to retry."
+            )
+    return AuthChallengeOut(
+        challengeToken=raw,
+        step=step,
+        expiresAt=now + timedelta(minutes=10),
+        secret=secret,
+        provisioningUri=mfa.provisioning_uri(secret, user.email) if secret else None,
+    )
+
+
+@router.post("/challenge/verify", response_model=TokenResponse | AuthChallengeOut)
+@limiter.limit("20/15 minutes")
+async def verify_challenge(request: Request, body: VerifyChallengeRequest):
+    require_enabled()
+    from app import mfa
+    import hmac
+
+    token_hash = security.hash_refresh_token(body.challengeToken)
+    now = datetime.now(timezone.utc)
+    user = None
+    purpose = None
+    recovery_codes = None
+    valid = False
+    # Serialize attempts, consumption, TOTP replay protection and recovery-code
+    # consumption. Invalid attempts commit before the generic error is returned.
+    preliminary = await db.authchallenge.find_unique(where={"tokenHash": token_hash})
+    if preliminary is None:
+        raise HTTPException(
+            400, "Invalid or expired code. After five attempts, sign in again."
+        )
+    async with db.tx() as tx:
+        # Same lock order as _begin_challenge: user, then challenge.
+        await tx.query_raw(
+            'SELECT id FROM "User" WHERE id = $1 FOR UPDATE', preliminary.userId
+        )
+        await tx.query_raw(
+            'SELECT id FROM "AuthChallenge" WHERE "tokenHash" = $1 FOR UPDATE',
+            token_hash,
+        )
+        challenge = await tx.authchallenge.find_unique(where={"tokenHash": token_hash})
+        if (
+            challenge
+            and challenge.usedAt is None
+            and challenge.expiresAt > now
+            and challenge.attempts < 5
+        ):
+            await tx.authchallenge.update(
+                where={"id": challenge.id}, data={"attempts": {"increment": 1}}
+            )
+            user = await tx.user.find_unique(where={"id": challenge.userId})
+            purpose = challenge.purpose
+            changes = {}
+            if purpose == "verify_email":
+                valid = hmac.compare_digest(
+                    challenge.codeHash or "",
+                    mfa.digest(f"{body.challengeToken}:{body.code}", "email"),
+                )
+                changes = {"emailVerifiedAt": now}
+            elif (
+                purpose in {"enroll_totp", "verify_totp"}
+                and user.emailVerifiedAt
+                and (purpose != "enroll_totp" or not user.twoFactorEnabled)
+            ):
+                encrypted = (
+                    challenge.pendingSecret
+                    if purpose == "enroll_totp"
+                    else user.twoFactorSecret
+                )
+                step = (
+                    mfa.verify(
+                        mfa.decrypt(encrypted), body.code, user.twoFactorLastStep
+                    )
+                    if encrypted
+                    else None
+                )
+                valid = step is not None
+                if valid:
+                    changes["twoFactorLastStep"] = step
+                    if purpose == "enroll_totp":
+                        recovery_codes = [secrets.token_hex(8) for _ in range(8)]
+                        changes.update(
+                            twoFactorEnabled=True,
+                            twoFactorSecret=encrypted,
+                            recoveryCodeHashes=[
+                                mfa.digest(c, "recovery") for c in recovery_codes
+                            ],
+                        )
+                elif purpose == "verify_totp":
+                    recovery_hash = mfa.digest(body.code, "recovery")
+                    matched = next(
+                        (
+                            c
+                            for c in user.recoveryCodeHashes
+                            if hmac.compare_digest(c, recovery_hash)
+                        ),
+                        None,
+                    )
+                    if matched:
+                        valid = True
+                        changes["recoveryCodeHashes"] = [
+                            c for c in user.recoveryCodeHashes if c != matched
+                        ]
+            if valid:
+                user = await tx.user.update(where={"id": user.id}, data=changes)
+                await tx.authchallenge.update(
+                    where={"id": challenge.id}, data={"usedAt": now}
+                )
+    if not valid:
+        raise HTTPException(
+            400, "Invalid or expired code. After five attempts, sign in again."
+        )
+    if purpose == "verify_email":
+        return await _begin_challenge(user)
+    tokens = await _issue_tokens(user.id, mfa_verified=True)
+    tokens.recoveryCodes = recovery_codes
+    return tokens
+
+
+@router.post("/register", response_model=TokenResponse | AuthChallengeOut)
 @limiter.limit("3/hour")  # per IP — signups are rare; this stops account-spam
 async def register(request: Request, body: RegisterRequest):
     # RegisterRequest already normalized/validated email + password length.
@@ -105,10 +271,12 @@ async def register(request: Request, body: RegisterRequest):
             "timezone": body.timezone,
         }
     )
+    if enabled():
+        return await _begin_challenge(user)
     return await _issue_tokens(user.id)
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse | AuthChallengeOut)
 @limiter.limit("5/15 minutes")  # per IP
 async def login(request: Request, body: LoginRequest):
     email = body.email.strip().lower()
@@ -121,11 +289,15 @@ async def login(request: Request, body: LoginRequest):
     # the account has no password (OAuth-only / legacy) — never reveal which.
     if user is None or not security.verify_password(body.password, user.passwordHash):
         raise HTTPException(401, "Invalid email or password.")
+    if enabled():
+        return await _begin_challenge(user)
     return await _issue_tokens(user.id)
 
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh(body: RefreshRequest):
+    if enabled():
+        return await _refresh_enhanced(body.refreshToken)
     token_hash = security.hash_refresh_token(body.refreshToken)
     stored = await db.refreshtoken.find_unique(where={"tokenHash": token_hash})
 
@@ -144,9 +316,38 @@ async def refresh(body: RefreshRequest):
         )
         raise HTTPException(401, "Invalid or expired refresh token.")
 
+    if enabled() and not stored.mfaVerified:
+        raise HTTPException(401, "Sign in again to complete two-factor authentication.")
+
     # Rotate: the presented token is now spent (revoked); a fresh pair is issued.
     await db.refreshtoken.update(where={"id": stored.id}, data={"revoked": True})
-    return await _issue_tokens(stored.userId)
+    return await _issue_tokens(stored.userId, mfa_verified=enabled())
+
+
+async def _refresh_enhanced(raw: str) -> TokenResponse:
+    token_hash = security.hash_refresh_token(raw)
+    now = datetime.now(timezone.utc)
+    tokens = None
+    async with db.tx() as tx:
+        await tx.query_raw(
+            'SELECT id FROM "RefreshToken" WHERE "tokenHash" = $1 FOR UPDATE',
+            token_hash,
+        )
+        stored = await tx.refreshtoken.find_unique(where={"tokenHash": token_hash})
+        if stored and stored.expiresAt > now and stored.mfaVerified:
+            if stored.revoked:
+                await tx.refreshtoken.update_many(
+                    where={"userId": stored.userId, "revoked": False},
+                    data={"revoked": True},
+                )
+            else:
+                await tx.refreshtoken.update(
+                    where={"id": stored.id}, data={"revoked": True}
+                )
+                tokens = await _issue_tokens(stored.userId, True, tx)
+    if tokens is None:
+        raise HTTPException(401, "Invalid or expired refresh token. Sign in again.")
+    return tokens
 
 
 @router.post("/logout")
@@ -233,7 +434,8 @@ async def forgot_password(request: Request, body: ForgotPasswordRequest):
                 data={
                     "userId": user.id,
                     "tokenHash": security.hash_refresh_token(raw),
-                    "expiresAt": datetime.now(timezone.utc) + timedelta(minutes=RESET_TTL_MIN),
+                    "expiresAt": datetime.now(timezone.utc)
+                    + timedelta(minutes=RESET_TTL_MIN),
                 }
             )
             reset_url = f"{_web_base()}/reset-password?token={raw}"
@@ -258,6 +460,10 @@ async def reset_password(body: ResetPasswordRequest):
         data={"passwordHash": security.hash_password(body.newPassword)},
     )
     await db.passwordresettoken.update(where={"id": stored.id}, data={"usedAt": now})
+    if enabled():
+        await db.authchallenge.update_many(
+            where={"userId": stored.userId, "usedAt": None}, data={"usedAt": now}
+        )
     # Every existing session is now stale — revoke all refresh tokens.
     await db.refreshtoken.update_many(
         where={"userId": stored.userId, "revoked": False}, data={"revoked": True}

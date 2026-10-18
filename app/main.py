@@ -13,7 +13,15 @@ from typing import Any, List, Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dotenv import load_dotenv
-from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import (
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
@@ -22,6 +30,8 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from app import db as database
 from app.auth import get_current_user, router as auth_router
+from app.enhancements import enabled as enhancements_enabled
+from app.oauth import router as oauth_router
 from app.entities import (
     ambiguous_norm_sets,
     known_names,
@@ -56,7 +66,9 @@ from app.schemas import (
     TodoListItem,
     TodoOut,
     UpdateTodoRequest,
+    TaskDetailsRequest,
 )
+from app.task_intelligence import metadata_out, normalize_metadata
 
 # Load environment variables from a local .env file if present.
 load_dotenv()
@@ -77,6 +89,7 @@ _ENTRY_INCLUDE = {
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Connect the Prisma client on startup, disconnect on shutdown."""
+    enhancements_enabled()  # fail before any database access if isolation is invalid
     await database.connect()
     # Reap orphaned jobs: extraction runs in in-process BackgroundTasks, which do
     # NOT survive a restart/deploy. Any entry still PENDING/PROCESSING at boot
@@ -92,7 +105,9 @@ async def lifespan(app: FastAPI):
             },
         )
         if reaped:
-            log.warning("Reaped %d orphaned PENDING/PROCESSING entries on boot.", reaped)
+            log.warning(
+                "Reaped %d orphaned PENDING/PROCESSING entries on boot.", reaped
+            )
     except Exception:  # noqa: BLE001 — never block startup on the reaper
         log.exception("Orphan reaper failed on boot")
     try:
@@ -103,7 +118,11 @@ async def lifespan(app: FastAPI):
 
 # API reference is OFF by default (don't expose the schema in prod). Enable in dev
 # with ENABLE_DOCS=1.
-_DOCS_ON = (os.environ.get("ENABLE_DOCS", "") or "").strip().lower() in {"1", "true", "yes"}
+_DOCS_ON = (os.environ.get("ENABLE_DOCS", "") or "").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+}
 app = FastAPI(
     title="Vournal Backend",
     lifespan=lifespan,
@@ -167,6 +186,7 @@ app.add_middleware(
 
 # /auth/register, /login, /refresh, /logout, /me
 app.include_router(auth_router)
+app.include_router(oauth_router)
 app.include_router(threads_router)
 
 
@@ -278,7 +298,14 @@ def _to_entry_out(entry: Any, ambiguous: dict[str, set[str]] | None = None) -> E
     create) and omit it where they aren't shown (the timeline list)."""
     amb = ambiguous or {}
     todos = [
-        TodoOut(id=t.id, text=t.text, dueDate=t.dueDate, startAt=t.startAt, done=t.done)
+        TodoOut(
+            id=t.id,
+            text=t.text,
+            dueDate=t.dueDate,
+            startAt=t.startAt,
+            done=t.done,
+            **metadata_out(t),
+        )
         for t in (entry.todos or [])
     ]
     return EntryOut(
@@ -345,7 +372,9 @@ async def process_transcript(
     extract_fn = extract_merged if use_merged else extract
     try:
         result, usage = await extract_fn(transcript, now=datetime.now(tz), known=known)
-    except Exception as exc:  # noqa: BLE001 — record any failure, never crash the caller
+    except (
+        Exception
+    ) as exc:  # noqa: BLE001 — record any failure, never crash the caller
         await db.entry.update(
             where={"id": entry_id},
             data={"status": "FAILED", "error": str(exc), "processedAt": _now()},
@@ -377,6 +406,11 @@ async def process_transcript(
                 "text": todo["text"],
                 "dueDate": _parse_due(todo.get("dueDate")),
                 "startAt": _compose_start_at(todo.get("dueDate"), todo.get("time"), tz),
+                **(
+                    normalize_metadata(todo, transcript)
+                    if enhancements_enabled()
+                    else {}
+                ),
             }
         )
 
@@ -520,8 +554,8 @@ async def create_audio_entry(
     if not looks_like_audio(data):
         raise HTTPException(status_code=400, detail="Uploaded file is not valid audio.")
 
-    await check_global_daily_cap(db)            # kill switch (whole app)
-    await reserve_entry_quota(db, current)      # per-user monthly limit
+    await check_global_daily_cap(db)  # kill switch (whole app)
+    await reserve_entry_quota(db, current)  # per-user monthly limit
 
     # Create the PENDING entry first so we have an id to name the file by.
     entry = await db.entry.create(
@@ -648,6 +682,7 @@ async def list_todos(done: Optional[bool] = None, current=Depends(get_current_us
             startAt=t.startAt,
             done=t.done,
             entryId=t.entryId,
+            **metadata_out(t),
         )
         for t in todos
     ]
@@ -667,6 +702,70 @@ async def update_todo(
         dueDate=todo.dueDate,
         startAt=todo.startAt,
         done=todo.done,
+        **metadata_out(todo),
+    )
+
+
+@app.patch("/todos/{todo_id}/details", response_model=TodoOut)
+async def update_task_details(
+    todo_id: str, body: TaskDetailsRequest, current=Depends(get_current_user)
+):
+    from app.enhancements import require_enabled
+
+    require_enabled()
+    task = await db.todo.find_unique(where={"id": todo_id})
+    if task is None or task.userId != current.id:
+        raise HTTPException(404, "Todo not found")
+    fields = body.model_fields_set
+    data = {key: getattr(body, key) for key in fields - {"date", "time", "dismiss"}}
+    if "urgency" in fields:
+        data["urgencyUnclear"] = False
+    if "recurrence" in fields:
+        data["recurrenceUnclear"] = False
+    tz = _user_tz(current.timezone)
+    if "date" in fields or "time" in fields:
+        day = (
+            body.date
+            if "date" in fields
+            else task.dueDate.date().isoformat() if task.dueDate else None
+        )
+        clock = (
+            body.time
+            if "time" in fields
+            else task.startAt.astimezone(tz).strftime("%H:%M") if task.startAt else None
+        )
+        if clock and not day:
+            raise HTTPException(422, "Choose a date before adding a time.")
+        start = _compose_start_at(day, clock, tz)
+        if (
+            start
+            and start.astimezone(tz).strftime("%Y-%m-%d %H:%M") != f"{day} {clock}"
+        ):
+            raise HTTPException(
+                422, "That time does not exist in your timezone. Choose another time."
+            )
+        if start:
+            local = datetime.fromisoformat(f"{day}T{clock}").replace(tzinfo=tz)
+            if local.replace(fold=0).utcoffset() != local.replace(fold=1).utcoffset():
+                raise HTTPException(
+                    422,
+                    "That time occurs twice during the clock change. Choose an unambiguous time.",
+                )
+        data.update(dueDate=_parse_due(day), startAt=start)
+    until = data.get("recurrenceUntil", task.recurrenceUntil)
+    anchor = data.get("startAt", task.startAt) or data.get("dueDate", task.dueDate)
+    if until and anchor and until < anchor:
+        raise HTTPException(422, "The repeat end must be after the first occurrence.")
+    # Explicit dismissal is persistent; no fabricated answer is written.
+    data["dismissedQuestions"] = list(set(task.dismissedQuestions + body.dismiss))
+    task = await db.todo.update(where={"id": todo_id}, data=data)
+    return TodoOut(
+        id=task.id,
+        text=task.text,
+        dueDate=task.dueDate,
+        startAt=task.startAt,
+        done=task.done,
+        **metadata_out(task),
     )
 
 

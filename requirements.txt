@@ -23,3 +23,6 @@ PyJWT>=2.8,<3.0
 
 # Rate limiting (Step 11). In-memory per-IP; resets on deploy (single-instance ok).
 slowapi>=0.1.9,<1.0
+
+# Local enhancement branch: authenticated encryption for authenticator secrets.
+cryptography>=43,<47
