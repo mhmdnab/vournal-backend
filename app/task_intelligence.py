@@ -136,9 +136,12 @@ def normalize_metadata(item: dict, transcript: str) -> dict:
 def questions(task) -> list[dict]:
     dismissed = set(getattr(task, "dismissedQuestions", []) or [])
     output = []
-    if (task.kind == "event" or task.recurrence) and not task.dueDate:
+    calendar_requested = getattr(task, "calendarRequested", False)
+    if (
+        task.kind == "event" or calendar_requested or task.recurrence
+    ) and not task.dueDate:
         output.append({"field": "date", "question": f"What date is “{task.text}” for?"})
-    if task.kind == "event" and not task.startAt:
+    if (task.kind == "event" or calendar_requested) and not task.startAt:
         output.append({"field": "time", "question": f"What time is “{task.text}”?"})
     if task.urgencyUnclear:
         output.append(
@@ -167,6 +170,8 @@ def metadata_out(task) -> dict:
         "urgency",
         "category",
         "location",
+        "locationLatitude",
+        "locationLongitude",
         "recurrence",
         "recurrenceInterval",
         "recurrenceUntil",

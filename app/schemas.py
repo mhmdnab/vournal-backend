@@ -190,6 +190,12 @@ class TaskDetailsRequest(BaseModel):
         ]
     ] = None
     location: Optional[str] = Field(default=None, max_length=200)
+    locationLatitude: Optional[float] = Field(
+        default=None, ge=-90, le=90, allow_inf_nan=False
+    )
+    locationLongitude: Optional[float] = Field(
+        default=None, ge=-180, le=180, allow_inf_nan=False
+    )
     recurrence: Optional[Literal["daily", "weekly", "monthly", "yearly"]] = None
     recurrenceInterval: Optional[int] = Field(default=None, ge=1, le=365)
     recurrenceUntil: Optional[datetime] = None
@@ -224,10 +230,24 @@ class TaskDetailsRequest(BaseModel):
 
     @model_validator(mode="after")
     def _no_null_values(self):
-        nullable = {"date", "time", "location", "recurrence", "recurrenceUntil"}
+        nullable = {
+            "date",
+            "time",
+            "location",
+            "locationLatitude",
+            "locationLongitude",
+            "recurrence",
+            "recurrenceUntil",
+        }
         for name in self.model_fields_set - nullable:
             if getattr(self, name) is None:
                 raise ValueError(f"{name} cannot be null")
+        coordinates = {"locationLatitude", "locationLongitude"}
+        supplied = self.model_fields_set & coordinates
+        if supplied and supplied != coordinates:
+            raise ValueError("Provide both location coordinates together")
+        if (self.locationLatitude is None) != (self.locationLongitude is None):
+            raise ValueError("Provide or clear both location coordinates together")
         return self
 
 
@@ -245,6 +265,8 @@ class TaskMetadata(BaseModel):
     urgency: int = 0
     category: str = "personal"
     location: Optional[str] = None
+    locationLatitude: Optional[float] = None
+    locationLongitude: Optional[float] = None
     recurrence: Optional[str] = None
     recurrenceInterval: int = 1
     recurrenceUntil: Optional[datetime] = None

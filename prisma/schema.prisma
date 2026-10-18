@@ -190,6 +190,8 @@ model Todo {
   urgencyUnclear Boolean @default(false)
   category String @default("personal")
   location String?
+  locationLatitude Float?
+  locationLongitude Float?
   recurrence String?
   recurrenceUnclear Boolean @default(false)
   recurrenceInterval Int @default(1)
