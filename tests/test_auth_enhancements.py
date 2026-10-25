@@ -31,6 +31,7 @@ class Primitives(unittest.TestCase):
             mfa.digest("123456", "email"), mfa.digest("123456", "recovery")
         )
 
+    @patch.dict(os.environ, {"VOURNAL_ENHANCEMENTS": "1"})
     def test_refuse_remote_or_non_dedicated_database(self):
         with patch.dict(os.environ, DATABASE_URL="postgresql://localhost/production"):
             with self.assertRaises(RuntimeError):
@@ -67,11 +68,13 @@ class AuthIntegration(unittest.IsolatedAsyncioTestCase):
                     from app.extraction import _normalize
 
                     todo = _normalize({"todos": [{"text": "Legacy task"}]})["todos"][0]
-                    self.assertEqual(set(todo), {"text", "dueDate", "time"})
+                    self.assertLessEqual({"text", "dueDate", "time"}, set(todo))
+                    self.assertIn("sourceText", todo)
         finally:
             await db.user.delete_many(where={"email": address})
             await db.disconnect()
 
+    @patch.dict(os.environ, {"VOURNAL_ENHANCEMENTS": "1"})
     async def test_email_totp_recovery_refresh_and_lockout(self):
         self.assertTrue(enabled())
         from app.db import db

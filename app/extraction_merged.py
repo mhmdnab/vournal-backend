@@ -49,7 +49,7 @@ from app.extraction import (
     _strip_and_parse,
     _user_message,
     usage_of,
-    _enhanced_prompt,
+    _with_task_prompt,
 )
 
 DEFAULT_MERGED_MODEL = "claude-sonnet-5"
@@ -100,7 +100,7 @@ async def extract_merged(
     response = await client.messages.create(
         model=model,
         max_tokens=MAX_TOKENS,
-        system=_enhanced_prompt(MERGED_SYSTEM_PROMPT),
+        system=_with_task_prompt(MERGED_SYSTEM_PROMPT),
         # Off by default on Sonnet 5 it is NOT — disable it explicitly; thinking
         # tokens bill as output and defeat the whole point (see module docstring).
         thinking={"type": "disabled"},

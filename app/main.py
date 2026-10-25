@@ -406,11 +406,7 @@ async def process_transcript(
                 "text": todo["text"],
                 "dueDate": _parse_due(todo.get("dueDate")),
                 "startAt": _compose_start_at(todo.get("dueDate"), todo.get("time"), tz),
-                **(
-                    normalize_metadata(todo, transcript)
-                    if enhancements_enabled()
-                    else {}
-                ),
+                **normalize_metadata(todo, transcript),
             }
         )
 
@@ -710,9 +706,6 @@ async def update_todo(
 async def update_task_details(
     todo_id: str, body: TaskDetailsRequest, current=Depends(get_current_user)
 ):
-    from app.enhancements import require_enabled
-
-    require_enabled()
     task = await db.todo.find_unique(where={"id": todo_id})
     if task is None or task.userId != current.id:
         raise HTTPException(404, "Todo not found")

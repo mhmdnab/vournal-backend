@@ -270,8 +270,6 @@ class TaskMetadata(BaseModel):
     recurrence: Optional[str] = None
     recurrenceInterval: int = 1
     recurrenceUntil: Optional[datetime] = None
-    calendarRequested: bool = False
-    remindersRequested: bool = False
     followUps: List[dict] = []
 
 

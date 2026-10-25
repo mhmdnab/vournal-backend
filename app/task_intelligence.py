@@ -161,10 +161,8 @@ def questions(task) -> list[dict]:
 
 
 def metadata_out(task) -> dict:
-    from app.enhancements import enabled
-
-    if not enabled():
-        return {}
+    # calendarRequested/remindersRequested stay in the DB but aren't sent: Apple
+    # copies are automatic again (build 4 behaviour), so clients must not see them.
     keys = (
         "kind",
         "urgency",
@@ -175,8 +173,6 @@ def metadata_out(task) -> dict:
         "recurrence",
         "recurrenceInterval",
         "recurrenceUntil",
-        "calendarRequested",
-        "remindersRequested",
     )
     return {**{key: getattr(task, key) for key in keys}, "followUps": questions(task)}
 

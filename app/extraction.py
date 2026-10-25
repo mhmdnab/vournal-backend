@@ -85,11 +85,9 @@ Output only the JSON object, nothing else."""
 EXTRACT_SYSTEM_PROMPT = SYSTEM_PROMPT + KNOWN_NAMES_ADDENDUM
 
 
-def _enhanced_prompt(base: str) -> str:
-    from app.enhancements import enabled
-
-    if not enabled():
-        return base
+def _with_task_prompt(base: str) -> str:
+    """The base prompt plus the per-task metadata instructions (urgency, place,
+    repeat, kind) shared by both extraction paths."""
     from app.task_intelligence import PROMPT
 
     return base + PROMPT
@@ -261,23 +259,20 @@ def _normalize(raw: dict[str, Any]) -> dict[str, Any]:
             due = item.get("dueDate")
             due = due.strip() if isinstance(due, str) and due.strip() else None
             todo = {"text": text, "dueDate": due, "time": _clean_time(item.get("time"))}
-            from app.enhancements import enabled
-
-            if enabled():
-                # Preserve the model's evidence only until transcript-bound validation.
-                todo.update(
-                    {
-                        key: item.get(key)
-                        for key in (
-                            "sourceText",
-                            "kind",
-                            "category",
-                            "location",
-                            "recurrence",
-                            "recurrenceInterval",
-                        )
-                    }
-                )
+            # Preserve the model's evidence only until transcript-bound validation.
+            todo.update(
+                {
+                    key: item.get(key)
+                    for key in (
+                        "sourceText",
+                        "kind",
+                        "category",
+                        "location",
+                        "recurrence",
+                        "recurrenceInterval",
+                    )
+                }
+            )
             todos.append(todo)
 
     # topics / people / places
@@ -345,7 +340,7 @@ async def extract(
     response = await client.messages.create(
         model=model,
         max_tokens=MAX_TOKENS,
-        system=_enhanced_prompt(EXTRACT_SYSTEM_PROMPT),
+        system=_with_task_prompt(EXTRACT_SYSTEM_PROMPT),
         messages=[
             {
                 "role": "user",
