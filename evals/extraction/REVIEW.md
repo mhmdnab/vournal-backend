@@ -49,7 +49,7 @@ Should the app ask a question? **no**
 
 | to-do (keywords) | day | time | urgency | place | repeat | kind |
 |---|---|---|---|---|---|---|
-| garage / مرآب / كاراج / كراج | — | — | 1 | — | — | task |
+| garage / مرآب / كاراج / كراج / غراج | — | — | 1 | — | — | task |
 
 Should the app ask a question? **no**
 
@@ -59,7 +59,7 @@ Should the app ask a question? **no**
 
 | to-do (keywords) | day | time | urgency | place | repeat | kind |
 |---|---|---|---|---|---|---|
-| grocer / vegetable / produce / خضار / خضرة / khodra | 2026-10-29 | — | 0 | — | — | task |
+| grocer / vegetable / produce / خضار / خضرة / khodra / خضرا | 2026-10-29 | — | 0 | — | — | task |
 
 Should the app ask a question? **no**
 
@@ -208,7 +208,7 @@ Should the app ask a question? **no**
 
 | to-do (keywords) | day | time | urgency | place | repeat | kind |
 |---|---|---|---|---|---|---|
-| garage / مرآب / كاراج / كراج | — | — | 1 | — | — | task |
+| garage / مرآب / كاراج / كراج / غراج | — | — | 1 | — | — | task |
 
 Should the app ask a question? **no**
 
@@ -220,7 +220,7 @@ Should the app ask a question? **no**
 
 | to-do (keywords) | day | time | urgency | place | repeat | kind |
 |---|---|---|---|---|---|---|
-| grocer / vegetable / produce / خضار / خضرة / khodra | 2026-10-29 | — | 0 | — | — | task |
+| grocer / vegetable / produce / خضار / خضرة / khodra / خضرا | 2026-10-29 | — | 0 | — | — | task |
 
 Should the app ask a question? **no**
 
@@ -387,7 +387,7 @@ Should the app ask a question? **no**
 
 | to-do (keywords) | day | time | urgency | place | repeat | kind |
 |---|---|---|---|---|---|---|
-| garage / مرآب / كاراج / كراج | — | — | 1 | — | — | task |
+| garage / مرآب / كاراج / كراج / غراج | — | — | 1 | — | — | task |
 
 Should the app ask a question? **no**
 
@@ -399,7 +399,7 @@ Should the app ask a question? **no**
 
 | to-do (keywords) | day | time | urgency | place | repeat | kind |
 |---|---|---|---|---|---|---|
-| grocer / vegetable / produce / خضار / خضرة / khodra | 2026-10-29 | — | 0 | — | — | task |
+| grocer / vegetable / produce / خضار / خضرة / khodra / خضرا | 2026-10-29 | — | 0 | — | — | task |
 
 Should the app ask a question? **no**
 
@@ -566,7 +566,7 @@ Should the app ask a question? **no**
 
 | to-do (keywords) | day | time | urgency | place | repeat | kind |
 |---|---|---|---|---|---|---|
-| garage / مرآب / كاراج / كراج | — | — | 1 | — | — | task |
+| garage / مرآب / كاراج / كراج / غراج | — | — | 1 | — | — | task |
 
 Should the app ask a question? **no**
 
@@ -578,7 +578,7 @@ Should the app ask a question? **no**
 
 | to-do (keywords) | day | time | urgency | place | repeat | kind |
 |---|---|---|---|---|---|---|
-| grocer / vegetable / produce / خضار / خضرة / khodra | 2026-10-29 | — | 0 | — | — | task |
+| grocer / vegetable / produce / خضار / خضرة / khodra / خضرا | 2026-10-29 | — | 0 | — | — | task |
 
 Should the app ask a question? **no**
 

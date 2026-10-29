@@ -1,0 +1,1017 @@
+{
+ "summary": {
+  "ar": {
+   "dueDate": 100.0,
+   "time": 100.0,
+   "urgency": 100.0,
+   "location": 100.0,
+   "recurrence": 100.0,
+   "kind": 100.0,
+   "questions": 100.0,
+   "recall": 100.0,
+   "extra": 0
+  },
+  "en": {
+   "dueDate": 100.0,
+   "time": 100.0,
+   "urgency": 100.0,
+   "location": 100.0,
+   "recurrence": 100.0,
+   "kind": 100.0,
+   "questions": 100.0,
+   "recall": 100.0,
+   "extra": 0
+  }
+ },
+ "cost": 0.043324299999999996,
+ "rows": [
+  {
+   "id": "en-01",
+   "lang": "en",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "I have a meeting with Ahmad tomorrow at 3pm at the office.",
+    "mood": {
+     "score": 3,
+     "label": "neutral",
+     "emotions": []
+    },
+    "todos": [
+     {
+      "text": "Meeting with Ahmad",
+      "dueDate": "2026-10-29",
+      "time": "15:00",
+      "sourceText": "I have a meeting with Ahmad tomorrow at 3pm at the office",
+      "kind": "event",
+      "category": "work",
+      "location": "the office",
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "urgency": 0
+     }
+    ],
+    "topics": [
+     "work"
+    ],
+    "people": [
+     "Ahmad"
+    ],
+    "places": [
+     "the office"
+    ]
+   },
+   "todos": [
+    {
+     "text": "Meeting with Ahmad",
+     "dueDate": "2026-10-29",
+     "time": "15:00",
+     "kind": "event",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "work",
+     "location": "the office",
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 97,
+    "outTokens": 271,
+    "cacheWriteTokens": 3801
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "en-02",
+   "lang": "en",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "I have a dentist appointment on Friday.",
+    "mood": {
+     "score": 3,
+     "label": "neutral",
+     "emotions": []
+    },
+    "todos": [
+     {
+      "text": "Dentist appointment",
+      "dueDate": "2026-10-30",
+      "time": null,
+      "sourceText": "I have a dentist appointment on Friday",
+      "kind": "event",
+      "category": "health",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "urgency": 0
+     }
+    ],
+    "topics": [
+     "health"
+    ],
+    "people": [],
+    "places": []
+   },
+   "todos": [
+    {
+     "text": "Dentist appointment",
+     "dueDate": "2026-10-30",
+     "time": null,
+     "kind": "event",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "health",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": [
+      "time"
+     ]
+    }
+   ],
+   "usage": {
+    "inTokens": 85,
+    "outTokens": 167,
+    "cacheReadTokens": 3801
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "en-04",
+   "lang": "en",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "I need to renew my passport tomorrow, it's urgent.",
+    "mood": {
+     "score": 3,
+     "label": "stressed but determined",
+     "emotions": [
+      "urgent",
+      "stressed"
+     ]
+    },
+    "todos": [
+     {
+      "text": "Renew passport",
+      "dueDate": "2026-10-29",
+      "time": null,
+      "sourceText": "I really need to renew my passport tomorrow, it's urgent.",
+      "kind": "task",
+      "category": "personal",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": "it's urgent",
+      "urgency": 3
+     }
+    ],
+    "topics": [
+     "travel"
+    ],
+    "people": [],
+    "places": []
+   },
+   "todos": [
+    {
+     "text": "Renew passport",
+     "dueDate": "2026-10-29",
+     "time": null,
+     "kind": "task",
+     "urgency": 3,
+     "urgencyUnclear": false,
+     "category": "personal",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 92,
+    "outTokens": 196,
+    "cacheReadTokens": 3801
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "en-07",
+   "lang": "en",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "I have to pay the rent soon.",
+    "mood": {
+     "score": 3,
+     "label": "neutral",
+     "emotions": []
+    },
+    "todos": [
+     {
+      "text": "Pay rent",
+      "dueDate": null,
+      "time": null,
+      "sourceText": "I have to pay the rent soon, it's important.",
+      "kind": "task",
+      "category": "finance",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": "it's important",
+      "urgency": null
+     }
+    ],
+    "topics": [
+     "money"
+    ],
+    "people": [],
+    "places": []
+   },
+   "todos": [
+    {
+     "text": "Pay rent",
+     "dueDate": null,
+     "time": null,
+     "kind": "task",
+     "urgency": 0,
+     "urgencyUnclear": true,
+     "category": "finance",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": [
+      "urgency"
+     ]
+    }
+   ],
+   "usage": {
+    "inTokens": 86,
+    "outTokens": 162,
+    "cacheReadTokens": 3801
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "en-08",
+   "lang": "en",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "I plan to go to the gym every Monday and Thursday at 7am.",
+    "mood": {
+     "score": 3,
+     "label": "neutral",
+     "emotions": []
+    },
+    "todos": [
+     {
+      "text": "Go to the gym",
+      "dueDate": "2026-10-29",
+      "time": "07:00",
+      "sourceText": "Gym every Monday and Thursday at 7am.",
+      "kind": "event",
+      "category": "health",
+      "location": null,
+      "recurrence": {
+       "freq": "weekly",
+       "interval": 1,
+       "weekdays": [
+        "MO",
+        "TH"
+       ],
+       "until": null
+      },
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "urgency": 0
+     }
+    ],
+    "topics": [
+     "health"
+    ],
+    "people": [],
+    "places": [
+     "the gym"
+    ]
+   },
+   "todos": [
+    {
+     "text": "Go to the gym",
+     "dueDate": "2026-10-29",
+     "time": "07:00",
+     "kind": "event",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "health",
+     "location": null,
+     "recurrence": "weekly",
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [
+      "MO",
+      "TH"
+     ],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 88,
+    "outTokens": 289,
+    "cacheReadTokens": 3801
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      0,
+      0
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      0,
+      0
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      0,
+      0
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "en-10",
+   "lang": "en",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "I want to water the plants every so often.",
+    "mood": {
+     "score": 3,
+     "label": "neutral",
+     "emotions": []
+    },
+    "todos": [
+     {
+      "text": "Water the plants",
+      "dueDate": null,
+      "time": null,
+      "sourceText": "I want to water the plants every so often",
+      "kind": "task",
+      "category": "personal",
+      "location": null,
+      "recurrence": "unclear",
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "urgency": 0
+     }
+    ],
+    "topics": [
+     "home"
+    ],
+    "people": [],
+    "places": []
+   },
+   "todos": [
+    {
+     "text": "Water the plants",
+     "dueDate": null,
+     "time": null,
+     "kind": "task",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "personal",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": true,
+     "questions": [
+      "recurrence"
+     ]
+    }
+   ],
+   "usage": {
+    "inTokens": 82,
+    "outTokens": 157,
+    "cacheReadTokens": 3801
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      0,
+      0
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "en-11",
+   "lang": "en",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "I met Sara for coffee yesterday and it was lovely.",
+    "mood": {
+     "score": 5,
+     "label": "pleasant and content",
+     "emotions": [
+      "happy",
+      "content"
+     ]
+    },
+    "todos": [],
+    "topics": [
+     "friendship"
+    ],
+    "people": [
+     "Sara"
+    ],
+    "places": []
+   },
+   "todos": [],
+   "usage": {
+    "inTokens": 92,
+    "outTokens": 92,
+    "cacheReadTokens": 3801
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      0,
+      0
+     ],
+     "time": [
+      0,
+      0
+     ],
+     "urgency": [
+      0,
+      0
+     ],
+     "location": [
+      0,
+      0
+     ],
+     "recurrence": [
+      0,
+      0
+     ],
+     "kind": [
+      0,
+      0
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 0
+   }
+  },
+  {
+   "id": "en-13",
+   "lang": "en",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "Tomorrow I have a client call, need to send the invoice, pick up my sister from school, and on Saturday I have dinner with Omar at Em Sherif.",
+    "mood": {
+     "score": 3,
+     "label": "neutral and organized",
+     "emotions": []
+    },
+    "todos": [
+     {
+      "text": "Client call",
+      "dueDate": "2026-10-29",
+      "time": "10:00",
+      "sourceText": "Tomorrow I have a client call at 10",
+      "kind": "event",
+      "category": "work",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "urgency": 0
+     },
+     {
+      "text": "Send the invoice",
+      "dueDate": "2026-10-29",
+      "time": null,
+      "sourceText": "I need to send the invoice",
+      "kind": "task",
+      "category": "work",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "urgency": 0
+     },
+     {
+      "text": "Pick up sister from school",
+      "dueDate": "2026-10-29",
+      "time": "16:00",
+      "sourceText": "pick up my sister from school at 4",
+      "kind": "task",
+      "category": "family",
+      "location": "school",
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "urgency": 0
+     },
+     {
+      "text": "Dinner with Omar",
+      "dueDate": "2026-10-31",
+      "time": "20:00",
+      "sourceText": "on Saturday dinner with Omar at Em Sherif at 8pm",
+      "kind": "event",
+      "category": "personal",
+      "location": "Em Sherif",
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "urgency": 0
+     }
+    ],
+    "topics": [
+     "work",
+     "family",
+     "relationship"
+    ],
+    "people": [
+     "sister",
+     "Omar"
+    ],
+    "places": [
+     "Em Sherif"
+    ]
+   },
+   "todos": [
+    {
+     "text": "Client call",
+     "dueDate": "2026-10-29",
+     "time": "10:00",
+     "kind": "event",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "work",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    },
+    {
+     "text": "Send the invoice",
+     "dueDate": "2026-10-29",
+     "time": null,
+     "kind": "task",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "work",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    },
+    {
+     "text": "Pick up sister from school",
+     "dueDate": "2026-10-29",
+     "time": "16:00",
+     "kind": "task",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "family",
+     "location": "school",
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    },
+    {
+     "text": "Dinner with Omar",
+     "dueDate": "2026-10-31",
+     "time": "20:00",
+     "kind": "event",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "personal",
+     "location": "Em Sherif",
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 134,
+    "outTokens": 680,
+    "cacheReadTokens": 3801
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      3,
+      3
+     ],
+     "time": [
+      4,
+      4
+     ],
+     "urgency": [
+      4,
+      4
+     ],
+     "location": [
+      3,
+      3
+     ],
+     "recurrence": [
+      4,
+      4
+     ],
+     "kind": [
+      2,
+      2
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 4
+   }
+  },
+  {
+   "id": "ar-01",
+   "lang": "ar",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "عندي اجتماع مع أحمد بكرا الساعة الثالثة عصراً في المكتب.",
+    "mood": {
+     "score": 3,
+     "label": "neutral",
+     "emotions": []
+    },
+    "todos": [
+     {
+      "text": "اجتماع مع أحمد",
+      "dueDate": "2026-10-29",
+      "time": "15:00",
+      "sourceText": "لدي اجتماع مع أحمد غداً الساعة الثالثة عصراً في المكتب",
+      "kind": "event",
+      "category": "work",
+      "location": "المكتب",
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "urgency": 0
+     }
+    ],
+    "topics": [
+     "work"
+    ],
+    "people": [
+     "أحمد"
+    ],
+    "places": [
+     "المكتب"
+    ]
+   },
+   "todos": [
+    {
+     "text": "اجتماع مع أحمد",
+     "dueDate": "2026-10-29",
+     "time": "15:00",
+     "kind": "event",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "work",
+     "location": "المكتب",
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 107,
+    "outTokens": 296,
+    "cacheReadTokens": 3801
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "ar-02",
+   "lang": "ar",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "عندي موعد عند طبيب الأسنان يوم الجمعة.",
+    "mood": {
+     "score": 3,
+     "label": "neutral",
+     "emotions": []
+    },
+    "todos": [
+     {
+      "text": "موعد طبيب الأسنان",
+      "dueDate": "2026-10-30",
+      "time": null,
+      "sourceText": "لدي موعد عند طبيب الأسنان يوم الجمعة",
+      "kind": "event",
+      "category": "health",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "urgency": 0
+     }
+    ],
+    "topics": [
+     "health"
+    ],
+    "people": [],
+    "places": []
+   },
+   "todos": [
+    {
+     "text": "موعد طبيب الأسنان",
+     "dueDate": "2026-10-30",
+     "time": null,
+     "kind": "event",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "health",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": [
+      "time"
+     ]
+    }
+   ],
+   "usage": {
+    "inTokens": 97,
+    "outTokens": 196,
+    "cacheReadTokens": 3801
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  }
+ ]
+}
