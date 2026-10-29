@@ -26,3 +26,5 @@ slowapi>=0.1.9,<1.0
 
 # Local enhancement branch: authenticated encryption for authenticator secrets.
 cryptography>=43,<47
+# Apple In-App Purchase: verify StoreKit 2 signed transactions + server notifications.
+app-store-server-library>=3.1.2,<4

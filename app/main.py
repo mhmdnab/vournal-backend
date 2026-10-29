@@ -30,6 +30,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from app import db as database
 from app.auth import get_current_user, router as auth_router
+from app.billing_apple import router as billing_apple_router
 from app.enhancements import enabled as enhancements_enabled
 from app.oauth import router as oauth_router
 from app.entities import (
@@ -188,6 +189,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(oauth_router)
 app.include_router(threads_router)
+app.include_router(billing_apple_router)
 
 
 @app.get("/health")
