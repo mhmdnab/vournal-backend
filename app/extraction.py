@@ -20,7 +20,27 @@ from anthropic import AsyncAnthropic
 # Fast + cheap default for high-volume extraction. Override with EXTRACTION_MODEL
 # (e.g. claude-sonnet-5) for higher quality.
 DEFAULT_MODEL = "claude-haiku-4-5-20251001"
-MAX_TOKENS = 1024
+# Room for long entries (many to-dos, Arabic, 5-minute recordings). A reply that
+# still hits the cap raises ExtractionTruncated instead of saving an empty entry.
+MAX_TOKENS = 4096
+
+
+class ExtractionTruncated(Exception):
+    """The model's reply was cut off at max_tokens: its JSON can't be trusted."""
+
+
+class ExtractionRefused(Exception):
+    """The model declined to process the entry (stop_reason "refusal")."""
+
+
+def check_stop_reason(response) -> None:
+    """Fail loudly instead of parsing a partial or refused reply. process_transcript
+    marks the entry FAILED, so the user can retry; nothing is saved half-empty."""
+    reason = getattr(response, "stop_reason", None)
+    if reason == "max_tokens":
+        raise ExtractionTruncated("Extraction reply was cut off at max_tokens.")
+    if reason == "refusal":
+        raise ExtractionRefused("The model declined to process this entry.")
 
 # Caps applied during normalization.
 MAX_EMOTIONS = 4
@@ -323,9 +343,10 @@ async def extract(
     Returns:
         (result, usage) — result is a normalized dict with keys: summary,
         mood{score,label,emotions}, todos[{text,dueDate,time}], topics[], people[];
-        usage is {inTokens, outTokens} or None when no API call was made. Never
-        raises on a malformed model response — worst case it returns the
-        empty-result shape.
+        usage is {inTokens, outTokens} or None when no API call was made. A
+        malformed reply returns the empty-result shape; a reply cut off at
+        max_tokens or refused raises ExtractionTruncated / ExtractionRefused so
+        the entry is marked FAILED instead of saved empty.
     """
     if now is None:
         now = datetime.now(timezone.utc)
@@ -351,6 +372,7 @@ async def extract(
         ],
     )
 
+    check_stop_reason(response)
     # Concatenate any text blocks in the response.
     text = "".join(block.text for block in response.content if block.type == "text")
 

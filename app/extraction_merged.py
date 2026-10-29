@@ -50,6 +50,7 @@ from app.extraction import (
     _user_message,
     usage_of,
     _with_task_prompt,
+    check_stop_reason,
 )
 
 DEFAULT_MERGED_MODEL = "claude-sonnet-5"
@@ -87,7 +88,7 @@ async def extract_merged(
     known: Optional[dict[str, list[str]]] = None,
 ) -> tuple[dict[str, Any], Optional[dict[str, int]]]:
     """Repair-then-extract in a single model call. Returns (result, usage) — same
-    contract as extraction.extract(); never raises on a malformed response. `known`
+    contract as extraction.extract() (raises only on a cut-off or refused reply). `known`
     is the user's existing people/topics for entity continuity (see extract())."""
     if now is None:
         now = datetime.now(timezone.utc)
@@ -113,6 +114,7 @@ async def extract_merged(
             }
         ],
     )
+    check_stop_reason(response)
     text = "".join(
         b.text for b in response.content if getattr(b, "type", None) == "text"
     )
