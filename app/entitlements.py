@@ -74,37 +74,77 @@ def _aware(value: datetime | None) -> datetime | None:
 
 
 async def grant_plus(
-    db, user_id: str, expires_at: datetime, source: str, external_id: str | None
+    db,
+    user_id: str,
+    expires_at: datetime,
+    source: str,
+    external_id: str | None,
+    purchased_at: datetime | None = None,
 ) -> None:
-    """Grant Plus until `expires_at` — unless a live grant already runs longer."""
+    """Grant Plus until `expires_at` — unless a live grant already runs longer.
+
+    A lifetime grant (paid, no expiry) is never shortened. An Apple purchase made
+    before the user's last refund/revocation is ignored, so a stale signed
+    transaction (replayed by the device, or retried late by Apple) can't undo a
+    refund. Apple reuses one original transaction id per Apple ID, so it moves to
+    the account that bought most recently.
+    """
     if source not in SOURCES:
         raise ValueError(f"Unknown entitlement source: {source}")
     user = await db.user.find_unique(where={"id": user_id})
     if user is None:
         return
+    revoked = _aware(getattr(user, "appleRevokedAt", None))
+    if source == "apple" and revoked and purchased_at and _aware(purchased_at) <= revoked:
+        return
     expires_at = _aware(expires_at)
+    lifetime = is_paid(user) and user.planExpiresAt is None
     current = _aware(user.planExpiresAt) if is_paid(user) else None
+    governs = not lifetime and (current is None or expires_at > current)
     data: dict = {}
-    if current is None or expires_at > current:
+    if governs:
         data.update(plan=PLUS, planExpiresAt=expires_at, planSource=source)
     if external_id and source == "apple":
+        await db.user.update_many(
+            where={"appleOriginalTransactionId": external_id, "id": {"not": user_id}},
+            data={"appleOriginalTransactionId": None},
+        )
         data["appleOriginalTransactionId"] = external_id
-    if external_id and source == "paddle":
+    if external_id and source == "paddle" and (governs or not user.paddleSubscriptionId):
         data["paddleSubscriptionId"] = external_id
     if data:
         await db.user.update(where={"id": user_id}, data=data)
 
 
-async def revoke_plus(db, user_id: str, source: str) -> None:
-    """End `source`'s grant now (refund, revoke, expiry). A grant from another
-    source that set the current expiry is left alone."""
+async def revoke_plus(
+    db,
+    user_id: str,
+    source: str,
+    external_id: str | None = None,
+    refunded: bool = False,
+) -> None:
+    """End `source`'s grant now (refund, revoke, expiry, cancellation).
+
+    Only the subscription named by `external_id` is ended: a cancelled duplicate
+    or an old subscription leaves the current one alone, and a grant from another
+    source that set the current expiry is left alone. `refunded` records the
+    moment, so older Apple purchases can't grant Plus again.
+    """
     user = await db.user.find_unique(where={"id": user_id})
-    if user is None or user.planSource != source:
+    if user is None:
         return
-    await db.user.update(
-        where={"id": user_id},
-        data={"planExpiresAt": datetime.now(timezone.utc)},
-    )
+    now = datetime.now(timezone.utc)
+    if refunded and source == "apple":
+        await db.user.update(where={"id": user_id}, data={"appleRevokedAt": now})
+    stored = {
+        "apple": user.appleOriginalTransactionId,
+        "paddle": user.paddleSubscriptionId,
+    }.get(source)
+    if external_id and stored and external_id != stored:
+        return
+    if user.planSource != source or user.planExpiresAt is None:
+        return
+    await db.user.update(where={"id": user_id}, data={"planExpiresAt": now})
 
 
 async def account_token_for(db, user_id: str) -> str:
@@ -114,9 +154,13 @@ async def account_token_for(db, user_id: str) -> str:
     user = await db.user.find_unique(where={"id": user_id})
     if user.appAccountToken:
         return user.appAccountToken
-    token = str(uuid.uuid4())
-    await db.user.update(where={"id": user_id}, data={"appAccountToken": token})
-    return token
+    # Only set it if still unset, so two first calls can't overwrite a token a
+    # purchase already carries; then read back whichever won.
+    await db.user.update_many(
+        where={"id": user_id, "appAccountToken": None},
+        data={"appAccountToken": str(uuid.uuid4())},
+    )
+    return (await db.user.find_unique(where={"id": user_id})).appAccountToken
 
 
 async def apply_pending_grants(db, user) -> None:

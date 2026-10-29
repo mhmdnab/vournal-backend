@@ -10,6 +10,10 @@ subscription's custom_data.vournalEmail. That email finds the account. A purchas
 made before the account exists is kept as a PendingGrant and applied when an
 account with that email is created (app.entitlements.apply_pending_grants).
 
+Only subscriptions for PADDLE_PLUS_PRICE_ID count. Sandbox and live Paddle have
+different price ids, so a sandbox purchase can never grant Plus on a backend
+configured with the live price (and with no price configured, nothing grants).
+
 Entitlement writes go through app.entitlements.grant_plus / revoke_plus only.
 """
 
@@ -70,6 +74,14 @@ async def webhook(request: Request):
     if not kind.startswith("subscription."):
         return {"ok": True}
 
+    plus_price = os.environ.get("PADDLE_PLUS_PRICE_ID", "")
+    prices = {
+        (item.get("price") or {}).get("id") for item in (data.get("items") or [])
+    }
+    if not plus_price or plus_price not in prices:
+        log.info("Paddle %s for another price ignored", kind)
+        return {"ok": True}
+
     sub_id = data.get("id")
     status = data.get("status")
     email = ((data.get("custom_data") or {}).get("vournalEmail") or "").strip().lower()
@@ -94,7 +106,7 @@ async def webhook(request: Request):
             )
     elif status in _ENDED:
         if user is not None:
-            await revoke_plus(db, user.id, "paddle")
+            await revoke_plus(db, user.id, "paddle", sub_id)
         if sub_id:
             await db.pendinggrant.delete_many(where={"externalId": sub_id, "appliedAt": None})
     log.info("Paddle %s (%s) handled for user %s", kind, status, user.id if user else None)

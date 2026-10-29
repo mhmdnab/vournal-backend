@@ -74,6 +74,9 @@ model User {
   appAccountToken            String? @unique
   appleOriginalTransactionId String? @unique
   planSource                 String?
+  // When Apple last refunded/revoked this user's subscription. A signed
+  // transaction bought before this moment never grants Plus again (stale replay).
+  appleRevokedAt             DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt @default(now())
 

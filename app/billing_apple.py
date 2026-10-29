@@ -17,12 +17,14 @@ All entitlement writes go through app.entitlements.grant_plus / revoke_plus.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import pathlib
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 from appstoreserverlibrary.models.Environment import Environment
 from appstoreserverlibrary.signed_data_verifier import (
@@ -55,6 +57,10 @@ class InvalidTransaction(Exception):
     """A signed payload that failed verification in every allowed environment."""
 
 
+class VerificationUnavailable(Exception):
+    """Apple's certificate status service couldn't be reached; try again later."""
+
+
 @dataclass
 class AppleNotification:
     type: str
@@ -63,9 +69,15 @@ class AppleNotification:
     grace_expires_ms: Optional[int]
 
 
+def _local_database() -> bool:
+    host = urlparse(os.environ.get("DATABASE_URL", "")).hostname
+    return host in {"127.0.0.1", "localhost", "::1"}
+
+
 def environments() -> list[Environment]:
     allowed = [Environment.PRODUCTION, Environment.SANDBOX]
-    if os.environ.get("APPLE_IAP_ALLOW_XCODE") == "1":
+    # Xcode transactions are unsigned: accepted only by a local dev backend.
+    if os.environ.get("APPLE_IAP_ALLOW_XCODE") == "1" and _local_database():
         # First: an Xcode-signed transaction fails Production on its signature
         # (not its environment), which would stop the search. Real App Store
         # data fails the Xcode check on environment and falls through.
@@ -73,15 +85,22 @@ def environments() -> list[Environment]:
     return allowed
 
 
+_VERIFIERS: dict[Environment, SignedDataVerifier] = {}
+
+
 def verifier_for(environment: Environment) -> SignedDataVerifier:
-    roots = [path.read_bytes() for path in sorted(_CERTS.glob("*.cer"))]
-    return SignedDataVerifier(
-        roots,
-        True,  # online revocation checks of the signing chain
-        environment,
-        BUNDLE_ID,
-        APP_APPLE_ID if environment == Environment.PRODUCTION else None,
-    )
+    """One verifier per environment for the process, so the library's chain cache
+    (it remembers verified signing chains) is reused across requests."""
+    if environment not in _VERIFIERS:
+        roots = [path.read_bytes() for path in sorted(_CERTS.glob("*.cer"))]
+        _VERIFIERS[environment] = SignedDataVerifier(
+            roots,
+            True,  # online revocation checks of the signing chain
+            environment,
+            BUNDLE_ID,
+            APP_APPLE_ID if environment == Environment.PRODUCTION else None,
+        )
+    return _VERIFIERS[environment]
 
 
 def _first_valid(decode) -> Any:
@@ -92,6 +111,8 @@ def _first_valid(decode) -> Any:
             return decode(verifier_for(environment))
         except VerificationException as exc:
             last = exc
+            if exc.status == VerificationStatus.RETRYABLE_VERIFICATION_FAILURE:
+                raise VerificationUnavailable(str(exc))
             if exc.status != VerificationStatus.INVALID_ENVIRONMENT:
                 break
         except Exception as exc:  # malformed input from the library's parser
@@ -167,21 +188,26 @@ async def account_token(current=Depends(get_current_user)):
 @router.post("/transactions", response_model=UserOut)
 async def submit_transaction(body: SignedTransactionIn, current=Depends(get_current_user)):
     try:
-        transaction = decode_transaction(body.signedTransaction)
+        # Verification may make blocking OCSP calls: keep them off the event loop.
+        transaction = await asyncio.to_thread(decode_transaction, body.signedTransaction)
+    except VerificationUnavailable:
+        raise HTTPException(503, {"code": "VERIFICATION_UNAVAILABLE"})
     except InvalidTransaction:
         raise HTTPException(400, {"code": "INVALID_TRANSACTION"})
     if transaction.productId != PRODUCT_ID:
         raise HTTPException(422, {"code": "WRONG_PRODUCT"})
 
     owner = await _user_for(transaction)
-    token = getattr(transaction, "appAccountToken", None)
-    if (owner is not None and owner.id != current.id) or (token and owner is None):
-        # Bought by another vournal account (shared Apple ID), or a token we never issued.
+    if owner is not None and owner.id != current.id:
+        # Bought by another vournal account on this Apple ID. (A token whose
+        # account was deleted maps to no one, so its owner can claim it again.)
         log.warning("Apple transaction for another account rejected (user %s)", current.id)
         raise HTTPException(409, {"code": "TRANSACTION_BELONGS_TO_ANOTHER_ACCOUNT"})
 
     if getattr(transaction, "revocationDate", None):
-        await revoke_plus(db, current.id, "apple")
+        await revoke_plus(
+            db, current.id, "apple", transaction.originalTransactionId, refunded=True
+        )
     else:
         await grant_plus(
             db,
@@ -189,6 +215,7 @@ async def submit_transaction(body: SignedTransactionIn, current=Depends(get_curr
             _when(transaction.expiresDate),
             "apple",
             transaction.originalTransactionId,
+            purchased_at=_when(getattr(transaction, "purchaseDate", None)),
         )
     log.info("Apple purchase verified for user %s", current.id)
     return _user_out(await db.user.find_unique(where={"id": current.id}))
@@ -197,7 +224,9 @@ async def submit_transaction(body: SignedTransactionIn, current=Depends(get_curr
 @router.post("/notifications")
 async def notifications(body: SignedNotificationIn):
     try:
-        note = decode_notification(body.signedPayload)
+        note = await asyncio.to_thread(decode_notification, body.signedPayload)
+    except VerificationUnavailable:
+        raise HTTPException(503, {"code": "VERIFICATION_UNAVAILABLE"})  # Apple retries
     except InvalidTransaction:
         raise HTTPException(400, {"code": "INVALID_NOTIFICATION"})
 
@@ -206,20 +235,25 @@ async def notifications(body: SignedNotificationIn):
         log.info("Apple notification %s for no known user", note.type)
         return {"ok": True}
 
-    if note.type in _GRANTS and not getattr(note.transaction, "revocationDate", None):
+    transaction = note.transaction
+    if transaction.productId != PRODUCT_ID:
+        log.info("Apple notification %s for another product ignored", note.type)
+        return {"ok": True}
+    bought = _when(getattr(transaction, "purchaseDate", None))
+    if note.type in _GRANTS and not getattr(transaction, "revocationDate", None):
         await grant_plus(
-            db,
-            user.id,
-            _when(note.transaction.expiresDate),
-            "apple",
-            note.transaction.originalTransactionId,
+            db, user.id, _when(transaction.expiresDate), "apple",
+            transaction.originalTransactionId, purchased_at=bought,
         )
     elif note.type == "DID_FAIL_TO_RENEW" and note.subtype == "GRACE_PERIOD" and note.grace_expires_ms:
         await grant_plus(
             db, user.id, _when(note.grace_expires_ms), "apple",
-            note.transaction.originalTransactionId,
+            transaction.originalTransactionId, purchased_at=bought,
         )
     elif note.type in _REVOKES:
-        await revoke_plus(db, user.id, "apple")
+        await revoke_plus(
+            db, user.id, "apple", transaction.originalTransactionId,
+            refunded=note.type in {"REFUND", "REVOKE"},
+        )
     log.info("Apple notification %s handled for user %s", note.type, user.id)
     return {"ok": True}
