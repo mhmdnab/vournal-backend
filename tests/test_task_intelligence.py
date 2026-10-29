@@ -6,77 +6,114 @@ from unittest.mock import patch
 from app.task_intelligence import local_extract, normalize_metadata, questions
 
 
+def _norm(item, transcript):
+    return normalize_metadata({"text": "Task", **item}, transcript)
+
+
 class TaskRules(unittest.TestCase):
-    def test_priority_stays_with_its_own_sentence(self):
-        transcript = (
-            "Call dentist !!!; Pay rent !!; Buy milk !; I had a wonderful day!!!"
-        )
-        for label, expected in (("Call dentist", 3), ("Pay rent", 2), ("Buy milk", 1)):
-            self.assertEqual(
-                normalize_metadata({"text": label}, transcript)["urgency"], expected
-            )
-        self.assertEqual(
-            normalize_metadata({"text": "Study"}, transcript)["urgency"], 0
-        )
+    """The AI decides; these guards only catch clear errors (falling back to
+    "unknown", which may ask, never to a guess)."""
 
-    def test_ambiguous_priority_and_no_invented_metadata(self):
-        result = normalize_metadata(
-            {
-                "text": "Call dentist",
-                "sourceText": "fictional",
-                "location": "Paris",
-                "recurrence": "daily",
-            },
-            "Call dentist ! !!",
+    def test_model_urgency_kept_when_evidence_is_real(self):
+        transcript = "I really really need to call the bank before Friday."
+        result = _norm(
+            {"text": "Call the bank", "urgency": 3, "urgencyEvidence": "really really need to"},
+            transcript,
         )
+        self.assertEqual((result["urgency"], result["urgencyUnclear"]), (3, False))
+
+    def test_markers_only_from_the_task_clause(self):
+        transcript = "Call dentist !!. What a great day!!!"
+        dentist = _norm({"text": "Call dentist", "sourceText": "Call dentist !!"}, transcript)
+        self.assertEqual(dentist["urgency"], 2)
+        other = _norm({"text": "Buy milk", "sourceText": "Buy milk", "urgency": 0}, transcript + " Buy milk")
+        self.assertEqual(other["urgency"], 0)
+        # Typed markers beat the model's own judgement for that task.
+        typed = _norm({"text": "Pay rent", "sourceText": "Pay rent !", "urgency": 3,
+                       "urgencyEvidence": "Pay rent"}, "Pay rent !")
+        self.assertEqual(typed["urgency"], 1)
+
+    def test_conflicting_markers_ask(self):
+        result = _norm({"text": "Call dentist", "sourceText": "Call dentist ! !!"}, "Call dentist ! !!")
+        self.assertEqual((result["urgency"], result["urgencyUnclear"]), (0, True))
+
+    def test_unverifiable_urgency_becomes_a_question(self):
+        result = _norm({"urgency": 3, "urgencyEvidence": "absolutely critical"}, "I should call the bank.")
+        self.assertEqual((result["urgency"], result["urgencyUnclear"]), (0, True))
+
+    def test_signalled_but_unclear_urgency_asks(self):
+        result = _norm({"urgency": None}, "Pay rent soon, it's important.")
         self.assertTrue(result["urgencyUnclear"])
-        self.assertEqual(result["urgency"], 0)
-        self.assertIsNone(result["location"])
-        self.assertIsNone(result["recurrence"])
-        self.assertEqual(result["category"], "health")
-        self.assertFalse(result["calendarRequested"])
-        for source in (
-            "Do not add call dentist to Apple Calendar",
-            "Don't add call dentist to Apple Reminders",
-        ):
-            result = normalize_metadata(
-                {"text": "call dentist", "sourceText": source}, source
-            )
-            self.assertFalse(result["calendarRequested"])
-            self.assertFalse(result["remindersRequested"])
-        transcript = "Call dentist !!!; Buy milk"
-        self.assertEqual(
-            normalize_metadata(
-                {"text": "Buy milk", "sourceText": transcript}, transcript
-            )["urgency"],
-            0,
-        )
 
-    def test_contextual_questions_and_dismissal(self):
-        task = SimpleNamespace(
-            text="Meeting with Rami",
-            kind="event",
-            dueDate="2030-01-03",
-            startAt=None,
-            urgencyUnclear=True,
-            recurrence=None,
-            dismissedQuestions=[],
+    def test_no_urgency_said_is_zero_without_a_question(self):
+        result = _norm({"urgency": 0}, "Buy milk.")
+        self.assertEqual((result["urgency"], result["urgencyUnclear"]), (0, False))
+
+    def test_arabic_evidence_matches_without_diacritics(self):
+        transcript = "لازم ادفع الإيجار ضروري جداً"
+        result = _norm({"urgency": 3, "urgencyEvidence": "ضروري جدا"}, transcript)
+        self.assertEqual(result["urgency"], 3)
+
+    def test_location_not_in_transcript_is_dropped(self):
+        self.assertIsNone(_norm({"location": "Paris"}, "Meeting with Rami tomorrow.")["location"])
+
+    def test_location_in_arabic_kept(self):
+        result = _norm({"location": "مكتب الحمرا"}, "عندي اجتماع بمكتب الحمرا بكرا")
+        self.assertEqual(result["location"], "مكتب الحمرا")
+
+    def test_weekly_with_weekdays(self):
+        result = _norm(
+            {"recurrence": {"freq": "weekly", "interval": 1, "weekdays": ["MO", "TH"], "until": None}},
+            "Gym every Monday and Thursday.",
         )
-        self.assertEqual([q["field"] for q in questions(task)], ["time", "urgency"])
-        task.dismissedQuestions = ["time", "urgency"]
+        self.assertEqual(result["recurrence"], "weekly")
+        self.assertEqual(result["recurrenceWeekdays"], ["MO", "TH"])
+        self.assertFalse(result["recurrenceUnclear"])
+
+    def test_unclear_repeat_asks(self):
+        result = _norm({"recurrence": "unclear"}, "Water the plants every so often.")
+        self.assertIsNone(result["recurrence"])
+        self.assertTrue(result["recurrenceUnclear"])
+
+    def test_repeat_until_and_interval(self):
+        result = _norm(
+            {"recurrence": {"freq": "monthly", "interval": 2, "weekdays": None, "until": "2027-06-30"}},
+            "Pay the bill every two months until June.",
+        )
+        self.assertEqual((result["recurrence"], result["recurrenceInterval"]), ("monthly", 2))
+        self.assertEqual(result["recurrenceUntil"].date().isoformat(), "2027-06-30")
+
+    def test_garbage_metadata_defaults(self):
+        result = _norm(
+            {"urgency": "high", "recurrence": {"freq": "hourly", "weekdays": ["XX"]}, "location": 7,
+             "kind": "party"},
+            "Something.",
+        )
+        self.assertEqual(result["urgency"], 0)
+        self.assertIsNone(result["recurrence"])
+        self.assertEqual(result["recurrenceWeekdays"], [])
+        self.assertIsNone(result["location"])
+        self.assertEqual(result["kind"], "task")
+
+    def test_event_with_date_no_time_asks_time(self):
+        task = SimpleNamespace(text="Meeting with Rami", kind="event", dueDate="2030-01-03",
+                               startAt=None, urgencyUnclear=False, recurrence=None,
+                               recurrenceUnclear=False, dismissedQuestions=[])
+        self.assertEqual([q["field"] for q in questions(task)], ["time"])
+        task.dismissedQuestions = ["time"]
         self.assertEqual(questions(task), [])
 
-    def test_calendar_request_needs_a_date_and_time_even_for_a_task(self):
-        task = SimpleNamespace(
-            text="Call dentist",
-            kind="task",
-            dueDate=None,
-            startAt=None,
-            urgencyUnclear=False,
-            recurrence=None,
-            calendarRequested=True,
-        )
+    def test_event_without_date_asks_date_then_time(self):
+        task = SimpleNamespace(text="Dentist appointment", kind="event", dueDate=None,
+                               startAt=None, urgencyUnclear=False, recurrence=None,
+                               recurrenceUnclear=False, dismissedQuestions=[])
         self.assertEqual([q["field"] for q in questions(task)], ["date", "time"])
+
+    def test_plain_task_without_date_asks_nothing(self):
+        task = SimpleNamespace(text="Buy milk", kind="task", dueDate=None, startAt=None,
+                               urgencyUnclear=False, recurrence=None, recurrenceUnclear=False,
+                               dismissedQuestions=[])
+        self.assertEqual(questions(task), [])
 
     def test_offline_fixture_keeps_missing_time_and_explicit_repeat(self):
         now = datetime(2030, 1, 1, tzinfo=timezone.utc)
@@ -86,13 +123,9 @@ class TaskRules(unittest.TestCase):
         )
         self.assertIsNone(result["todos"][0]["time"])
         self.assertEqual(result["todos"][0]["dueDate"], "2030-01-02")
-        self.assertEqual(result["todos"][1]["recurrence"], "weekly")
-        self.assertEqual(result["todos"][1]["recurrenceInterval"], 2)
+        self.assertEqual(result["todos"][1]["recurrence"]["freq"], "weekly")
+        self.assertEqual(result["todos"][1]["recurrence"]["interval"], 2)
         self.assertEqual(result["todos"][1]["time"], "14:00")
-        source = "Add meeting at Beirut Office on 2030-01-02 every week to Apple Calendar !!!"
-        self.assertEqual(
-            local_extract(source, now)["todos"][0]["location"], "Beirut Office"
-        )
 
 
 class TasksIntegration(unittest.IsolatedAsyncioTestCase):

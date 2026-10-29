@@ -198,6 +198,9 @@ class TaskDetailsRequest(BaseModel):
     )
     recurrence: Optional[Literal["daily", "weekly", "monthly", "yearly"]] = None
     recurrenceInterval: Optional[int] = Field(default=None, ge=1, le=365)
+    recurrenceWeekdays: Optional[
+        List[Literal["MO", "TU", "WE", "TH", "FR", "SA", "SU"]]
+    ] = None
     recurrenceUntil: Optional[datetime] = None
     calendarRequested: Optional[bool] = None
     remindersRequested: Optional[bool] = None
@@ -269,6 +272,7 @@ class TaskMetadata(BaseModel):
     locationLongitude: Optional[float] = None
     recurrence: Optional[str] = None
     recurrenceInterval: int = 1
+    recurrenceWeekdays: List[str] = []
     recurrenceUntil: Optional[datetime] = None
     followUps: List[dict] = []
 

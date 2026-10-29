@@ -126,6 +126,9 @@ class Migrations(unittest.TestCase):
             "t|t|t",
         )
         self.assertEqual(_psql('SELECT count(*) FROM "PendingGrant"'), "0")
+        self.assertEqual(
+            _psql("""SELECT "recurrenceWeekdays" FROM "Todo" WHERE id = 't1'"""), "{}"
+        )
 
     def test_schema_matches_after_all_migrations(self):
         _deploy()

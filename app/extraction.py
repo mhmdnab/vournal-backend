@@ -279,7 +279,8 @@ def _normalize(raw: dict[str, Any]) -> dict[str, Any]:
             due = item.get("dueDate")
             due = due.strip() if isinstance(due, str) and due.strip() else None
             todo = {"text": text, "dueDate": due, "time": _clean_time(item.get("time"))}
-            # Preserve the model's evidence only until transcript-bound validation.
+            # The model's per-task judgement, checked later by
+            # task_intelligence.normalize_metadata against the transcript.
             todo.update(
                 {
                     key: item.get(key)
@@ -290,9 +291,14 @@ def _normalize(raw: dict[str, Any]) -> dict[str, Any]:
                         "location",
                         "recurrence",
                         "recurrenceInterval",
+                        "urgencyEvidence",
                     )
                 }
             )
+            # Only when the model sent it: an explicit null means "signalled but
+            # unclear" (ask), while a missing key means no judgement (0).
+            if "urgency" in item:
+                todo["urgency"] = item["urgency"]
             todos.append(todo)
 
     # topics / people / places

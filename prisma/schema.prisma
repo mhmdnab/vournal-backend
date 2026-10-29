@@ -205,6 +205,7 @@ model Todo {
   recurrence String?
   recurrenceUnclear Boolean @default(false)
   recurrenceInterval Int @default(1)
+  recurrenceWeekdays String[] @default([]) // "MO".."SU" for weekly repeats
   recurrenceUntil DateTime?
   calendarRequested Boolean @default(false)
   remindersRequested Boolean @default(false)

@@ -719,6 +719,8 @@ async def update_task_details(
         data["urgencyUnclear"] = False
     if "recurrence" in fields:
         data["recurrenceUnclear"] = False
+        if body.recurrence is None:
+            data["recurrenceWeekdays"] = []  # a one-time task has no repeat days
     tz = _user_tz(current.timezone)
     if "date" in fields or "time" in fields:
         day = (
