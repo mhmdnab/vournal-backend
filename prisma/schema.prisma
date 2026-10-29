@@ -67,6 +67,13 @@ model User {
   planExpiresAt        DateTime?
   paddleCustomerId     String?
   paddleSubscriptionId String?
+  // Billing (build 5). appAccountToken is the UUID the app attaches to every App
+  // Store purchase so a transaction maps back to this user; created on demand.
+  // planSource says which grant set the current planExpiresAt ("apple" | "paddle"
+  // | "manual"). Written only through app.entitlements.grant_plus/revoke_plus.
+  appAccountToken            String? @unique
+  appleOriginalTransactionId String? @unique
+  planSource                 String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt @default(now())
 
@@ -283,4 +290,18 @@ model EntryPlace {
 
   @@id([entryId, placeId])
   @@index([placeId]) // reverse lookup: a place's moments (thread queries)
+}
+
+// A web (Paddle) purchase whose email matched no account yet. Applied when an
+// account with that email is created; externalId is the Paddle subscription id.
+model PendingGrant {
+  id         String    @id @default(cuid())
+  email      String
+  source     String
+  externalId String    @unique
+  expiresAt  DateTime
+  appliedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email])
 }

@@ -117,6 +117,15 @@ class Migrations(unittest.TestCase):
             ),
             "f|{}|t",
         )
+        self.assertEqual(
+            _psql(
+                """SELECT "appAccountToken" IS NULL, "planSource" IS NULL,
+                          "appleOriginalTransactionId" IS NULL
+                   FROM "User" WHERE id = 'u1'"""
+            ),
+            "t|t|t",
+        )
+        self.assertEqual(_psql('SELECT count(*) FROM "PendingGrant"'), "0")
 
     def test_schema_matches_after_all_migrations(self):
         _deploy()

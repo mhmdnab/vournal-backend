@@ -57,3 +57,63 @@ def effective_plan(user) -> str:
 def is_paid(user) -> bool:
     """True if the user's live entitlement is any paid tier."""
     return effective_plan(user) in PAID_PLANS
+
+
+# ---- Writes (build 5 billing) -------------------------------------------------
+# The ONLY code that writes plan / planExpiresAt. Apple purchases, App Store Server
+# Notifications and Paddle webhooks all come through here, so two sources can't
+# fight: the later expiry always wins, and a source can only end its own grant.
+
+SOURCES = ("apple", "paddle", "manual")
+
+
+def _aware(value: datetime | None) -> datetime | None:
+    if value is not None and value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
+
+
+async def grant_plus(
+    db, user_id: str, expires_at: datetime, source: str, external_id: str | None
+) -> None:
+    """Grant Plus until `expires_at` — unless a live grant already runs longer."""
+    if source not in SOURCES:
+        raise ValueError(f"Unknown entitlement source: {source}")
+    user = await db.user.find_unique(where={"id": user_id})
+    if user is None:
+        return
+    expires_at = _aware(expires_at)
+    current = _aware(user.planExpiresAt) if is_paid(user) else None
+    data: dict = {}
+    if current is None or expires_at > current:
+        data.update(plan=PLUS, planExpiresAt=expires_at, planSource=source)
+    if external_id and source == "apple":
+        data["appleOriginalTransactionId"] = external_id
+    if external_id and source == "paddle":
+        data["paddleSubscriptionId"] = external_id
+    if data:
+        await db.user.update(where={"id": user_id}, data=data)
+
+
+async def revoke_plus(db, user_id: str, source: str) -> None:
+    """End `source`'s grant now (refund, revoke, expiry). A grant from another
+    source that set the current expiry is left alone."""
+    user = await db.user.find_unique(where={"id": user_id})
+    if user is None or user.planSource != source:
+        return
+    await db.user.update(
+        where={"id": user_id},
+        data={"planExpiresAt": datetime.now(timezone.utc)},
+    )
+
+
+async def account_token_for(db, user_id: str) -> str:
+    """The user's App Store appAccountToken (a UUID4), created once."""
+    import uuid
+
+    user = await db.user.find_unique(where={"id": user_id})
+    if user.appAccountToken:
+        return user.appAccountToken
+    token = str(uuid.uuid4())
+    await db.user.update(where={"id": user_id}, data={"appAccountToken": token})
+    return token
