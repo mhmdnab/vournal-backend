@@ -24,13 +24,13 @@ PROMPT = """
 TO-DO DETAILS (read carefully):
 Each object in "todos" ALSO has these keys:
 - "sourceText": the exact words from the transcript this to-do came from, copied verbatim (keep any !, !! or !!!).
-- "kind": "event" for a meeting, appointment, class, flight, dinner or anything happening at a time; otherwise "task".
-- "urgency": how urgent the speaker says THIS to-do is — 3 high (must happen first / very soon / serious consequences), 2 medium (important, some flexibility), 1 low (whenever, no rush), 0 if they gave no sign either way. Use null ONLY when they clearly signal importance but you cannot tell the level ("it's important", "soon"). Judge from how they talk: "I really have to", "lezem 2ablo bukra", "ضروري جداً" -> 3; "whenever I get a chance", "mesh mesta3jel", "مش مستعجل" -> 1. Typed !, !! and !!! after a to-do mean 1, 2 and 3. Excitement or emotion about the day ("what a great day!!!") is NOT urgency for any to-do.
+- "kind": "event" for a meeting, appointment, class, flight, dinner or anything happening at a time with other people or at a venue; otherwise "task". A phone call, an errand or a chore is a "task".
+- "urgency": how urgent the speaker says THIS to-do is — 3 high ("it's urgent", "very necessary", "ضروري كتير", "darure ktir", "عاجل جداً"), 2 medium, 1 low ("whenever I get a chance", "no rush", "mesh mesta3jel", "مش مستعجل", "لا داعي للعجلة"), 0 if they gave no sign. Plain obligation words — "need to", "have to", "must", "lezem", "لازم", "يجب" — are NOT urgency on their own: they just make it a to-do (0). Use null when they signal importance but not the level ("it's important", "soon", "mhem", "مهم", "قريباً"). Typed !, !! and !!! after a to-do mean 1, 2 and 3. Excitement or emotion about the day ("what a great day!!!", "شو هالنهار الحلو!!!") is NOT urgency for any to-do.
 - "urgencyEvidence": the exact words (verbatim from the transcript) that show the urgency, or null when urgency is 0 or null.
 - "location": a place said for THIS to-do, written exactly as spoken, or null. Never invent one.
-- "recurrence": null for a one-time to-do. If the speaker asks for it to repeat: {"freq": "daily"|"weekly"|"monthly"|"yearly", "interval": number (every 2 weeks -> 2), "weekdays": ["MO","TU","WE","TH","FR","SA","SU"] or null, "until": "YYYY-MM-DD" or null}. "every Monday and Thursday" -> {"freq":"weekly","interval":1,"weekdays":["MO","TH"],"until":null}. Use the string "unclear" when they ask for a repeat but you cannot tell how often.
+- "recurrence": null for a one-time to-do. If the speaker asks for it to repeat: {"freq": "daily"|"weekly"|"monthly"|"yearly", "interval": number (every 2 weeks -> 2), "weekdays": ["MO","TU","WE","TH","FR","SA","SU"] or null, "until": "YYYY-MM-DD" or null}. "every Monday and Thursday" -> {"freq":"weekly","interval":1,"weekdays":["MO","TH"],"until":null}. Use the string "unclear" when they want it to repeat but don't say how often ("every so often", "from time to time", "every now and then", "kel fatra", "كل فترة", "من وقت لآخر").
 - "category": one of work, health, family, finance, personal, learning, errands.
-Never invent a date, a clock time, a place or a repeat. A meeting or appointment with a day but no clock time keeps "time": null; the app asks the user.
+Never invent a date, a clock time, a place or a repeat. Urgency is not a date: "Call the bank !!!" with no day keeps "dueDate": null. A meeting or appointment with a day but no clock time keeps "time": null; the app asks the user.
 
 Output only the JSON object, nothing else."""
 
@@ -156,7 +156,13 @@ def questions(task) -> list[dict]:
     dismissed = set(getattr(task, "dismissedQuestions", []) or [])
     output = []
     is_event = task.kind == "event"
-    if (is_event or task.recurrence) and not task.dueDate:
+    # A repeat needs a start day unless the repeat itself says when: every day,
+    # or weekly on named days ("every Monday and Thursday").
+    repeat_needs_day = bool(task.recurrence) and not (
+        task.recurrence == "daily"
+        or (task.recurrence == "weekly" and getattr(task, "recurrenceWeekdays", None))
+    )
+    if (is_event or repeat_needs_day) and not task.dueDate:
         output.append({"field": "date", "question": f"What date is “{task.text}” for?"})
     if is_event and not task.startAt:
         output.append({"field": "time", "question": f"What time is “{task.text}”?"})

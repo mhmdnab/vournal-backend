@@ -79,7 +79,7 @@ Should the app ask a question? **yes**
 
 | to-do (keywords) | day | time | urgency | place | repeat | kind |
 |---|---|---|---|---|---|---|
-| gym / نادي / جيم | * | 07:00 | 0 | — | weekly MO,TH | * |
+| gym / نادي / جيم | * | 07:00 | 0 | * | weekly MO,TH | * |
 
 Should the app ask a question? **no**
 
@@ -127,7 +127,7 @@ Should the app ask a question? **no**
 |---|---|---|---|---|---|---|
 | client / عميل / زبون | 2026-10-29 | 10:00 | 0 | — | — | event |
 | invoice / فاتورة | * | — | 0 | — | — | * |
-| sister / أخت / اخت / ekht | 2026-10-29 | 16:00 | 0 | — | — | task |
+| sister / أخت / اخت / ekht | 2026-10-29 | 16:00 | 0 | * | — | * |
 | omar / عمر | 2026-10-31 | 20:00 | 0 | Em Sherif | — | event |
 
 Should the app ask a question? **no**
@@ -244,7 +244,7 @@ Should the app ask a question? **yes**
 
 | to-do (keywords) | day | time | urgency | place | repeat | kind |
 |---|---|---|---|---|---|---|
-| gym / نادي / جيم | * | 07:00 | 0 | — | weekly MO,TH | * |
+| gym / نادي / جيم | * | 07:00 | 0 | * | weekly MO,TH | * |
 
 Should the app ask a question? **no**
 
@@ -302,7 +302,7 @@ Should the app ask a question? **no**
 |---|---|---|---|---|---|---|
 | client / عميل / زبون | 2026-10-29 | 10:00 | 0 | — | — | event |
 | invoice / فاتورة | * | — | 0 | — | — | * |
-| sister / أخت / اخت / ekht | 2026-10-29 | 16:00 | 0 | — | — | task |
+| sister / أخت / اخت / ekht | 2026-10-29 | 16:00 | 0 | * | — | * |
 | omar / عمر | 2026-10-31 | 20:00 | 0 | أم شريف | — | event |
 
 Should the app ask a question? **no**
@@ -423,7 +423,7 @@ Should the app ask a question? **yes**
 
 | to-do (keywords) | day | time | urgency | place | repeat | kind |
 |---|---|---|---|---|---|---|
-| gym / نادي / جيم | * | 07:00 | 0 | — | weekly MO,TH | * |
+| gym / نادي / جيم | * | 07:00 | 0 | * | weekly MO,TH | * |
 
 Should the app ask a question? **no**
 
@@ -481,7 +481,7 @@ Should the app ask a question? **no**
 |---|---|---|---|---|---|---|
 | client / عميل / زبون | 2026-10-29 | 10:00 | 0 | — | — | event |
 | invoice / فاتورة | * | — | 0 | — | — | * |
-| sister / أخت / اخت / ekht | 2026-10-29 | 16:00 | 0 | — | — | task |
+| sister / أخت / اخت / ekht | 2026-10-29 | 16:00 | 0 | * | — | * |
 | omar / عمر | 2026-10-31 | 20:00 | 0 | أم شريف | — | event |
 
 Should the app ask a question? **no**
@@ -602,7 +602,7 @@ Should the app ask a question? **yes**
 
 | to-do (keywords) | day | time | urgency | place | repeat | kind |
 |---|---|---|---|---|---|---|
-| gym / نادي / جيم | * | 07:00 | 0 | — | weekly MO,TH | * |
+| gym / نادي / جيم | * | 07:00 | 0 | * | weekly MO,TH | * |
 
 Should the app ask a question? **no**
 
@@ -660,7 +660,7 @@ Should the app ask a question? **no**
 |---|---|---|---|---|---|---|
 | client / عميل / زبون | 2026-10-29 | 10:00 | 0 | — | — | event |
 | invoice / فاتورة | * | — | 0 | — | — | * |
-| sister / أخت / اخت / ekht | 2026-10-29 | 16:00 | 0 | — | — | task |
+| sister / أخت / اخت / ekht | 2026-10-29 | 16:00 | 0 | * | — | * |
 | omar / عمر | 2026-10-31 | 20:00 | 0 | Em Sherif | — | event |
 
 Should the app ask a question? **no**

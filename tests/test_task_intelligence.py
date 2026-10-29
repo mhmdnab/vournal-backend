@@ -109,6 +109,19 @@ class TaskRules(unittest.TestCase):
                                recurrenceUnclear=False, dismissedQuestions=[])
         self.assertEqual([q["field"] for q in questions(task)], ["date", "time"])
 
+    def test_daily_or_weekday_repeat_needs_no_start_day(self):
+        for recurrence, weekdays in (("daily", []), ("weekly", ["MO", "TH"])):
+            task = SimpleNamespace(text="Gym", kind="task", dueDate=None, startAt=None,
+                                   urgencyUnclear=False, recurrence=recurrence,
+                                   recurrenceWeekdays=weekdays, recurrenceUnclear=False,
+                                   dismissedQuestions=[])
+            self.assertEqual(questions(task), [], recurrence)
+        monthly = SimpleNamespace(text="Pay the bill", kind="task", dueDate=None, startAt=None,
+                                  urgencyUnclear=False, recurrence="monthly",
+                                  recurrenceWeekdays=[], recurrenceUnclear=False,
+                                  dismissedQuestions=[])
+        self.assertEqual([q["field"] for q in questions(monthly)], ["date"])
+
     def test_plain_task_without_date_asks_nothing(self):
         task = SimpleNamespace(text="Buy milk", kind="task", dueDate=None, startAt=None,
                                urgencyUnclear=False, recurrence=None, recurrenceUnclear=False,

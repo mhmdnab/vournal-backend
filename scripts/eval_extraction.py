@@ -201,7 +201,13 @@ def _cost(rows: list[dict]) -> float:
     for row in rows:
         if row.get("usage"):
             p_in, p_out = PRICES.get(row["model"], (2.0, 10.0))
-            total += (row["usage"]["inTokens"] * p_in + row["usage"]["outTokens"] * p_out) / 1e6
+            usage = row["usage"]
+            total += (
+                usage["inTokens"] * p_in
+                + usage.get("cacheWriteTokens", 0) * p_in * 1.25  # 5-minute cache write
+                + usage.get("cacheReadTokens", 0) * p_in * 0.1  # cache read
+                + usage["outTokens"] * p_out
+            ) / 1e6
     return total
 
 
@@ -250,9 +256,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=pathlib.Path)
     parser.add_argument("--rescore", type=pathlib.Path)
     parser.add_argument("--review", type=pathlib.Path, help="write the owner review sheet here")
+    parser.add_argument("--errors-from", type=pathlib.Path,
+                        help="rerun only the cases that errored in this results file, and merge into it")
     args = parser.parse_args(argv)
 
     cases = load_cases(args.cases, args.only)
+    merge_into = None
+    if args.errors_from:
+        merge_into = json.loads(args.errors_from.read_text())
+        failed = {r["id"] for r in merge_into["rows"] if r["error"]}
+        cases = [c for c in cases if c["id"] in failed]
     if args.review:
         write_review(cases, args.review)
         print(f"Wrote {args.review} ({len(cases)} cases)")
@@ -276,6 +289,10 @@ def main(argv: list[str] | None = None) -> int:
         return [await _run_case(case, args.typed_model) for case in cases]
 
     rows = asyncio.run(run_all())
+    if merge_into is not None:
+        fresh = {r["id"]: r for r in rows}
+        rows = [fresh.get(r["id"], r) for r in merge_into["rows"]]
+        args.out = args.out or args.errors_from
     table = summarize(rows)
     print_table(table)
     failed = [r["id"] for r in rows if r["error"]]

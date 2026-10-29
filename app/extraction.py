@@ -105,12 +105,21 @@ Output only the JSON object, nothing else."""
 EXTRACT_SYSTEM_PROMPT = SYSTEM_PROMPT + KNOWN_NAMES_ADDENDUM
 
 
-def _with_task_prompt(base: str) -> str:
+def _with_task_prompt(base: str):
     """The base prompt plus the per-task metadata instructions (urgency, place,
-    repeat, kind) shared by both extraction paths."""
+    repeat, kind) shared by both extraction paths.
+
+    With EXTRACTION_PROMPT_CACHE=1 the (fixed) system prompt is marked cacheable.
+    Off by default: a cache entry lives 5 minutes and costs 1.25x to write, so it
+    only saves money with roughly one entry or more every 5 minutes across all
+    users. Typed entries (Haiku 4.5, 4096-token minimum) never cache anyway.
+    """
     from app.task_intelligence import PROMPT
 
-    return base + PROMPT
+    text = base + PROMPT
+    if os.environ.get("EXTRACTION_PROMPT_CACHE") == "1":
+        return [{"type": "text", "text": text, "cache_control": {"type": "ephemeral"}}]
+    return text
 
 
 def _format_now(now: datetime) -> str:
@@ -328,6 +337,15 @@ def usage_of(response) -> dict[str, int]:
     return {
         "inTokens": int(getattr(u, "input_tokens", 0) or 0),
         "outTokens": int(getattr(u, "output_tokens", 0) or 0),
+        # Present only when prompt caching is on (EXTRACTION_PROMPT_CACHE=1).
+        **{
+            key: int(getattr(u, attr, 0) or 0)
+            for key, attr in (
+                ("cacheWriteTokens", "cache_creation_input_tokens"),
+                ("cacheReadTokens", "cache_read_input_tokens"),
+            )
+            if isinstance(getattr(u, attr, None), int) and getattr(u, attr)
+        },
     }
 
 

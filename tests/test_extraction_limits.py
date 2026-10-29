@@ -53,3 +53,23 @@ class ExtractionLimits(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PromptCacheSwitch(unittest.IsolatedAsyncioTestCase):
+    async def test_cache_switch_marks_the_fixed_prompt(self):
+        import os
+
+        from app import extraction, extraction_merged
+
+        for module, call in ((extraction, extraction.extract), (extraction_merged, extraction_merged.extract_merged)):
+            client = _client("end_turn", '{"summary": "ok"}')
+            with patch.dict(os.environ, {"EXTRACTION_PROMPT_CACHE": "1"}), patch.object(module, "AsyncAnthropic", client):
+                await call("Buy milk.")
+            system = client.return_value.messages.create.call_args.kwargs["system"]
+            self.assertIsInstance(system, list, module.__name__)
+            self.assertEqual(system[-1]["cache_control"], {"type": "ephemeral"})
+
+            client = _client("end_turn", '{"summary": "ok"}')
+            with patch.dict(os.environ, {"EXTRACTION_PROMPT_CACHE": ""}), patch.object(module, "AsyncAnthropic", client):
+                await call("Buy milk.")
+            self.assertIsInstance(client.return_value.messages.create.call_args.kwargs["system"], str)
