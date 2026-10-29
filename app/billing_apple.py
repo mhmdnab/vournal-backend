@@ -66,7 +66,10 @@ class AppleNotification:
 def environments() -> list[Environment]:
     allowed = [Environment.PRODUCTION, Environment.SANDBOX]
     if os.environ.get("APPLE_IAP_ALLOW_XCODE") == "1":
-        allowed.append(Environment.XCODE)
+        # First: an Xcode-signed transaction fails Production on its signature
+        # (not its environment), which would stop the search. Real App Store
+        # data fails the Xcode check on environment and falls through.
+        allowed.insert(0, Environment.XCODE)
     return allowed
 
 

@@ -62,7 +62,41 @@ class Decoding(unittest.TestCase):
                 return payload
 
         fakes = {Environment.PRODUCTION: Production(), Environment.SANDBOX: Sandbox()}
-        with patch.object(billing_apple, "verifier_for", lambda env: fakes[env]):
+        with patch.dict(os.environ, {"APPLE_IAP_ALLOW_XCODE": ""}), patch.object(
+            billing_apple, "verifier_for", lambda env: fakes[env]
+        ):
+            self.assertIs(billing_apple.decode_transaction("jws"), payload)
+
+    def test_xcode_signed_transaction_verifies_locally(self):
+        # Xcode StoreKit testing signs with a local certificate: the Production
+        # check fails on the signature, not the environment. With the local flag
+        # the Xcode check must still be reached.
+        from appstoreserverlibrary.models.Environment import Environment
+        from appstoreserverlibrary.signed_data_verifier import (
+            VerificationException,
+            VerificationStatus,
+        )
+
+        from app import billing_apple
+
+        payload = _txn("tok")
+
+        class Signed:
+            def verify_and_decode_signed_transaction(self, jws):
+                raise VerificationException(VerificationStatus.VERIFICATION_FAILURE)
+
+        class Xcode:
+            def verify_and_decode_signed_transaction(self, jws):
+                return payload
+
+        fakes = {
+            Environment.PRODUCTION: Signed(),
+            Environment.SANDBOX: Signed(),
+            Environment.XCODE: Xcode(),
+        }
+        with patch.dict(os.environ, {"APPLE_IAP_ALLOW_XCODE": "1"}), patch.object(
+            billing_apple, "verifier_for", lambda env: fakes[env]
+        ):
             self.assertIs(billing_apple.decode_transaction("jws"), payload)
 
     def test_xcode_environment_only_with_local_flag(self):
