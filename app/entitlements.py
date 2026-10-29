@@ -117,3 +117,14 @@ async def account_token_for(db, user_id: str) -> str:
     token = str(uuid.uuid4())
     await db.user.update(where={"id": user_id}, data={"appAccountToken": token})
     return token
+
+
+async def apply_pending_grants(db, user) -> None:
+    """Grant any web purchase made with this email before the account existed."""
+    now = datetime.now(timezone.utc)
+    pending = await db.pendinggrant.find_many(
+        where={"email": user.email.lower(), "appliedAt": None, "expiresAt": {"gt": now}}
+    )
+    for grant in pending:
+        await grant_plus(db, user.id, grant.expiresAt, grant.source, grant.externalId)
+        await db.pendinggrant.update(where={"id": grant.id}, data={"appliedAt": now})

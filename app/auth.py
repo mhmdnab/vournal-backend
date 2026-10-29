@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from app import email, security
 from app.enhancements import enabled, require_enabled
 from app.db import db
-from app.entitlements import effective_plan
+from app.entitlements import apply_pending_grants, effective_plan
 from app.quota import usage_snapshot
 from app.rate_limit import limiter, rate_limited
 from app.storage import delete_audio
@@ -271,6 +271,8 @@ async def register(request: Request, body: RegisterRequest):
             "timezone": body.timezone,
         }
     )
+    # A web (Paddle) purchase made before this account existed.
+    await apply_pending_grants(db, user)
     if enabled():
         return await _begin_challenge(user)
     return await _issue_tokens(user.id)
