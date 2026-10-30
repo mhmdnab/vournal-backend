@@ -70,7 +70,7 @@ from app.schemas import (
     UpdateTodoRequest,
     TaskDetailsRequest,
 )
-from app.task_intelligence import metadata_out, normalize_metadata
+from app.task_intelligence import metadata_out, normalize_metadata, verified_day
 
 # Load environment variables from a local .env file if present.
 load_dotenv()
@@ -379,9 +379,15 @@ async def process_transcript(
     except (
         Exception
     ) as exc:  # noqa: BLE001 — record any failure, never crash the caller
+        log.warning("Extraction failed for entry %s: %r", entry_id, exc)
         await db.entry.update(
             where={"id": entry_id},
-            data={"status": "FAILED", "error": str(exc), "processedAt": _now()},
+            data={
+                "status": "FAILED",
+                # A plain sentence for the app; the technical detail goes to the log.
+                "error": getattr(exc, "user_message", "vournal couldn’t organise this entry. Please try again."),
+                "processedAt": _now(),
+            },
         )
         return
 
@@ -403,14 +409,20 @@ async def process_transcript(
     # Persist todos. startAt is composed from dueDate + a spoken time (if any);
     # untimed todos keep startAt = null.
     for todo in result["todos"]:
+        due, time = verified_day(todo, transcript)
+        try:
+            meta = normalize_metadata(todo, transcript, tz)
+        except Exception:  # noqa: BLE001 — one odd to-do must not lose the rest
+            log.exception("Task metadata fell back to defaults for entry %s", entry_id)
+            meta = normalize_metadata({"text": todo["text"]}, transcript, tz)
         await db.todo.create(
             data={
                 "entryId": entry_id,
                 "userId": user_id,
                 "text": todo["text"],
-                "dueDate": _parse_due(todo.get("dueDate")),
-                "startAt": _compose_start_at(todo.get("dueDate"), todo.get("time"), tz),
-                **normalize_metadata(todo, transcript),
+                "dueDate": _parse_due(due),
+                "startAt": _compose_start_at(due, time, tz),
+                **meta,
             }
         )
 
@@ -719,8 +731,8 @@ async def update_task_details(
         data["urgencyUnclear"] = False
     if "recurrence" in fields:
         data["recurrenceUnclear"] = False
-        if body.recurrence is None:
-            data["recurrenceWeekdays"] = []  # a one-time task has no repeat days
+        if body.recurrence != "weekly" and "recurrenceWeekdays" not in fields:
+            data["recurrenceWeekdays"] = []  # repeat days only mean something weekly
     tz = _user_tz(current.timezone)
     if "date" in fields or "time" in fields:
         day = (

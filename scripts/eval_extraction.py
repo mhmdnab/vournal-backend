@@ -71,7 +71,10 @@ def _field_ok(field: str, want, todo: dict) -> bool:
         if todo.get("recurrence") != want.get("freq"):
             return False
         days = want.get("weekdays")
-        return days is None or sorted(todo.get("recurrenceWeekdays") or []) == sorted(days)
+        if days is not None and sorted(todo.get("recurrenceWeekdays") or []) != sorted(days):
+            return False
+        interval = want.get("interval")
+        return interval is None or todo.get("recurrenceInterval") == interval
     return todo.get(field) == want
 
 
@@ -152,18 +155,19 @@ def estimate(cases: list[dict], typed_model: str | None) -> float:
 
 def _pipeline_todos(result: dict, transcript: str, tz) -> list[dict]:
     from app.main import _compose_start_at
-    from app.task_intelligence import normalize_metadata, questions
+    from app.task_intelligence import normalize_metadata, questions, verified_day
 
     todos = []
     for item in result.get("todos", []):
-        meta = normalize_metadata(item, transcript)
-        start = _compose_start_at(item.get("dueDate"), item.get("time"), tz)
-        task = SimpleNamespace(text=item["text"], dueDate=item.get("dueDate"), startAt=start,
+        due, time = verified_day(item, transcript)  # same checks as process_transcript
+        meta = normalize_metadata(item, transcript, tz)
+        start = _compose_start_at(due, time, tz)
+        task = SimpleNamespace(text=item["text"], dueDate=due, startAt=start,
                                dismissedQuestions=[], **meta)
         todos.append({
             "text": item["text"],
-            "dueDate": item.get("dueDate"),
-            "time": item.get("time"),
+            "dueDate": due,
+            "time": time,
             **{k: v for k, v in meta.items() if k != "recurrenceUntil"},
             "questions": [q["field"] for q in questions(task)],
         })

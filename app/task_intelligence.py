@@ -25,8 +25,9 @@ TO-DO DETAILS (read carefully):
 Each object in "todos" ALSO has these keys:
 - "sourceText": the exact words from the transcript this to-do came from, copied verbatim (keep any !, !! or !!!).
 - "kind": "event" for a meeting, appointment, class, flight, dinner or anything happening at a time with other people or at a venue; otherwise "task". A phone call, an errand or a chore is a "task".
-- "urgency": how urgent the speaker says THIS to-do is — 3 high ("it's urgent", "very necessary", "ضروري كتير", "darure ktir", "عاجل جداً"), 2 medium, 1 low ("whenever I get a chance", "no rush", "mesh mesta3jel", "مش مستعجل", "لا داعي للعجلة"), 0 if they gave no sign. Plain obligation words — "need to", "have to", "must", "lezem", "لازم", "يجب" — are NOT urgency on their own: they just make it a to-do (0). Use null when they signal importance but not the level ("it's important", "soon", "mhem", "مهم", "قريباً"). Typed !, !! and !!! after a to-do mean 1, 2 and 3. Excitement or emotion about the day ("what a great day!!!", "شو هالنهار الحلو!!!") is NOT urgency for any to-do.
-- "urgencyEvidence": the exact words (verbatim from the transcript) that show the urgency, or null when urgency is 0 or null.
+- "urgency": how urgent the speaker says THIS to-do is — 3 high ("it's urgent", "very necessary", "ضروري كتير", "darure ktir", "عاجل جداً"), 2 medium, 1 low ("whenever I get a chance", "no rush", "mesh mesta3jel", "مش مستعجل", "لا داعي للعجلة"), 0 if they gave no sign. Plain obligation words — "need to", "have to", "must", "lezem", "لازم", "يجب" — are NOT urgency on their own: they just make it a to-do (0). Use the string "unclear" when they signal importance but not the level ("it's important", "soon", "mhem", "مهم", "قريباً"). Typed !, !! and !!! after a to-do mean 1, 2 and 3. Excitement or emotion about the day ("what a great day!!!", "شو هالنهار الحلو!!!") is NOT urgency for any to-do.
+- "urgencyEvidence": the exact words (verbatim from THIS to-do's part of the transcript) that show the urgency, or null when urgency is 0 or "unclear".
+- "dueDateEvidence": the exact words (verbatim from the transcript) that name the day ("tomorrow", "on Friday", "bukra", "نهار الجمعة"), or null when "dueDate" is null.
 - "location": a place said for THIS to-do, written exactly as spoken, or null. Never invent one.
 - "recurrence": null for a one-time to-do. If the speaker asks for it to repeat: {"freq": "daily"|"weekly"|"monthly"|"yearly", "interval": number (every 2 weeks -> 2), "weekdays": ["MO","TU","WE","TH","FR","SA","SU"] or null, "until": "YYYY-MM-DD" or null}. "every Monday and Thursday" -> {"freq":"weekly","interval":1,"weekdays":["MO","TH"],"until":null}. Use the string "unclear" when they want it to repeat but don't say how often ("every so often", "from time to time", "every now and then", "kel fatra", "كل فترة", "من وقت لآخر").
 - "category": one of work, health, family, finance, personal, learning, errands.
@@ -49,12 +50,25 @@ def category_for(text: str) -> str:
     return "personal"
 
 
+_FOLD = str.maketrans(
+    {
+        "أ": "ا", "إ": "ا", "آ": "ا", "ٱ": "ا",  # alef forms
+        "ة": "ه",  # ta marbuta
+        "ى": "ي",  # alef maqsura
+        "’": "'", "‘": "'", "`": "'", "“": '"', "”": '"',  # iOS smart punctuation
+        **{chr(0x0660 + d): str(d) for d in range(10)},  # Arabic-Indic digits
+        **{chr(0x06F0 + d): str(d) for d in range(10)},  # Persian digits
+    }
+)
+
+
 def _fold(text: str) -> str:
-    """Compare text the way a reader would: case-insensitive, without Arabic
-    diacritics or tatweel, Unicode-normalized, whitespace collapsed."""
-    text = unicodedata.normalize("NFKC", text).casefold()
+    """Compare text the way a reader would: case-insensitive; Arabic without
+    diacritics/tatweel and with alef, ta marbuta and alef maqsura unified; smart
+    quotes and Arabic digits made plain; punctuation ignored; whitespace collapsed."""
+    text = unicodedata.normalize("NFKC", text).casefold().translate(_FOLD)
     text = "".join(
-        ch
+        " " if unicodedata.category(ch).startswith("P") and ch != "'" else ch
         for ch in text
         if not ("\u064b" <= ch <= "\u065f" or ch in "\u0670\u0640")
     )
@@ -87,22 +101,27 @@ def _task_clause(item: dict, transcript: str) -> str:
 def _urgency(item: dict, transcript: str) -> tuple[int, bool]:
     """(urgency 0-3, unclear). Typed markers in the task's clause win; otherwise
     the model's level stands only when its evidence is really in the transcript."""
-    levels = {len(m) for m in re.findall(r"!+", _task_clause(item, transcript))}
+    clause = _task_clause(item, transcript)
+    levels = {len(m) for m in re.findall(r"!+", clause)}
     if levels:
         if len(levels) == 1 and 1 <= next(iter(levels)) <= 3:
             return next(iter(levels)), False
         return 0, True  # conflicting or out-of-range markers: ask
-    if "urgency" in item and item["urgency"] is None:
-        return 0, True  # importance signalled, level unknown: ask
     level = item.get("urgency")
+    if level == "unclear":
+        return 0, True  # importance signalled, level unknown: ask
     if type(level) is int and 1 <= level <= 3:
-        if _in_transcript(item.get("urgencyEvidence"), transcript):
+        evidence = item.get("urgencyEvidence")
+        if isinstance(evidence, str) and not evidence.strip(" !"):
+            return 0, False  # bare "!!!" outside the task is excitement, not urgency
+        # The words must belong to THIS task when its clause is known.
+        if _in_transcript(evidence, clause or transcript):
             return level, False
-        return 0, True  # unverifiable: ask instead of trusting it
+        return 0, True  # unverifiable or from another sentence: ask
     return 0, False
 
 
-def _recurrence(item: dict) -> dict:
+def _recurrence(item: dict, tz=None) -> dict:
     raw = item.get("recurrence")
     out = {
         "recurrence": None,
@@ -113,19 +132,25 @@ def _recurrence(item: dict) -> dict:
     }
     if isinstance(raw, str) and raw in RECURRENCES:  # flat legacy form
         raw = {"freq": raw, "interval": item.get("recurrenceInterval", 1)}
-    if not isinstance(raw, dict) or raw.get("freq") not in RECURRENCES:
+    if not isinstance(raw, dict) or not isinstance(raw.get("freq"), str) or raw["freq"] not in RECURRENCES:
         return out
     interval = raw.get("interval", 1)
     weekdays = raw.get("weekdays") if raw["freq"] == "weekly" else None
     until = raw.get("until")
     try:
+        # The end of that day where the user lives, stored in UTC.
         until_at = (
-            datetime.strptime(until, "%Y-%m-%d").replace(hour=23, minute=59, tzinfo=timezone.utc)
+            datetime.strptime(until, "%Y-%m-%d")
+            .replace(hour=23, minute=59, tzinfo=tz or timezone.utc)
+            .astimezone(timezone.utc)
             if isinstance(until, str)
             else None
         )
     except ValueError:
         until_at = None
+    due = item.get("dueDate")
+    if until_at and isinstance(due, str) and until < due:
+        until_at = None  # an end before the first occurrence is a mistake
     out.update(
         recurrence=raw["freq"],
         recurrenceInterval=interval if type(interval) is int and 1 <= interval <= 365 else 1,
@@ -135,7 +160,7 @@ def _recurrence(item: dict) -> dict:
     return out
 
 
-def normalize_metadata(item: dict, transcript: str) -> dict:
+def normalize_metadata(item: dict, transcript: str, tz=None) -> dict:
     urgency, unclear = _urgency(item, transcript)
     location = item.get("location")
     category = item.get("category")
@@ -144,10 +169,22 @@ def normalize_metadata(item: dict, transcript: str) -> dict:
         kind="event" if kind == "event" or EVENT.search(str(item.get("text") or "")) else "task",
         urgency=urgency,
         urgencyUnclear=unclear,
-        category=category if category in CATEGORIES else category_for(str(item.get("text") or "")),
+        category=category
+        if isinstance(category, str) and category in CATEGORIES
+        else category_for(str(item.get("text") or "")),
         location=location.strip() if _in_transcript(location, transcript) else None,
-        **_recurrence(item),
+        **_recurrence(item, tz),
     )
+
+
+def verified_day(item: dict, transcript: str) -> tuple:
+    """(dueDate, time) — dropped when the model named a day but its evidence isn't
+    in the transcript (an invented day, e.g. "today" for an urgent task). Replies
+    without a dueDateEvidence key keep the model's values."""
+    due, time = item.get("dueDate"), item.get("time")
+    if due and "dueDateEvidence" in item and not _in_transcript(item.get("dueDateEvidence"), transcript):
+        return None, None
+    return due, time
 
 
 def questions(task) -> list[dict]:
@@ -162,7 +199,8 @@ def questions(task) -> list[dict]:
         task.recurrence == "daily"
         or (task.recurrence == "weekly" and getattr(task, "recurrenceWeekdays", None))
     )
-    if (is_event or repeat_needs_day) and not task.dueDate:
+    repeat_says_when = bool(task.recurrence) and not repeat_needs_day
+    if (repeat_needs_day or (is_event and not repeat_says_when)) and not task.dueDate:
         output.append({"field": "date", "question": f"What date is “{task.text}” for?"})
     if is_event and not task.startAt:
         output.append({"field": "time", "question": f"What time is “{task.text}”?"})

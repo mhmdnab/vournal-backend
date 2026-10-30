@@ -42,7 +42,7 @@ class TaskRules(unittest.TestCase):
         self.assertEqual((result["urgency"], result["urgencyUnclear"]), (0, True))
 
     def test_signalled_but_unclear_urgency_asks(self):
-        result = _norm({"urgency": None}, "Pay rent soon, it's important.")
+        result = _norm({"urgency": "unclear"}, "Pay rent soon, it's important.")
         self.assertTrue(result["urgencyUnclear"])
 
     def test_no_urgency_said_is_zero_without_a_question(self):
@@ -121,6 +121,13 @@ class TaskRules(unittest.TestCase):
                                   recurrenceWeekdays=[], recurrenceUnclear=False,
                                   dismissedQuestions=[])
         self.assertEqual([q["field"] for q in questions(monthly)], ["date"])
+
+    def test_recurring_event_on_named_days_asks_only_missing_time(self):
+        task = SimpleNamespace(text="Team sync", kind="event", dueDate=None, startAt=None,
+                               urgencyUnclear=False, recurrence="weekly",
+                               recurrenceWeekdays=["TU"], recurrenceUnclear=False,
+                               dismissedQuestions=[])
+        self.assertEqual([q["field"] for q in questions(task)], ["time"])
 
     def test_plain_task_without_date_asks_nothing(self):
         task = SimpleNamespace(text="Buy milk", kind="task", dueDate=None, startAt=None,
@@ -252,6 +259,15 @@ class TasksIntegration(unittest.IsolatedAsyncioTestCase):
                     ).status_code,
                     404,
                 )
+                weekly = await client.patch(
+                    f"/todos/{task['id']}/details",
+                    json={"recurrence": "weekly", "recurrenceWeekdays": ["MO", "TH"]},
+                )
+                self.assertEqual(weekly.json()["recurrenceWeekdays"], ["MO", "TH"])
+                monthly = await client.patch(
+                    f"/todos/{task['id']}/details", json={"recurrence": "monthly"}
+                )
+                self.assertEqual(monthly.json()["recurrenceWeekdays"], [])
                 todos = (await client.get("/todos")).json()
                 self.assertEqual(todos[0]["location"], "Beirut office")
                 self.assertEqual(todos[0]["locationLongitude"], 35.5018)

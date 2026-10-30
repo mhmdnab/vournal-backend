@@ -41,16 +41,15 @@ from anthropic import AsyncAnthropic
 from app.extraction import (
     SYSTEM_PROMPT as _EXTRACT_SYS,
     KNOWN_NAMES_ADDENDUM as _KNOWN_ADDENDUM,
-    MAX_TOKENS,
     _empty_result,
     _format_now,
     _known_block,
     _normalize,
-    _strip_and_parse,
     _user_message,
     usage_of,
     _with_task_prompt,
-    check_stop_reason,
+    call_model,
+    parse_reply,
 )
 
 DEFAULT_MERGED_MODEL = "claude-sonnet-5"
@@ -98,9 +97,9 @@ async def extract_merged(
     client = AsyncAnthropic()
     model = model or os.environ.get("MERGED_MODEL") or DEFAULT_MERGED_MODEL
 
-    response = await client.messages.create(
+    response = await call_model(
+        client,
         model=model,
-        max_tokens=MAX_TOKENS,
         system=_with_task_prompt(MERGED_SYSTEM_PROMPT),
         # Off by default on Sonnet 5 it is NOT — disable it explicitly; thinking
         # tokens bill as output and defeat the whole point (see module docstring).
@@ -114,8 +113,7 @@ async def extract_merged(
             }
         ],
     )
-    check_stop_reason(response)
     text = "".join(
         b.text for b in response.content if getattr(b, "type", None) == "text"
     )
-    return _normalize(_strip_and_parse(text)), usage_of(response)
+    return _normalize(parse_reply(text)), usage_of(response)

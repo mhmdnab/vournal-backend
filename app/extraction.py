@@ -25,22 +25,62 @@ DEFAULT_MODEL = "claude-haiku-4-5-20251001"
 MAX_TOKENS = 4096
 
 
-class ExtractionTruncated(Exception):
-    """The model's reply was cut off at max_tokens: its JSON can't be trusted."""
+# One retry gets this much room when MAX_TOKENS wasn't enough.
+MAX_TOKENS_RETRY = 16000
 
 
-class ExtractionRefused(Exception):
+class ExtractionFailed(Exception):
+    """Base for replies vournal can't use. `user_message` is what the entry shows."""
+
+    user_message = "vournal couldn’t organise this entry. Your words are saved; please try again."
+
+    def __init__(self, detail: str = ""):
+        super().__init__(detail or self.user_message)
+
+
+class ExtractionTruncated(ExtractionFailed):
+    """The reply was cut off even after a retry with more room."""
+
+    user_message = "This entry was too long for vournal to organise in one go. Try splitting it into two."
+
+
+class ExtractionRefused(ExtractionFailed):
     """The model declined to process the entry (stop_reason "refusal")."""
+
+    user_message = "vournal couldn’t process this entry. Your words are saved."
+
+
+class ExtractionMalformed(ExtractionFailed):
+    """The reply wasn't the JSON object we asked for."""
 
 
 def check_stop_reason(response) -> None:
     """Fail loudly instead of parsing a partial or refused reply. process_transcript
-    marks the entry FAILED, so the user can retry; nothing is saved half-empty."""
+    marks the entry FAILED with the exception's user_message."""
     reason = getattr(response, "stop_reason", None)
     if reason == "max_tokens":
         raise ExtractionTruncated("Extraction reply was cut off at max_tokens.")
     if reason == "refusal":
         raise ExtractionRefused("The model declined to process this entry.")
+
+
+async def call_model(client, **request):
+    """messages.create with one retry at MAX_TOKENS_RETRY if the reply was cut
+    off, then the stop-reason check."""
+    response = await client.messages.create(max_tokens=MAX_TOKENS, **request)
+    if getattr(response, "stop_reason", None) == "max_tokens":
+        response = await client.messages.create(max_tokens=MAX_TOKENS_RETRY, **request)
+    check_stop_reason(response)
+    return response
+
+
+def parse_reply(text: str) -> dict:
+    """The model's JSON object, or ExtractionMalformed — never a silently empty entry."""
+    parsed = _strip_and_parse(text)
+    if not parsed or "summary" not in parsed:
+        raise ExtractionMalformed("The extraction reply wasn't the expected JSON object.")
+    return parsed
+
 
 # Caps applied during normalization.
 MAX_EMOTIONS = 4
@@ -304,10 +344,11 @@ def _normalize(raw: dict[str, Any]) -> dict[str, Any]:
                     )
                 }
             )
-            # Only when the model sent it: an explicit null means "signalled but
-            # unclear" (ask), while a missing key means no judgement (0).
-            if "urgency" in item:
-                todo["urgency"] = item["urgency"]
+            # Only when the model sent them: a missing dueDateEvidence keeps the
+            # model's day (older replies); urgency "unclear" asks the user.
+            for key in ("dueDateEvidence", "urgency"):
+                if key in item:
+                    todo[key] = item[key]
             todos.append(todo)
 
     # topics / people / places
@@ -382,9 +423,9 @@ async def extract(
     client = AsyncAnthropic()  # reads ANTHROPIC_API_KEY from the environment
     model = os.environ.get("EXTRACTION_MODEL") or DEFAULT_MODEL
 
-    response = await client.messages.create(
+    response = await call_model(
+        client,
         model=model,
-        max_tokens=MAX_TOKENS,
         system=_with_task_prompt(EXTRACT_SYSTEM_PROMPT),
         messages=[
             {
@@ -396,8 +437,7 @@ async def extract(
         ],
     )
 
-    check_stop_reason(response)
     # Concatenate any text blocks in the response.
     text = "".join(block.text for block in response.content if block.type == "text")
 
-    return _normalize(_strip_and_parse(text)), usage_of(response)
+    return _normalize(parse_reply(text)), usage_of(response)
