@@ -6,7 +6,7 @@ Run only through the guarded runner (frontend-mobile-app):
 """
 
 import unittest
-from datetime import timezone
+from datetime import date, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from zoneinfo import ZoneInfo
@@ -119,6 +119,64 @@ class Guards(unittest.TestCase):
         )
         # No evidence key at all (older replies): keep what the model said.
         self.assertEqual(verified_day({"dueDate": "2026-10-29", "time": "09:00"}, "x"), ("2026-10-29", "09:00"))
+
+
+class HeldOutFixes(unittest.TestCase):
+    """Misses from the held-out evaluation (h1)."""
+
+    TODAY = date(2026, 10, 31)  # a Saturday
+
+    def _day(self, due, evidence, transcript, today=TODAY):
+        return verified_day({"dueDate": due, "time": "10:00", "dueDateEvidence": evidence}, transcript, today)[0]
+
+    def test_named_weekday_corrects_the_date(self):
+        self.assertEqual(self._day("2026-11-03", "on Monday", "pick up the dry cleaning on Monday"), "2026-11-02")
+        self.assertEqual(self._day("2026-11-04", "يوم الإثنين", "استلم الملابس يوم الإثنين"), "2026-11-02")
+        self.assertEqual(self._day("2026-11-03", "nhar el tnen", "jib el tyeb nhar el tnen"), "2026-11-02")
+        self.assertEqual(self._day("2026-11-06", "el khamis", "el khamis el jeye"), "2026-11-05")
+        self.assertEqual(self._day("2026-11-03", "الإثنين المقبل", "الإثنين المقبل"), "2026-11-02")
+        # The model's week is kept ("next Monday" a week out stays a week out)...
+        self.assertEqual(self._day("2026-11-10", "next Monday", "next Monday"), "2026-11-09")
+        # ...but never moved into the past.
+        self.assertEqual(self._day("2026-11-01", "Friday", "on Friday"), "2026-11-06")
+
+    def test_right_or_ambiguous_weekdays_are_left_alone(self):
+        self.assertEqual(self._day("2026-11-02", "on Monday", "on Monday"), "2026-11-02")
+        self.assertEqual(self._day("2026-11-01", "before Monday", "before Monday"), "2026-11-01")
+        self.assertEqual(self._day("2026-11-03", "Monday or Tuesday", "Monday or Tuesday"), "2026-11-03")
+        # "tnen" is also "two" and "jem3a" also "a week": only a day after nhar/yom.
+        self.assertEqual(self._day("2026-11-07", "ba3d jem3a", "ba3d jem3a"), "2026-11-07")
+        self.assertEqual(self._day("2026-11-01", "el tnen", "el tnen"), "2026-11-01")
+        self.assertEqual(verified_day({"dueDate": "soon", "dueDateEvidence": "Monday"}, "Monday", self.TODAY), ("soon", None))
+
+    def test_urgency_words_anywhere_in_the_tasks_sentence(self):
+        for transcript, source, evidence in (
+            ("This can't wait — I have to fix the car brakes before Monday.",
+             "I have to fix the car brakes before Monday.", "This can't wait"),
+            ("هذا الأمر لا يحتمل التأجيل، يجب أن أصلح فرامل السيارة قبل يوم الإثنين.",
+             "يجب أن أصلح فرامل السيارة قبل يوم الإثنين", "هذا الأمر لا يحتمل التأجيل"),
+        ):
+            result = normalize_metadata(
+                {"text": "Fix the brakes", "sourceText": source, "urgency": 3, "urgencyEvidence": evidence},
+                transcript,
+            )
+            self.assertEqual((result["urgency"], result["urgencyUnclear"]), (3, False), transcript)
+
+    def test_lowercase_speech_still_keeps_urgency_in_its_sentence(self):
+        transcript = "bukra lezem e7ke el bank, mesta3jel. nhar el tnen 3ande interview"
+        result = normalize_metadata(
+            {"text": "Interview", "sourceText": "nhar el tnen 3ande interview", "urgency": 3,
+             "urgencyEvidence": "mesta3jel"},
+            transcript,
+        )
+        self.assertTrue(result["urgencyUnclear"])
+
+    def test_the_models_kind_wins_over_keywords(self):
+        booking = {"text": "Book dentist appointment for Sami", "kind": "task"}
+        self.assertEqual(normalize_metadata(booking, "Need to book the dentist for Sami.")["kind"], "task")
+        self.assertEqual(normalize_metadata({"text": "حجز موعد", "kind": "task"}, "احجز موعد")["kind"], "task")
+        # Keywords only fill in when the model gave no usable kind.
+        self.assertEqual(normalize_metadata({"text": "Dentist appointment"}, "Dentist appointment")["kind"], "event")
 
 
 if __name__ == "__main__":

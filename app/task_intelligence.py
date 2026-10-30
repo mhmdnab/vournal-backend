@@ -9,7 +9,7 @@ a guess. Typed !, !! and !!! attached to a task always win.
 
 import re
 import unicodedata
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 CATEGORIES = {"work", "health", "family", "finance", "personal", "learning", "errands"}
 RECURRENCES = {"daily", "weekly", "monthly", "yearly"}
@@ -88,6 +88,17 @@ def _clauses(text: str) -> list[str]:
     ]
 
 
+def _sentence_of(clause: str, transcript: str) -> str:
+    """The transcript sentence holding the clause, so urgency said just before
+    the task ("This can't wait — I have to…") still counts. Sentences end at any
+    . ! ? ؟ (lowercase Arabizi speech too); the clause itself when it spans more."""
+    target = _fold(clause)
+    return next(
+        (s for s in re.split(r"[\n;]+|(?<=[.!?؟])\s+", transcript) if target and target in _fold(s)),
+        clause,
+    )
+
+
 def _task_clause(item: dict, transcript: str) -> str:
     """The verbatim clause the to-do came from: the model's sourceText when it is
     really in the transcript (and is one clause), else the clause holding its text."""
@@ -114,8 +125,8 @@ def _urgency(item: dict, transcript: str) -> tuple[int, bool]:
         evidence = item.get("urgencyEvidence")
         if isinstance(evidence, str) and not evidence.strip(" !"):
             return 0, False  # bare "!!!" outside the task is excitement, not urgency
-        # The words must belong to THIS task when its clause is known.
-        if _in_transcript(evidence, clause or transcript):
+        # The words must belong to THIS task's sentence when its clause is known.
+        if _in_transcript(evidence, _sentence_of(clause, transcript) if clause else transcript):
             return level, False
         return 0, True  # unverifiable or from another sentence: ask
     return 0, False
@@ -166,7 +177,8 @@ def normalize_metadata(item: dict, transcript: str, tz=None) -> dict:
     category = item.get("category")
     kind = item.get("kind")
     return dict(
-        kind="event" if kind == "event" or EVENT.search(str(item.get("text") or "")) else "task",
+        # The model's kind wins ("book the dentist" is a task); keywords only fill in.
+        kind=kind if kind in ("event", "task") else "event" if EVENT.search(str(item.get("text") or "")) else "task",
         urgency=urgency,
         urgencyUnclear=unclear,
         category=category
@@ -177,13 +189,58 @@ def normalize_metadata(item: dict, transcript: str, tz=None) -> dict:
     )
 
 
-def verified_day(item: dict, transcript: str) -> tuple:
+# Weekday names in day evidence, after folding. Words that are also numbers or
+# "week" (tnen = two, jem3a = a week, التنين = both) count only after nhar/yom.
+_DAY_PREFIX = r"(?:nhar|nahar|yom|youm|yawm|يوم|نهار)\s+(?:el\s+|l\s+|al\s+)?"
+_WEEKDAY_NAMES = (
+    (0, r"monday|الاثنين", r"tnen|etnen|itnen|tanen|ithnayn|اثنين|الاتنين|اتنين|التنين"),
+    (1, r"tuesday|الثلاثاء|الثلاثا|التلاتا", r"talata|tlata|tleta|tlete|ثلاثاء|تلاتا"),
+    (2, r"wednesday|الاربعاء|الاربعا", r"arba3a|arb3a|erb3a|arbi3a|اربعاء|اربعا"),
+    (3, r"thursday|الخميس|khamis|5amis|khmis", r"خميس"),
+    (4, r"friday", r"jem3a|jom3a|jum3a|jim3a|الجمعه|جمعه"),
+    (5, r"saturday|السبت|sabt|sabet|sebt", r"سبت"),
+    (6, r"sunday|الاحد", r"a7ad|ahad|احد"),
+)
+_RELATIVE = re.compile(r"(?<!\w)(?:before|after|until|till|abel|2abel|ba3d|la7ad|قبل|بعد|حتى|لحد)(?!\w)")
+
+
+def _named_weekday(evidence) -> int | None:
+    """The one weekday the day evidence names (0 = Monday), or None when it names
+    none, several, or a relative day ("before Monday")."""
+    if not isinstance(evidence, str):
+        return None
+    text = _fold(evidence)
+    if _RELATIVE.search(text):
+        return None
+    named = {
+        day
+        for day, bare, prefixed in _WEEKDAY_NAMES
+        if re.search(rf"(?<!\w)(?:{bare})(?!\w)|{_DAY_PREFIX}(?:{prefixed})(?!\w)", text)
+    }
+    return named.pop() if len(named) == 1 else None
+
+
+def verified_day(item: dict, transcript: str, today: date | None = None) -> tuple:
     """(dueDate, time) — dropped when the model named a day but its evidence isn't
     in the transcript (an invented day, e.g. "today" for an urgent task). Replies
-    without a dueDateEvidence key keep the model's values."""
+    without a dueDateEvidence key keep the model's values. When the evidence names
+    one weekday and the date falls on another, the date moves to the nearest such
+    weekday (keeping the model's week), never before `today`."""
     due, time = item.get("dueDate"), item.get("time")
-    if due and "dueDateEvidence" in item and not _in_transcript(item.get("dueDateEvidence"), transcript):
+    evidence = item.get("dueDateEvidence")
+    if due and "dueDateEvidence" in item and not _in_transcript(evidence, transcript):
         return None, None
+    weekday = _named_weekday(evidence)
+    if isinstance(due, str) and weekday is not None:
+        try:
+            day = date.fromisoformat(due)
+        except ValueError:
+            return due, time
+        forward = (weekday - day.weekday()) % 7
+        day += timedelta(days=forward if forward <= 3 else forward - 7)
+        while today and day < today:
+            day += timedelta(days=7)
+        due = day.isoformat()
     return due, time
 
 

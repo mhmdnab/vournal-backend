@@ -25,6 +25,7 @@ import sys
 import unicodedata
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from zoneinfo import ZoneInfo
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 CASES = ROOT / "evals" / "extraction" / "cases.jsonl"
@@ -153,13 +154,13 @@ def estimate(cases: list[dict], typed_model: str | None) -> float:
     return cost
 
 
-def _pipeline_todos(result: dict, transcript: str, tz) -> list[dict]:
+def _pipeline_todos(result: dict, transcript: str, tz, today=None) -> list[dict]:
     from app.main import _compose_start_at
     from app.task_intelligence import normalize_metadata, questions, verified_day
 
     todos = []
     for item in result.get("todos", []):
-        due, time = verified_day(item, transcript)  # same checks as process_transcript
+        due, time = verified_day(item, transcript, today)  # same checks as process_transcript
         meta = normalize_metadata(item, transcript, tz)
         start = _compose_start_at(due, time, tz)
         task = SimpleNamespace(text=item["text"], dueDate=due, startAt=start,
@@ -175,7 +176,6 @@ def _pipeline_todos(result: dict, transcript: str, tz) -> list[dict]:
 
 
 async def _run_case(case: dict, typed_model: str | None) -> dict:
-    from zoneinfo import ZoneInfo
 
     from app.extraction import extract
     from app.extraction_merged import extract_merged
@@ -194,7 +194,7 @@ async def _run_case(case: dict, typed_model: str | None) -> dict:
         error = None
     except Exception as exc:  # truncated/refused/API errors are results too
         result, usage, model, error = {"todos": []}, None, typed if case["mode"] == "typed" else spoken, repr(exc)
-    todos = _pipeline_todos(result, case["transcript"], tz)
+    todos = _pipeline_todos(result, case["transcript"], tz, now.date())
     return {"id": case["id"], "lang": case["lang"], "mode": case["mode"], "model": model,
             "error": error, "raw": result, "todos": todos, "usage": usage,
             "score": score_case(case, todos)}
@@ -259,6 +259,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--yes", action="store_true")
     parser.add_argument("--out", type=pathlib.Path)
     parser.add_argument("--rescore", type=pathlib.Path)
+    parser.add_argument("--repipe", action="store_true", help="with --rescore: rerun the code guards on saved replies")
     parser.add_argument("--review", type=pathlib.Path, help="write the owner review sheet here")
     parser.add_argument("--errors-from", type=pathlib.Path,
                         help="rerun only the cases that errored in this results file, and merge into it")
@@ -277,7 +278,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.rescore:
         saved = json.loads(args.rescore.read_text())
         by_id = {c["id"]: c for c in cases}
-        rows = [dict(r, score=score_case(by_id[r["id"]], r["todos"])) for r in saved["rows"] if r["id"] in by_id]
+        rows = []
+        for r in saved["rows"]:
+            if r["id"] not in by_id:
+                continue
+            case = by_id[r["id"]]
+            if args.repipe:  # rerun today's guards on the saved model replies (free)
+                r = dict(r, todos=_pipeline_todos(r["raw"], case["transcript"],
+                                                  ZoneInfo(case.get("tz", "Asia/Beirut")),
+                                                  datetime.fromisoformat(case["now"]).date()))
+            rows.append(dict(r, score=score_case(case, r["todos"])))
         print_table(summarize(rows))
         return 0
 

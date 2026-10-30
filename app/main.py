@@ -374,8 +374,9 @@ async def process_transcript(
     known = await known_names(db, user_id)
 
     extract_fn = extract_merged if use_merged else extract
+    now = datetime.now(tz)
     try:
-        result, usage = await extract_fn(transcript, now=datetime.now(tz), known=known)
+        result, usage = await extract_fn(transcript, now=now, known=known)
     except (
         Exception
     ) as exc:  # noqa: BLE001 — record any failure, never crash the caller
@@ -409,7 +410,7 @@ async def process_transcript(
     # Persist todos. startAt is composed from dueDate + a spoken time (if any);
     # untimed todos keep startAt = null.
     for todo in result["todos"]:
-        due, time = verified_day(todo, transcript)
+        due, time = verified_day(todo, transcript, now.date())
         try:
             meta = normalize_metadata(todo, transcript, tz)
         except Exception:  # noqa: BLE001 — one odd to-do must not lose the rest

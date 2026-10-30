@@ -1,0 +1,2035 @@
+{
+ "summary": {
+  "ar": {
+   "dueDate": 100.0,
+   "time": 100.0,
+   "urgency": 100.0,
+   "location": 100.0,
+   "recurrence": 100.0,
+   "kind": 100.0,
+   "questions": 100.0,
+   "recall": 100.0,
+   "extra": 0
+  },
+  "az": {
+   "dueDate": 100.0,
+   "time": 100.0,
+   "urgency": 100.0,
+   "location": 100.0,
+   "recurrence": 100.0,
+   "kind": 100.0,
+   "questions": 100.0,
+   "recall": 100.0,
+   "extra": 0
+  },
+  "en": {
+   "dueDate": 100.0,
+   "time": 100.0,
+   "urgency": 100.0,
+   "location": 100.0,
+   "recurrence": 100.0,
+   "kind": 100.0,
+   "questions": 100.0,
+   "recall": 100.0,
+   "extra": 0
+  },
+  "lb": {
+   "dueDate": 100.0,
+   "time": 100.0,
+   "urgency": 100.0,
+   "location": 100.0,
+   "recurrence": 100.0,
+   "kind": 100.0,
+   "questions": 100.0,
+   "recall": 100.0,
+   "extra": 0
+  }
+ },
+ "cost": 0.163156,
+ "rows": [
+  {
+   "id": "h2-en-01",
+   "lang": "en",
+   "mode": "typed",
+   "model": "claude-haiku-4-5-20251001",
+   "error": null,
+   "raw": {
+    "summary": "I need to renew my car insurance by Thursday.",
+    "mood": {
+     "score": 3,
+     "label": "neutral, task-focused",
+     "emotions": []
+    },
+    "todos": [
+     {
+      "text": "Renew car insurance",
+      "dueDate": "2026-11-05",
+      "time": null,
+      "sourceText": "renew the car insurance by Thursday",
+      "kind": "task",
+      "category": "finance",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": "Honestly this is urgent",
+      "dueDateEvidence": "by Thursday",
+      "urgency": 3
+     }
+    ],
+    "topics": [],
+    "people": [],
+    "places": []
+   },
+   "todos": [
+    {
+     "text": "Renew car insurance",
+     "dueDate": "2026-11-05",
+     "time": null,
+     "kind": "task",
+     "urgency": 3,
+     "urgencyUnclear": false,
+     "category": "finance",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 2730,
+    "outTokens": 212
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "h2-en-02",
+   "lang": "en",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "I had a long day at work and I need to make an appointment with the vet for Luna.",
+    "mood": {
+     "score": 3,
+     "label": "tired",
+     "emotions": [
+      "tired"
+     ]
+    },
+    "todos": [
+     {
+      "text": "Make vet appointment for Luna",
+      "dueDate": null,
+      "time": null,
+      "sourceText": "I should make an appointment with the vet for Luna",
+      "kind": "task",
+      "category": "errands",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "dueDateEvidence": null,
+      "urgency": 0
+     }
+    ],
+    "topics": [
+     "work",
+     "pets"
+    ],
+    "people": [],
+    "places": []
+   },
+   "todos": [
+    {
+     "text": "Make vet appointment for Luna",
+     "dueDate": null,
+     "time": null,
+     "kind": "task",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "errands",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 3985,
+    "outTokens": 256
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "h2-en-03",
+   "lang": "en",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "I have dinner with Rania on Saturday at 8 at Em Sherif.",
+    "mood": {
+     "score": 3,
+     "label": "neutral",
+     "emotions": []
+    },
+    "todos": [
+     {
+      "text": "Dinner with Rania",
+      "dueDate": "2026-11-07",
+      "time": "20:00",
+      "sourceText": "Dinner with Rania on Saturday at 8 at Em Sherif",
+      "kind": "event",
+      "category": "personal",
+      "location": "Em Sherif",
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "dueDateEvidence": "Saturday",
+      "urgency": 0
+     }
+    ],
+    "topics": [
+     "relationship"
+    ],
+    "people": [
+     "Rania"
+    ],
+    "places": [
+     "Em Sherif"
+    ]
+   },
+   "todos": [
+    {
+     "text": "Dinner with Rania",
+     "dueDate": "2026-11-07",
+     "time": "20:00",
+     "kind": "event",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "personal",
+     "location": "Em Sherif",
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 3988,
+    "outTokens": 295
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "h2-en-04",
+   "lang": "en",
+   "mode": "typed",
+   "model": "claude-haiku-4-5-20251001",
+   "error": null,
+   "raw": {
+    "summary": "I need to water the plants every Sunday and Wednesday.",
+    "mood": {
+     "score": 3,
+     "label": "neutral",
+     "emotions": []
+    },
+    "todos": [
+     {
+      "text": "Water the plants",
+      "dueDate": null,
+      "time": null,
+      "sourceText": "Water the plants every Sunday and Wednesday.",
+      "kind": "task",
+      "category": "personal",
+      "location": null,
+      "recurrence": {
+       "freq": "weekly",
+       "interval": 1,
+       "weekdays": [
+        "SU",
+        "WE"
+       ],
+       "until": null
+      },
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "dueDateEvidence": "every Sunday and Wednesday",
+      "urgency": 0
+     }
+    ],
+    "topics": [],
+    "people": [],
+    "places": []
+   },
+   "todos": [
+    {
+     "text": "Water the plants",
+     "dueDate": null,
+     "time": null,
+     "kind": "task",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "personal",
+     "location": null,
+     "recurrence": "weekly",
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [
+      "WE",
+      "SU"
+     ],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 2724,
+    "outTokens": 235
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      0,
+      0
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "h2-en-05",
+   "lang": "en",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "I need to call the bank tomorrow, and I need to buy bread.",
+    "mood": {
+     "score": 3,
+     "label": "neutral",
+     "emotions": []
+    },
+    "todos": [
+     {
+      "text": "Call the bank",
+      "dueDate": "2026-11-04",
+      "time": null,
+      "sourceText": "Call the bank tomorrow, it's urgent",
+      "kind": "task",
+      "category": "finance",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": "it's urgent",
+      "dueDateEvidence": "tomorrow",
+      "urgency": 3
+     },
+     {
+      "text": "Buy bread",
+      "dueDate": null,
+      "time": null,
+      "sourceText": "buy bread",
+      "kind": "task",
+      "category": "errands",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "dueDateEvidence": null,
+      "urgency": 0
+     }
+    ],
+    "topics": [
+     "finance",
+     "errands"
+    ],
+    "people": [],
+    "places": []
+   },
+   "todos": [
+    {
+     "text": "Call the bank",
+     "dueDate": "2026-11-04",
+     "time": null,
+     "kind": "task",
+     "urgency": 3,
+     "urgencyUnclear": false,
+     "category": "finance",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    },
+    {
+     "text": "Buy bread",
+     "dueDate": null,
+     "time": null,
+     "kind": "task",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "errands",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 3986,
+    "outTokens": 293
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      2,
+      2
+     ],
+     "urgency": [
+      2,
+      2
+     ],
+     "location": [
+      2,
+      2
+     ],
+     "recurrence": [
+      2,
+      2
+     ],
+     "kind": [
+      2,
+      2
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 2
+   }
+  },
+  {
+   "id": "h2-ar-01",
+   "lang": "ar",
+   "mode": "typed",
+   "model": "claude-haiku-4-5-20251001",
+   "error": null,
+   "raw": {
+    "summary": "يجب تجديد تأمين السيارة بحلول يوم الخميس.",
+    "mood": {
+     "score": 2,
+     "label": "stressed and urgent",
+     "emotions": [
+      "stressed",
+      "anxious"
+     ]
+    },
+    "todos": [
+     {
+      "text": "تجديد تأمين السيارة",
+      "dueDate": "2026-11-05",
+      "time": null,
+      "sourceText": "يجب تجديد تأمين السيارة بحلول يوم الخميس",
+      "kind": "task",
+      "category": "finance",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": "الأمر عاجل جداً",
+      "dueDateEvidence": "بحلول يوم الخميس",
+      "urgency": 3
+     }
+    ],
+    "topics": [
+     "finance"
+    ],
+    "people": [],
+    "places": []
+   },
+   "todos": [
+    {
+     "text": "تجديد تأمين السيارة",
+     "dueDate": "2026-11-05",
+     "time": null,
+     "kind": "task",
+     "urgency": 3,
+     "urgencyUnclear": false,
+     "category": "finance",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 2755,
+    "outTokens": 275
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "h2-ar-02",
+   "lang": "ar",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "كان يومي طويلاً في العمل ولازم أحجز موعداً عند الطبيب البيطري للونا.",
+    "mood": {
+     "score": 2,
+     "label": "tired",
+     "emotions": [
+      "tired"
+     ]
+    },
+    "todos": [
+     {
+      "text": "حجز موعد عند الطبيب البيطري للونا",
+      "dueDate": null,
+      "time": null,
+      "sourceText": "يجب أن أحجز موعداً عند الطبيب البيطري للونا",
+      "kind": "task",
+      "category": "personal",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "dueDateEvidence": null,
+      "urgency": 0
+     }
+    ],
+    "topics": [
+     "work",
+     "pets"
+    ],
+    "people": [
+     "لونا"
+    ],
+    "places": []
+   },
+   "todos": [
+    {
+     "text": "حجز موعد عند الطبيب البيطري للونا",
+     "dueDate": null,
+     "time": null,
+     "kind": "task",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "personal",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 4007,
+    "outTokens": 238
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "h2-ar-03",
+   "lang": "ar",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "عندي عشاء مع رانيا يوم السبت الساعة الثامنة مساءً في مطعم أم شريف",
+    "mood": {
+     "score": 3,
+     "label": "neutral",
+     "emotions": []
+    },
+    "todos": [
+     {
+      "text": "عشاء مع رانيا",
+      "dueDate": "2026-11-07",
+      "time": "20:00",
+      "sourceText": "عشاء مع رانيا يوم السبت الساعة الثامنة مساءً في مطعم أم شريف",
+      "kind": "event",
+      "category": "personal",
+      "location": "مطعم أم شريف",
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "dueDateEvidence": "يوم السبت",
+      "urgency": 0
+     }
+    ],
+    "topics": [
+     "relationship"
+    ],
+    "people": [
+     "رانيا"
+    ],
+    "places": [
+     "مطعم أم شريف"
+    ]
+   },
+   "todos": [
+    {
+     "text": "عشاء مع رانيا",
+     "dueDate": "2026-11-07",
+     "time": "20:00",
+     "kind": "event",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "personal",
+     "location": "مطعم أم شريف",
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 4003,
+    "outTokens": 269
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "h2-ar-04",
+   "lang": "ar",
+   "mode": "typed",
+   "model": "claude-haiku-4-5-20251001",
+   "error": null,
+   "raw": {
+    "summary": "أسقي النباتات كل أحد وأربعاء.",
+    "mood": {
+     "score": 3,
+     "label": "neutral",
+     "emotions": []
+    },
+    "todos": [
+     {
+      "text": "Water the plants",
+      "dueDate": "2026-11-08",
+      "time": null,
+      "sourceText": "اسقِ النباتات كل أحد وأربعاء",
+      "kind": "task",
+      "category": "personal",
+      "location": null,
+      "recurrence": {
+       "freq": "weekly",
+       "interval": 1,
+       "weekdays": [
+        "SU",
+        "WE"
+       ],
+       "until": null
+      },
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "dueDateEvidence": "كل أحد وأربعاء",
+      "urgency": 0
+     }
+    ],
+    "topics": [],
+    "people": [],
+    "places": []
+   },
+   "todos": [
+    {
+     "text": "Water the plants",
+     "dueDate": "2026-11-08",
+     "time": null,
+     "kind": "task",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "personal",
+     "location": null,
+     "recurrence": "weekly",
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [
+      "WE",
+      "SU"
+     ],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 2737,
+    "outTokens": 270
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      0,
+      0
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "h2-ar-05",
+   "lang": "ar",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "لازم اتصل بالبنك غداً، الأمر مستعجل، واشتري الخبز",
+    "mood": {
+     "score": 3,
+     "label": "neutral but urgent",
+     "emotions": [
+      "urgent"
+     ]
+    },
+    "todos": [
+     {
+      "text": "الاتصال بالبنك",
+      "dueDate": "2026-11-04",
+      "time": null,
+      "sourceText": "اتصل بالبنك غداً، الأمر مستعجل",
+      "kind": "task",
+      "category": "finance",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": "الأمر مستعجل",
+      "dueDateEvidence": "غداً",
+      "urgency": 3
+     },
+     {
+      "text": "شراء الخبز",
+      "dueDate": null,
+      "time": null,
+      "sourceText": "اشترِ الخبز",
+      "kind": "task",
+      "category": "errands",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "dueDateEvidence": null,
+      "urgency": 0
+     }
+    ],
+    "topics": [
+     "finance",
+     "errands"
+    ],
+    "people": [],
+    "places": []
+   },
+   "todos": [
+    {
+     "text": "الاتصال بالبنك",
+     "dueDate": "2026-11-04",
+     "time": null,
+     "kind": "task",
+     "urgency": 3,
+     "urgencyUnclear": false,
+     "category": "finance",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    },
+    {
+     "text": "شراء الخبز",
+     "dueDate": null,
+     "time": null,
+     "kind": "task",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "errands",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 3996,
+    "outTokens": 425
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      2,
+      2
+     ],
+     "urgency": [
+      2,
+      2
+     ],
+     "location": [
+      2,
+      2
+     ],
+     "recurrence": [
+      2,
+      2
+     ],
+     "kind": [
+      2,
+      2
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 2
+   }
+  },
+  {
+   "id": "h2-lb-01",
+   "lang": "lb",
+   "mode": "typed",
+   "model": "claude-haiku-4-5-20251001",
+   "error": null,
+   "raw": {
+    "summary": "عندي تأمين السيارة لازم أجدده يوم الخميس، وهيدا مستعجل كتير.",
+    "mood": {
+     "score": 2,
+     "label": "stressed and urgent",
+     "emotions": [
+      "stressed",
+      "urgent"
+     ]
+    },
+    "todos": [
+     {
+      "text": "تجديد تأمين السيارة",
+      "dueDate": "2026-11-05",
+      "time": null,
+      "sourceText": "لازم جدد تأمين السيارة نهار الخميس",
+      "kind": "task",
+      "category": "finance",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": "هيدا مستعجل كتير",
+      "dueDateEvidence": "نهار الخميس",
+      "urgency": 3
+     }
+    ],
+    "topics": [
+     "finance"
+    ],
+    "people": [],
+    "places": []
+   },
+   "todos": [
+    {
+     "text": "تجديد تأمين السيارة",
+     "dueDate": "2026-11-05",
+     "time": null,
+     "kind": "task",
+     "urgency": 3,
+     "urgencyUnclear": false,
+     "category": "finance",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 2750,
+    "outTokens": 279
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "h2-lb-02",
+   "lang": "lb",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "كان نهاري طويل بالشغل ولازم أحجز موعد عند البيطري للونا",
+    "mood": {
+     "score": 3,
+     "label": "tired",
+     "emotions": [
+      "tired"
+     ]
+    },
+    "todos": [
+     {
+      "text": "حجز موعد عند البيطري للونا",
+      "dueDate": null,
+      "time": null,
+      "sourceText": "لازم احجز موعد عند البيطري للونا",
+      "kind": "task",
+      "category": "errands",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "dueDateEvidence": null,
+      "urgency": 0
+     }
+    ],
+    "topics": [
+     "work",
+     "pets"
+    ],
+    "people": [],
+    "places": []
+   },
+   "todos": [
+    {
+     "text": "حجز موعد عند البيطري للونا",
+     "dueDate": null,
+     "time": null,
+     "kind": "task",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "errands",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 3993,
+    "outTokens": 272
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "h2-lb-03",
+   "lang": "lb",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "عندي عشا مع رانيا نهار السبت الساعة تمانة بالليل بأم شريف",
+    "mood": {
+     "score": 3,
+     "label": "neutral",
+     "emotions": []
+    },
+    "todos": [
+     {
+      "text": "عشا مع رانيا",
+      "dueDate": "2026-11-07",
+      "time": "20:00",
+      "sourceText": "عشا مع رانيا نهار السبت الساعة تمانة بالليل بأم شريف",
+      "kind": "event",
+      "category": "personal",
+      "location": "أم شريف",
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "dueDateEvidence": "نهار السبت الساعة تمانة بالليل",
+      "urgency": 0
+     }
+    ],
+    "topics": [
+     "relationship"
+    ],
+    "people": [
+     "رانيا"
+    ],
+    "places": [
+     "أم شريف"
+    ]
+   },
+   "todos": [
+    {
+     "text": "عشا مع رانيا",
+     "dueDate": "2026-11-07",
+     "time": "20:00",
+     "kind": "event",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "personal",
+     "location": "أم شريف",
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 3996,
+    "outTokens": 260
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "h2-lb-04",
+   "lang": "lb",
+   "mode": "typed",
+   "model": "claude-haiku-4-5-20251001",
+   "error": null,
+   "raw": {
+    "summary": "عندي روتين سقي الزرع كل أحد وأربعا.",
+    "mood": {
+     "score": 3,
+     "label": "neutral",
+     "emotions": []
+    },
+    "todos": [
+     {
+      "text": "سقي الزرع",
+      "dueDate": null,
+      "time": null,
+      "sourceText": "سقي الزرع كل أحد وأربعا",
+      "kind": "task",
+      "category": "personal",
+      "location": null,
+      "recurrence": {
+       "freq": "weekly",
+       "interval": 1,
+       "weekdays": [
+        "SU",
+        "WE"
+       ],
+       "until": null
+      },
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "dueDateEvidence": null,
+      "urgency": 0
+     }
+    ],
+    "topics": [
+     "plants"
+    ],
+    "people": [],
+    "places": []
+   },
+   "todos": [
+    {
+     "text": "سقي الزرع",
+     "dueDate": null,
+     "time": null,
+     "kind": "task",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "personal",
+     "location": null,
+     "recurrence": "weekly",
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [
+      "WE",
+      "SU"
+     ],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 2733,
+    "outTokens": 260
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      0,
+      0
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "h2-lb-05",
+   "lang": "lb",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "لازم احكي البنك بكرا وهو مستعجل، وبدي جيب خبز",
+    "mood": {
+     "score": 3,
+     "label": "neutral with mild urgency",
+     "emotions": [
+      "urgent"
+     ]
+    },
+    "todos": [
+     {
+      "text": "الاتصال بالبنك",
+      "dueDate": "2026-11-04",
+      "time": null,
+      "sourceText": "احكي البنك بكرا، مستعجل",
+      "kind": "task",
+      "category": "finance",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": "مستعجل",
+      "dueDateEvidence": "بكرا",
+      "urgency": 3
+     },
+     {
+      "text": "جيب خبز",
+      "dueDate": null,
+      "time": null,
+      "sourceText": "جيب خبز",
+      "kind": "task",
+      "category": "errands",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "dueDateEvidence": null,
+      "urgency": 0
+     }
+    ],
+    "topics": [
+     "finance",
+     "errands"
+    ],
+    "people": [],
+    "places": []
+   },
+   "todos": [
+    {
+     "text": "الاتصال بالبنك",
+     "dueDate": "2026-11-04",
+     "time": null,
+     "kind": "task",
+     "urgency": 3,
+     "urgencyUnclear": false,
+     "category": "finance",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    },
+    {
+     "text": "جيب خبز",
+     "dueDate": null,
+     "time": null,
+     "kind": "task",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "errands",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 3987,
+    "outTokens": 320
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      2,
+      2
+     ],
+     "urgency": [
+      2,
+      2
+     ],
+     "location": [
+      2,
+      2
+     ],
+     "recurrence": [
+      2,
+      2
+     ],
+     "kind": [
+      2,
+      2
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 2
+   }
+  },
+  {
+   "id": "h2-az-01",
+   "lang": "az",
+   "mode": "typed",
+   "model": "claude-haiku-4-5-20251001",
+   "error": null,
+   "raw": {
+    "summary": "لازم أجدد تأمين السيارة يوم الخميس، هذا مستعجل كتير.",
+    "mood": {
+     "score": 2,
+     "label": "stressed and urgent",
+     "emotions": [
+      "stressed",
+      "pressured"
+     ]
+    },
+    "todos": [
+     {
+      "text": "Renew car insurance",
+      "dueDate": "2026-11-06",
+      "time": null,
+      "sourceText": "lezem jadded ta2min el siyara nhar el khamis",
+      "kind": "task",
+      "category": "finance",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": "hayda mesta3jel ktir",
+      "dueDateEvidence": "nhar el khamis",
+      "urgency": 3
+     }
+    ],
+    "topics": [
+     "finance"
+    ],
+    "people": [],
+    "places": []
+   },
+   "todos": [
+    {
+     "text": "Renew car insurance",
+     "dueDate": "2026-11-05",
+     "time": null,
+     "kind": "task",
+     "urgency": 3,
+     "urgencyUnclear": false,
+     "category": "finance",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 2743,
+    "outTokens": 260
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "h2-az-02",
+   "lang": "az",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "نهار طويل بالشغل ولازم أحجز موعد عند البيطري للونا",
+    "mood": {
+     "score": 3,
+     "label": "neutral, a bit tired",
+     "emotions": [
+      "tired"
+     ]
+    },
+    "todos": [
+     {
+      "text": "حجز موعد عند البيطري للونا",
+      "dueDate": null,
+      "time": null,
+      "sourceText": "lezem e7joz maw3ad 3end el bitari la Luna",
+      "kind": "task",
+      "category": "personal",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "dueDateEvidence": null,
+      "urgency": 0
+     }
+    ],
+    "topics": [
+     "work",
+     "pets"
+    ],
+    "people": [
+     "Luna"
+    ],
+    "places": []
+   },
+   "todos": [
+    {
+     "text": "حجز موعد عند البيطري للونا",
+     "dueDate": null,
+     "time": null,
+     "kind": "task",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "personal",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 3999,
+    "outTokens": 226
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "h2-az-03",
+   "lang": "az",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "عندي عشا مع رانيا نهار السبت الساعة 8 بالليل بمطعم أم شريف",
+    "mood": {
+     "score": 4,
+     "label": "pleasant anticipation",
+     "emotions": [
+      "happy"
+     ]
+    },
+    "todos": [
+     {
+      "text": "عشاء مع رانيا",
+      "dueDate": "2026-11-07",
+      "time": "20:00",
+      "sourceText": "3asha ma3 Rania nhar el sabt el se3a 8 bel lel b Em Sherif",
+      "kind": "event",
+      "category": "personal",
+      "location": "Em Sherif",
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "dueDateEvidence": "nhar el sabt el se3a 8 bel lel",
+      "urgency": 0
+     }
+    ],
+    "topics": [
+     "relationship",
+     "food"
+    ],
+    "people": [
+     "Rania"
+    ],
+    "places": [
+     "Em Sherif"
+    ]
+   },
+   "todos": [
+    {
+     "text": "عشاء مع رانيا",
+     "dueDate": "2026-11-07",
+     "time": "20:00",
+     "kind": "event",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "personal",
+     "location": "Em Sherif",
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 3998,
+    "outTokens": 277
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "h2-az-04",
+   "lang": "az",
+   "mode": "typed",
+   "model": "claude-haiku-4-5-20251001",
+   "error": null,
+   "raw": {
+    "summary": "أسقي الزرع كل أحد والأربعاء",
+    "mood": {
+     "score": 3,
+     "label": "neutral",
+     "emotions": []
+    },
+    "todos": [
+     {
+      "text": "Water the plants",
+      "dueDate": null,
+      "time": null,
+      "sourceText": "es2e el zare3 kel a7ad w arba3a",
+      "kind": "task",
+      "category": "personal",
+      "location": null,
+      "recurrence": {
+       "freq": "weekly",
+       "interval": 1,
+       "weekdays": [
+        "SU",
+        "WE"
+       ],
+       "until": null
+      },
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "dueDateEvidence": null,
+      "urgency": 0
+     }
+    ],
+    "topics": [],
+    "people": [],
+    "places": []
+   },
+   "todos": [
+    {
+     "text": "Water the plants",
+     "dueDate": null,
+     "time": null,
+     "kind": "task",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "personal",
+     "location": null,
+     "recurrence": "weekly",
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [
+      "WE",
+      "SU"
+     ],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 2734,
+    "outTokens": 251
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      0,
+      0
+     ],
+     "time": [
+      1,
+      1
+     ],
+     "urgency": [
+      1,
+      1
+     ],
+     "location": [
+      1,
+      1
+     ],
+     "recurrence": [
+      1,
+      1
+     ],
+     "kind": [
+      1,
+      1
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 1
+   }
+  },
+  {
+   "id": "h2-az-05",
+   "lang": "az",
+   "mode": "spoken",
+   "model": "claude-sonnet-5",
+   "error": null,
+   "raw": {
+    "summary": "لازم احكي البنك بكرا وجيب خبز",
+    "mood": {
+     "score": 3,
+     "label": "neutral",
+     "emotions": []
+    },
+    "todos": [
+     {
+      "text": "الاتصال بالبنك",
+      "dueDate": "2026-11-04",
+      "time": null,
+      "sourceText": "e7ke el bank bukra, mesta3jel",
+      "kind": "task",
+      "category": "finance",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": "mesta3jel",
+      "dueDateEvidence": "bukra",
+      "urgency": 3
+     },
+     {
+      "text": "جيب خبز",
+      "dueDate": null,
+      "time": null,
+      "sourceText": "jib khebez",
+      "kind": "task",
+      "category": "errands",
+      "location": null,
+      "recurrence": null,
+      "recurrenceInterval": null,
+      "urgencyEvidence": null,
+      "dueDateEvidence": null,
+      "urgency": 0
+     }
+    ],
+    "topics": [
+     "finance",
+     "errands"
+    ],
+    "people": [],
+    "places": []
+   },
+   "todos": [
+    {
+     "text": "الاتصال بالبنك",
+     "dueDate": "2026-11-04",
+     "time": null,
+     "kind": "task",
+     "urgency": 3,
+     "urgencyUnclear": false,
+     "category": "finance",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    },
+    {
+     "text": "جيب خبز",
+     "dueDate": null,
+     "time": null,
+     "kind": "task",
+     "urgency": 0,
+     "urgencyUnclear": false,
+     "category": "errands",
+     "location": null,
+     "recurrence": null,
+     "recurrenceInterval": 1,
+     "recurrenceWeekdays": [],
+     "recurrenceUnclear": false,
+     "questions": []
+    }
+   ],
+   "usage": {
+    "inTokens": 3987,
+    "outTokens": 388
+   },
+   "score": {
+    "fields": {
+     "dueDate": [
+      1,
+      1
+     ],
+     "time": [
+      2,
+      2
+     ],
+     "urgency": [
+      2,
+      2
+     ],
+     "location": [
+      2,
+      2
+     ],
+     "recurrence": [
+      2,
+      2
+     ],
+     "kind": [
+      2,
+      2
+     ]
+    },
+    "questions": true,
+    "missing": 0,
+    "extra": 0,
+    "expected": 2
+   }
+  }
+ ]
+}
