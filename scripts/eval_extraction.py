@@ -226,7 +226,7 @@ def print_table(table: dict) -> None:
 def write_review(cases: list[dict], path: pathlib.Path) -> None:
     """An owner-readable table of every case and its expected answers."""
     lines = ["# Extraction evaluation — expected answers", "",
-             "Reference time for every case: Wednesday 28 October 2026, 09:00 (Asia/Beirut).",
+             "Reference time: given per case (development set: Wednesday 28 October 2026, 09:00; held-out set: Saturday 31 October 2026, 19:30, Asia/Beirut).",
              "Check each expected answer; `*` means the field isn't scored, `ask` means the app should ask.", ""]
     for case in cases:
         lines += [f"## {case['id']} ({case['lang']}, {case['mode']})", "",
