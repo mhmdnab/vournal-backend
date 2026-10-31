@@ -149,6 +149,26 @@ class HeldOutFixes(unittest.TestCase):
         self.assertEqual(self._day("2026-11-01", "el tnen", "el tnen"), "2026-11-01")
         self.assertEqual(verified_day({"dueDate": "soon", "dueDateEvidence": "Monday"}, "Monday", self.TODAY), ("soon", None))
 
+    def test_two_named_days_leave_the_date_alone(self):
+        """و attaches to the next word, and tnen/jem3a only count after nhar/yom,
+        so a second day could go unseen and a correct date got moved."""
+        for due, evidence in (
+            ("2026-11-05", "يوم الإثنين والخميس"),
+            ("2026-11-06", "الثلاثاء والجمعة"),
+            ("2026-11-08", "السبت والأحد"),
+            ("2026-11-02", "el tnen w el khamis"),
+            ("2026-11-06", "el jem3a w el sabt"),
+            ("2026-11-06", "الجمعة أو السبت"),
+            ("2026-11-05", "يوم إثنين وخميس"),
+        ):
+            self.assertEqual(self._day(due, evidence, evidence), due, evidence)
+
+    def test_a_date_on_one_of_the_repeat_days_stays(self):
+        """"كل يوم إثنين وخميس" said on a Wednesday: Thursday is the first session."""
+        item = {"dueDate": "2026-10-29", "time": None, "dueDateEvidence": "يوم إثنين",
+                "recurrence": {"freq": "weekly", "interval": 1, "weekdays": ["MO", "TH"], "until": None}}
+        self.assertEqual(verified_day(item, "النادي كل يوم إثنين وخميس", date(2026, 10, 28))[0], "2026-10-29")
+
     def test_urgency_words_anywhere_in_the_tasks_sentence(self):
         for transcript, source, evidence in (
             ("This can't wait — I have to fix the car brakes before Monday.",

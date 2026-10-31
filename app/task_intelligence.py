@@ -213,11 +213,15 @@ def _named_weekday(evidence) -> int | None:
     text = _fold(evidence)
     if _RELATIVE.search(text):
         return None
-    named = {
-        day
-        for day, bare, prefixed in _WEEKDAY_NAMES
-        if re.search(rf"(?<!\w)(?:{bare})(?!\w)|{_DAY_PREFIX}(?:{prefixed})(?!\w)", text)
-    }
+    named = set()
+    for day, bare, prefixed in _WEEKDAY_NAMES:
+        # An attached "and" (و) hides the word boundary: "الاثنين والخميس" names two days.
+        said = len(re.findall(rf"(?<!\w)و?(?:{prefixed})(?!\w)", text))
+        as_day = len(re.findall(rf"{_DAY_PREFIX}(?:{prefixed})(?!\w)", text))
+        if said > as_day:
+            return None  # "el tnen w el khamis": it may be a day, so we can't tell
+        if as_day or re.search(rf"(?<!\w)و?(?:{bare})(?!\w)", text):
+            named.add(day)
     return named.pop() if len(named) == 1 else None
 
 
@@ -237,6 +241,10 @@ def verified_day(item: dict, transcript: str, today: date | None = None) -> tupl
             day = date.fromisoformat(due)
         except ValueError:
             return due, time
+        repeat = item.get("recurrence")
+        repeat_days = repeat.get("weekdays") if isinstance(repeat, dict) else None
+        if isinstance(repeat_days, list) and WEEKDAYS[day.weekday()] in repeat_days:
+            return due, time  # "every Monday and Thursday": already on one of its days
         forward = (weekday - day.weekday()) % 7
         day += timedelta(days=forward if forward <= 3 else forward - 7)
         while today and day < today:
