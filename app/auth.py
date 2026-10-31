@@ -102,7 +102,11 @@ def _code_digest(user_id: str, code: str) -> str:
 
 
 async def begin_email_challenge(
-    user, purpose: str = "verify_email", issuer: str | None = None, subject: str | None = None
+    user,
+    purpose: str = "verify_email",
+    issuer: str | None = None,
+    subject: str | None = None,
+    sealed_apple_token: str | None = None,
 ) -> AuthChallengeOut:
     """Email a 6-digit code. Only the latest challenge per account is valid."""
     raw = secrets.token_urlsafe(32)
@@ -120,6 +124,7 @@ async def begin_email_challenge(
                 "purpose": purpose,
                 "expiresAt": now + timedelta(minutes=10),
                 "codeHash": _code_digest(user.id, code),
+                "pendingSecret": sealed_apple_token,
                 **({"pendingIssuer": issuer, "pendingSubject": subject} if issuer else {}),
             }
         )
@@ -176,7 +181,28 @@ async def verify_challenge(request: Request, body: VerifyChallengeRequest):
     if user is None:
         raise HTTPException(400, _BAD_CODE)
     await confirm_email(db, user)
+    if challenge.purpose == "link_identity" and challenge.pendingIssuer:
+        await _finish_link(user, challenge)
     return await _issue_tokens(user.id)
+
+
+async def _finish_link(user, challenge) -> None:
+    """The person just proved this email, and the account never had. Whoever set its
+    password didn't prove anything, so that password and those sessions end here.
+    The real owner can set a new password with "forgot password"."""
+    from app.oauth import link_identity
+
+    await link_identity(user.id, challenge.pendingIssuer, challenge.pendingSubject)
+    await db.user.update(
+        where={"id": user.id},
+        data={
+            "passwordHash": None,
+            **({"appleRefreshToken": challenge.pendingSecret} if challenge.pendingSecret else {}),
+        },
+    )
+    await db.refreshtoken.update_many(
+        where={"userId": user.id, "revoked": False}, data={"revoked": True}
+    )
 
 
 @router.post("/email/send-code")
@@ -338,6 +364,12 @@ async def delete_me(body: DeleteAccountRequest, current=Depends(get_current_user
         body.password, current.passwordHash
     ):
         raise HTTPException(403, "Password is incorrect.")
+
+    # Apple requires revoking its token when the account goes.
+    if current.appleRefreshToken:
+        from app.oauth import revoke_apple
+
+        await revoke_apple(current.appleRefreshToken)
 
     # 1) External storage first — best-effort per object (a missing one is fine).
     entries = await db.entry.find_many(where={"userId": current.id})
