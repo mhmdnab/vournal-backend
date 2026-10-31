@@ -50,6 +50,9 @@ model User {
   emailConfirmRequired Boolean @default(false)
   // Sign in with Apple's refresh token, encrypted: deleting the account revokes it.
   appleRefreshToken String?
+  // Raised when old sessions must die at once. Every token carries the generation
+  // it was issued for, so a refresh or login racing the change dies with them.
+  sessionGeneration Int @default(0)
   twoFactorSecret String?
   twoFactorEnabled Boolean @default(false)
   twoFactorLastStep Int @default(-1)
@@ -155,6 +158,7 @@ model RefreshToken {
   expiresAt DateTime
   revoked   Boolean  @default(false)
   mfaVerified Boolean @default(false)
+  generation Int @default(0)
   createdAt DateTime @default(now())
 
   @@index([userId])

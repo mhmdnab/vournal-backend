@@ -270,6 +270,8 @@ async def main() -> int:
                 "email": email,
                 "passwordHash": hash_password(password),
                 "timezone": TIMEZONE,
+                # Pre-confirmed: the reviewer sees no email prompt.
+                "emailVerifiedAt": datetime.now(tz),
                 # Dated to the first entry, so "Joined" agrees with the journal.
                 "createdAt": _local(
                     datetime.now(tz) - timedelta(days=ENTRIES[0]["days_ago"]),

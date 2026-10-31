@@ -130,6 +130,8 @@ class AuthChallengeOut(BaseModel):
     challengeToken: str
     step: Literal["verify_email", "link_identity"]
     expiresAt: datetime
+    # Answering this ends the account's password and sessions: the app says so first.
+    clearsPassword: bool = False
 
 
 class VerifyChallengeRequest(BaseModel):

@@ -72,6 +72,25 @@ async def send_password_reset(to: str, reset_url: str, ttl_minutes: int) -> bool
     return await _send(to, subject, html, text)
 
 
-async def send_verification_code(to: str, code: str) -> bool:
-    text = f"Your Vournal verification code is {code}. It expires in 10 minutes."
-    return await _send(to, "Verify your Vournal email", f"<p>{text}</p>", text)
+async def send_verification_code(to: str, code: str, note: str | None = None) -> bool:
+    lines = [
+        f"Your vournal code is {code}. It expires in 10 minutes.",
+        *([note] if note else []),
+        "If you didn't ask for this, you can ignore this email.",
+    ]
+    html = "".join(f"<p>{line}</p>" for line in lines)
+    return await _send(to, "Your vournal code", html, "\n\n".join(lines))
+
+
+async def send_plus_confirm_link(to: str, url: str) -> bool:
+    """A website purchase is waiting on an account that hasn't confirmed this address."""
+    text = (
+        "Thanks for subscribing to vournal Plus. To turn it on, confirm that this "
+        f"email address is yours: {url}\n\nThe link works for 7 days."
+    )
+    html = (
+        "<p>Thanks for subscribing to vournal Plus. To turn it on, confirm that this "
+        f'email address is yours:</p><p><a href="{url}">Confirm my email</a></p>'
+        "<p>The link works for 7 days.</p>"
+    )
+    return await _send(to, "Turn on vournal Plus", html, text)

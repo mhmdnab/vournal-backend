@@ -16,8 +16,10 @@ import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi.responses import HTMLResponse
 
 from app import email, security
 from app.db import db
@@ -66,33 +68,50 @@ async def get_current_user(authorization: Optional[str] = Header(default=None)):
         raise HTTPException(401, "Not authenticated", headers=_UNAUTHENTICATED)
 
     token = authorization[len("bearer ") :].strip()
-    user_id = security.decode_access_token(token)
-    if not user_id:
+    decoded = security.decode_access_token(token)
+    if not decoded:
         raise HTTPException(401, "Invalid or expired token", headers=_UNAUTHENTICATED)
 
+    user_id, generation = decoded
     user = await db.user.find_unique(where={"id": user_id})
-    if user is None:
+    if user is None or user.sessionGeneration != generation:
         raise HTTPException(401, "Invalid or expired token", headers=_UNAUTHENTICATED)
     return user
 
 
-async def _issue_tokens(user_id: str, client=None) -> TokenResponse:
-    """Mint an access JWT and persist a new (hashed) refresh token."""
+async def _issue_tokens(user_id: str, generation: int | None = None) -> TokenResponse:
+    """Mint an access JWT and persist a new (hashed) refresh token. Callers that read
+    the account before doing slow work pass the generation they saw, so a session
+    change in between kills what they're about to issue."""
+    if generation is None:
+        user = await db.user.find_unique(where={"id": user_id})
+        generation = user.sessionGeneration if user else 0
     raw_refresh = security.generate_refresh_token()
-    await (client or db).refreshtoken.create(
+    await db.refreshtoken.create(
         data={
             "userId": user_id,
             "tokenHash": security.hash_refresh_token(raw_refresh),
             "expiresAt": security.refresh_expiry(),
+            "generation": generation,
         }
     )
     return TokenResponse(
-        accessToken=security.create_access_token(user_id),
+        accessToken=security.create_access_token(user_id, generation),
         refreshToken=raw_refresh,
     )
 
 
 _BAD_CODE = "Invalid or expired code. After five attempts, sign in again."
+# Per account, in the database, so they hold across IPs and deploys.
+_CODES_PER_HOUR = 6
+_CODES_PER_DAY = 15
+_WRONG_GUESSES_PER_DAY = 20
+_CODE_PURPOSES = ["verify_email", "link_identity"]
+_CONFIRM_LINK_DAYS = 7
+_CLEARS_PASSWORD_NOTE = (
+    "Entering this code connects your sign-in to this vournal account and removes its "
+    'old password. You can set a new one any time with "Forgot password".'
+)
 
 
 def _code_digest(user_id: str, code: str) -> str:
@@ -112,10 +131,22 @@ async def begin_email_challenge(
     raw = secrets.token_urlsafe(32)
     now = datetime.now(timezone.utc)
     code = f"{secrets.randbelow(1_000_000):06d}"
+    clears_password = (
+        purpose == "link_identity"
+        and user.emailVerifiedAt is None
+        and user.passwordHash is not None
+    )
     async with db.tx() as tx:
         await tx.query_raw('SELECT id FROM "User" WHERE id = $1 FOR UPDATE', user.id)
+        for window, limit in ((timedelta(hours=1), _CODES_PER_HOUR), (timedelta(days=1), _CODES_PER_DAY)):
+            sent = await tx.authchallenge.count(
+                where={"userId": user.id, "purpose": {"in": _CODE_PURPOSES}, "createdAt": {"gt": now - window}}
+            )
+            if sent >= limit:
+                raise HTTPException(429, "Too many codes. Please wait and try again.")
         await tx.authchallenge.update_many(
-            where={"userId": user.id, "usedAt": None}, data={"usedAt": now}
+            where={"userId": user.id, "usedAt": None, "purpose": {"in": _CODE_PURPOSES}},
+            data={"usedAt": now},
         )
         await tx.authchallenge.create(
             data={
@@ -129,11 +160,30 @@ async def begin_email_challenge(
             }
         )
     # The local runner replaces delivery with a private local mailbox file.
-    if not await email.send_verification_code(user.email, code):
+    note = _CLEARS_PASSWORD_NOTE if clears_password else None
+    if not await email.send_verification_code(user.email, code, note):
         raise HTTPException(503, "Verification email could not be sent. Sign in to retry.")
     return AuthChallengeOut(
-        challengeToken=raw, step=purpose, expiresAt=now + timedelta(minutes=10)
+        challengeToken=raw,
+        step=purpose,
+        expiresAt=now + timedelta(minutes=10),
+        clearsPassword=clears_password,
     )
+
+
+async def begin_confirm_link(user) -> str:
+    """A one-time token for emailing a link, for when there's no app to type a code
+    into: a build 4 phone, or someone who only used the website."""
+    raw = secrets.token_urlsafe(32)
+    await db.authchallenge.create(
+        data={
+            "userId": user.id,
+            "tokenHash": security.hash_refresh_token(raw),
+            "purpose": "confirm_link",
+            "expiresAt": datetime.now(timezone.utc) + timedelta(days=_CONFIRM_LINK_DAYS),
+        }
+    )
+    return raw
 
 
 async def _spend_code(user_id: str, find_challenge, code: str):
@@ -150,7 +200,13 @@ async def _spend_code(user_id: str, find_challenge, code: str):
             or challenge.usedAt is not None
             or challenge.expiresAt <= now
             or challenge.attempts >= 5
+            or challenge.purpose not in _CODE_PURPOSES
         ):
+            return None
+        recent = await tx.authchallenge.find_many(
+            where={"userId": user_id, "createdAt": {"gt": now - timedelta(days=1)}}
+        )
+        if sum(item.attempts for item in recent) >= _WRONG_GUESSES_PER_DAY:
             return None
         await tx.authchallenge.update(
             where={"id": challenge.id}, data={"attempts": {"increment": 1}}
@@ -180,28 +236,95 @@ async def verify_challenge(request: Request, body: VerifyChallengeRequest):
     user = await db.user.find_unique(where={"id": challenge.userId})
     if user is None:
         raise HTTPException(400, _BAD_CODE)
-    await confirm_email(db, user)
     if challenge.purpose == "link_identity" and challenge.pendingIssuer:
         await _finish_link(user, challenge)
+        user = await db.user.find_unique(where={"id": user.id})
+    await confirm_email(db, user)
     return await _issue_tokens(user.id)
 
 
 async def _finish_link(user, challenge) -> None:
-    """The person just proved this email, and the account never had. Whoever set its
-    password didn't prove anything, so that password and those sessions end here.
-    The real owner can set a new password with "forgot password"."""
-    from app.oauth import link_identity
+    """All or nothing. If the account had never proved its email, whoever set its
+    password proved nothing: that password and every session end here, and the
+    person just proved the address. A confirmed account keeps its password."""
+    now = datetime.now(timezone.utc)
+    data = {"emailVerifiedAt": user.emailVerifiedAt or now}
+    if challenge.pendingSecret:
+        data["appleRefreshToken"] = challenge.pendingSecret
+    async with db.tx() as tx:
+        known = await tx.externalidentity.find_unique(
+            where={"issuer_subject": {"issuer": challenge.pendingIssuer, "subject": challenge.pendingSubject}}
+        )
+        if known is None:
+            await tx.externalidentity.create(
+                data={
+                    "userId": user.id,
+                    "issuer": challenge.pendingIssuer,
+                    "subject": challenge.pendingSubject,
+                }
+            )
+        elif known.userId != user.id:
+            raise HTTPException(409, "That sign-in already belongs to another account.")
+        if user.emailVerifiedAt is None:
+            data.update(passwordHash=None, sessionGeneration={"increment": 1})
+            await tx.refreshtoken.update_many(
+                where={"userId": user.id, "revoked": False}, data={"revoked": True}
+            )
+        await tx.user.update(where={"id": user.id}, data=data)
 
-    await link_identity(user.id, challenge.pendingIssuer, challenge.pendingSubject)
-    await db.user.update(
-        where={"id": user.id},
-        data={
-            "passwordHash": None,
-            **({"appleRefreshToken": challenge.pendingSecret} if challenge.pendingSecret else {}),
-        },
+
+def _confirm_page(title: str, body: str, form: str = "") -> HTMLResponse:
+    return HTMLResponse(
+        "<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width'>"
+        f"<title>{title}</title><body style='font-family:system-ui;max-width:28rem;margin:4rem auto;padding:0 1.5rem'>"
+        f"<h1 style='font-weight:500'>{title}</h1><p>{body}</p>{form}"
     )
-    await db.refreshtoken.update_many(
-        where={"userId": user.id, "revoked": False}, data={"revoked": True}
+
+
+async def _live_confirm_link(token: str):
+    challenge = await db.authchallenge.find_unique(
+        where={"tokenHash": security.hash_refresh_token(token)}
+    )
+    if (
+        challenge is None
+        or challenge.purpose != "confirm_link"
+        or challenge.usedAt is not None
+        or challenge.expiresAt <= datetime.now(timezone.utc)
+    ):
+        return None
+    return challenge
+
+
+@router.get("/email/confirm-link", response_class=HTMLResponse)
+async def confirm_link_page(token: str):
+    """Only shows a button: mail scanners open links, and that mustn't confirm."""
+    if await _live_confirm_link(token) is None:
+        return _confirm_page("This link has expired", "Open vournal to confirm your email instead.")
+    form = (
+        f"<form method=post action='/auth/email/confirm-link?token={quote(token)}'>"
+        "<button style='font:inherit;padding:.6rem 1.2rem'>Confirm my email</button></form>"
+    )
+    return _confirm_page("Confirm your email", "This turns on what you bought with this address.", form)
+
+
+@router.post("/email/confirm-link", response_class=HTMLResponse)
+@limiter.limit("20/15 minutes")
+async def confirm_link(request: Request, token: str):
+    challenge = await _live_confirm_link(token)
+    if challenge is None:
+        raise HTTPException(400, "This link has expired.")
+    await db.authchallenge.update(
+        where={"id": challenge.id}, data={"usedAt": datetime.now(timezone.utc)}
+    )
+    user = await db.user.find_unique(where={"id": challenge.userId})
+    if user is None:
+        raise HTTPException(400, "This link has expired.")
+    await confirm_email(db, user)
+    return _confirm_page(
+        "You’re all set",
+        "Your email is confirmed, and Plus is on. Open vournal to use it. "
+        "If you never made a vournal account, someone else used your email: use "
+        '"Forgot password" in vournal to set your own password, which signs them out.',
     )
 
 
@@ -272,7 +395,8 @@ async def login(request: Request, body: LoginRequest):
         raise HTTPException(401, "Invalid email or password.")
     if body.confirmEmail and user.emailConfirmRequired and user.emailVerifiedAt is None:
         return await begin_email_challenge(user)
-    return await _issue_tokens(user.id)
+    # The generation read before the slow password check: a link in between kills this.
+    return await _issue_tokens(user.id, user.sessionGeneration)
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -295,9 +419,14 @@ async def refresh(body: RefreshRequest):
         )
         raise HTTPException(401, "Invalid or expired refresh token.")
 
+    # Issued before the account's sessions were ended (a link or a reset).
+    owner = await db.user.find_unique(where={"id": stored.userId})
+    if owner is None or stored.generation != owner.sessionGeneration:
+        raise HTTPException(401, "Invalid or expired refresh token.")
+
     # Rotate: the presented token is now spent (revoked); a fresh pair is issued.
     await db.refreshtoken.update(where={"id": stored.id}, data={"revoked": True})
-    return await _issue_tokens(stored.userId)
+    return await _issue_tokens(stored.userId, stored.generation)
 
 
 @router.post("/logout")
@@ -366,10 +495,14 @@ async def delete_me(body: DeleteAccountRequest, current=Depends(get_current_user
         raise HTTPException(403, "Password is incorrect.")
 
     # Apple requires revoking its token when the account goes.
-    if current.appleRefreshToken:
-        from app.oauth import revoke_apple
+    from app.oauth import APPLE_ISSUER, log as oauth_log, revoke_apple
 
+    if current.appleRefreshToken:
         await revoke_apple(current.appleRefreshToken)
+    elif await db.externalidentity.find_first(
+        where={"userId": current.id, "issuer": APPLE_ISSUER}
+    ):
+        oauth_log.error("Apple account %s deleted with no token to revoke.", current.id)
 
     # 1) External storage first — best-effort per object (a missing one is fine).
     entries = await db.entry.find_many(where={"userId": current.id})
@@ -421,11 +554,15 @@ async def reset_password(body: ResetPasswordRequest):
 
     await db.user.update(
         where={"id": stored.userId},
-        data={"passwordHash": security.hash_password(body.newPassword)},
+        data={
+            "passwordHash": security.hash_password(body.newPassword),
+            "sessionGeneration": {"increment": 1},
+        },
     )
     await db.passwordresettoken.update(where={"id": stored.id}, data={"usedAt": now})
     await db.authchallenge.update_many(
-        where={"userId": stored.userId, "usedAt": None}, data={"usedAt": now}
+        where={"userId": stored.userId, "usedAt": None, "purpose": {"in": _CODE_PURPOSES}},
+        data={"usedAt": now},
     )
     # The reset link went to this address, so it's proven theirs.
     owner = await db.user.find_unique(where={"id": stored.userId})

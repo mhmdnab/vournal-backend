@@ -33,11 +33,14 @@ router = APIRouter(prefix="/auth/oauth", tags=["auth"])
 Provider = Literal["apple", "google"]
 APPLE_ISSUER = "https://appleid.apple.com"
 GOOGLE_ISSUERS = ["https://accounts.google.com", "accounts.google.com"]
+# Addresses each provider runs itself. For any other address, "verified" only means
+# someone proved it once, and they may not own it now.
+_APPLE_RUN_DOMAINS = {"privaterelay.appleid.com", "icloud.com", "me.com", "mac.com"}
+_GOOGLE_RUN_DOMAINS = {"gmail.com", "googlemail.com"}
 _JWKS = {
-    "apple": jwt.PyJWKClient(f"{APPLE_ISSUER}/auth/keys", cache_keys=True, lifespan=3600),
-    "google": jwt.PyJWKClient(
-        "https://www.googleapis.com/oauth2/v3/certs", cache_keys=True, lifespan=3600
-    ),
+    # The key set is cached for an hour; an unknown key id fetches it again.
+    "apple": jwt.PyJWKClient(f"{APPLE_ISSUER}/auth/keys", lifespan=3600),
+    "google": jwt.PyJWKClient("https://www.googleapis.com/oauth2/v3/certs", lifespan=3600),
 }
 
 
@@ -47,6 +50,8 @@ class VerifiedIdentity:
     subject: str
     email: str | None
     email_verified: bool
+    # The provider runs this address, so its word is good enough to link directly.
+    authoritative: bool = False
 
 
 class ProviderSignIn(BaseModel):
@@ -80,6 +85,15 @@ async def verify_identity(provider: Provider, id_token: str, nonce: str) -> Veri
     """The verified identity in a provider's token, or 401. 503 if keys can't load."""
     try:
         key = await _signing_key(provider, id_token)
+    except (jwt.PyJWKClientConnectionError, jwt.PyJWKSetError) as exc:
+        log.warning("Could not load %s signing keys: %r", provider, exc)
+        raise HTTPException(503, "Sign-in is unavailable right now. Please try again.")
+    except jwt.PyJWTError:  # unknown key id, or not a token at all
+        raise HTTPException(401, "Sign-in could not be verified.")
+    except Exception as exc:  # noqa: BLE001 — a bad reply from the provider isn't the user's fault
+        log.warning("Could not load %s signing keys: %r", provider, exc)
+        raise HTTPException(503, "Sign-in is unavailable right now. Please try again.")
+    try:
         claims = jwt.decode(
             id_token,
             key,
@@ -88,9 +102,6 @@ async def verify_identity(provider: Provider, id_token: str, nonce: str) -> Veri
             issuer=APPLE_ISSUER if provider == "apple" else GOOGLE_ISSUERS,
             options={"require": ["exp", "iat", "sub", "aud", "iss"]},
         )
-    except jwt.PyJWKClientConnectionError as exc:
-        log.warning("Could not load %s signing keys: %r", provider, exc)
-        raise HTTPException(503, "Sign-in is unavailable right now. Please try again.")
     except jwt.PyJWTError:
         raise HTTPException(401, "Sign-in could not be verified.")
     # Apple always echoes the nonce. Google's does when the client passed one.
@@ -98,10 +109,17 @@ async def verify_identity(provider: Provider, id_token: str, nonce: str) -> Veri
     if (provider == "apple" or "nonce" in claims) and claims.get("nonce") != expected:
         raise HTTPException(401, "Sign-in could not be verified.")
     email = claims.get("email")
+    email = email.strip().lower() if isinstance(email, str) and email.strip() else None
+    domain = email.rsplit("@", 1)[-1] if email else ""
     return VerifiedIdentity(
         issuer=claims["iss"],
         subject=claims["sub"],
-        email=email.strip().lower() if isinstance(email, str) and email.strip() else None,
+        email=email,
+        authoritative=(
+            domain in _APPLE_RUN_DOMAINS
+            if provider == "apple"
+            else domain in _GOOGLE_RUN_DOMAINS or claims.get("hd") == domain
+        ),
         # Apple sends this as the string "true".
         email_verified=claims.get("email_verified") in (True, "true"),
     )
@@ -125,11 +143,11 @@ def _apple_client_secret() -> str | None:
 async def exchange_apple_code(code: str) -> str | None:
     """Apple's refresh token, sealed for storage. None if this can't be done now:
     sign-in still works, and the failure is logged because deletion relies on it."""
-    secret = _apple_client_secret()
-    if secret is None:
-        log.warning("Sign in with Apple key isn't configured; no token to revoke later.")
-        return None
     try:
+        secret = _apple_client_secret()
+        if secret is None:
+            log.error("Sign in with Apple key isn't configured; no token to revoke later.")
+            return None
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.post(
                 f"{APPLE_ISSUER}/auth/token",
@@ -144,7 +162,7 @@ async def exchange_apple_code(code: str) -> str | None:
         refresh = response.json().get("refresh_token")
         return mfa.encrypt(refresh) if refresh else None
     except Exception as exc:  # noqa: BLE001 — never fail a sign-in over this
-        log.warning("Apple code exchange failed: %r", exc)
+        log.error("Apple code exchange failed: %r", exc)
         return None
 
 
@@ -168,6 +186,22 @@ async def revoke_apple(sealed: str) -> None:
             response.raise_for_status()
     except Exception as exc:  # noqa: BLE001
         log.error("Apple token revoke failed: %r", exc)
+
+
+def config_problems() -> list[str]:
+    """What stops deletion revoking Apple's token, which Apple requires. Logged at
+    startup, so a bad deploy is visible before anyone deletes an account."""
+    problems = []
+    try:
+        if _apple_client_secret() is None:
+            problems.append("APPLE_TEAM_ID, APPLE_SIGNIN_KEY_ID and APPLE_SIGNIN_PRIVATE_KEY must all be set")
+    except Exception as exc:  # noqa: BLE001
+        problems.append(f"APPLE_SIGNIN_PRIVATE_KEY isn't a usable key: {type(exc).__name__}")
+    try:
+        mfa.decrypt(mfa.encrypt("check"))
+    except Exception as exc:  # noqa: BLE001
+        problems.append(f"VOURNAL_FIELD_ENCRYPTION_KEY isn't usable: {type(exc).__name__}")
+    return problems
 
 
 @router.get("/providers")
@@ -217,13 +251,14 @@ async def sign_in(provider: Provider, request: Request, body: ProviderSignIn):
         await confirm_email(db, user)
         return await _issue_tokens(user.id)
 
-    if user.emailVerifiedAt is not None:
+    if user.emailVerifiedAt is not None and identity.authoritative:
         if extra:
             await db.user.update(where={"id": user.id}, data=extra)
         await link_identity(user.id, identity.issuer, identity.subject)
         return await _issue_tokens(user.id)
 
-    # The same email on an account that never proved it: the code proves it now.
+    # The same email on an account that never proved it, or that the provider can't
+    # vouch for: the code proves it now.
     return await begin_email_challenge(
         user, "link_identity", identity.issuer, identity.subject, sealed
     )

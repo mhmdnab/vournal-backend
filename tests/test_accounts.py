@@ -32,15 +32,24 @@ class Accounts(unittest.IsolatedAsyncioTestCase):
         )
         self.sent = []
 
-        async def capture(to, code):
+        async def capture(to, code, note=None):
             self.sent.append(code)
+            return True
+
+        self.links = []
+
+        async def capture_link(to, url):
+            self.links.append(url)
             return True
 
         self.mail = patch("app.email.send_verification_code", capture)
         self.mail.start()
+        self.link_mail = patch("app.email.send_plus_confirm_link", capture_link)
+        self.link_mail.start()
 
     async def asyncTearDown(self):
         self.mail.stop()
+        self.link_mail.stop()
         await self.client.aclose()
         await self.db.user.delete_many(where={"email": self.address})
         await self.db.pendinggrant.delete_many(where={"email": self.address})
@@ -203,6 +212,120 @@ class Accounts(unittest.IsolatedAsyncioTestCase):
         user = await self.db.user.find_unique(where={"email": self.address})
         self.assertEqual(effective_plan(user), "plus")
 
+    async def test_buyer_with_an_existing_account_is_emailed_a_confirm_link(self):
+        from app.entitlements import effective_plan
+
+        await self._register()  # every account from before build 5 looks like this
+        sub = f"sub_{uuid.uuid4().hex}"
+        await self._paddle(sub)
+        await self._paddle(sub)  # Paddle sends created, then activated
+        self.assertEqual(len(self.links), 1)
+        token = self.links[0].split("token=")[1]
+        # Opening the link, as mail scanners do, changes nothing: it takes a button.
+        page = await self.client.get(f"/auth/email/confirm-link?token={token}")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("<form", page.text)
+        user = await self.db.user.find_unique(where={"email": self.address})
+        self.assertEqual(effective_plan(user), "free")
+        done = await self.client.post(f"/auth/email/confirm-link?token={token}")
+        self.assertEqual(done.status_code, 200)
+        self.assertIn("Forgot password", done.text)  # a squatted account stays reclaimable
+        user = await self.db.user.find_unique(where={"email": self.address})
+        self.assertIsNotNone(user.emailVerifiedAt)
+        self.assertEqual(effective_plan(user), "plus")
+        again = await self.client.post(f"/auth/email/confirm-link?token={token}")
+        self.assertEqual(again.status_code, 400)
+
+    async def test_buyer_with_no_account_gets_no_link(self):
+        await self._paddle(f"sub_{uuid.uuid4().hex}")
+        self.assertEqual(self.links, [])
+
+    async def test_a_bad_confirm_link_is_refused(self):
+        self.assertEqual((await self.client.post("/auth/email/confirm-link?token=nope")).status_code, 400)
+
+    async def test_a_code_request_does_not_cancel_a_purchase_link(self):
+        tokens = (await self._register()).json()
+        await self._paddle(f"sub_{uuid.uuid4().hex}")
+        await self.client.post("/auth/email/send-code", headers=self._auth(tokens))
+        token = self.links[0].split("token=")[1]
+        done = await self.client.post(f"/auth/email/confirm-link?token={token}")
+        self.assertEqual(done.status_code, 200, done.text)
+
+    async def test_codes_are_capped_per_account(self):
+        from fastapi import HTTPException
+
+        from app.auth import begin_email_challenge
+
+        await self._register()
+        user = await self.db.user.find_unique(where={"email": self.address})
+        for _ in range(6):
+            await begin_email_challenge(user)
+        with self.assertRaises(HTTPException) as caught:
+            await begin_email_challenge(user)
+        self.assertEqual(caught.exception.status_code, 429)
+        self.assertEqual(len(self.sent), 6)
+
+    async def test_wrong_guesses_are_capped_per_account_across_challenges(self):
+        body = (await self._register(confirmEmail=True)).json()
+        user = await self.db.user.find_unique(where={"email": self.address})
+        await self.db.authchallenge.update_many(where={"userId": user.id}, data={"attempts": 20})
+        await self.db.authchallenge.create(
+            data={
+                "userId": user.id,
+                "tokenHash": "spent-budget",
+                "purpose": "other",
+                "attempts": 0,
+                "expiresAt": datetime.now(timezone.utc) + timedelta(minutes=5),
+            }
+        )
+        fresh = (await self._login(confirmEmail=True)).json()
+        wrong = await self._verify(fresh["challengeToken"], self.sent[-1])
+        self.assertEqual(wrong.status_code, 400)
+        self.assertNotEqual(body["challengeToken"], fresh["challengeToken"])
+
+    async def test_a_password_reset_ends_old_access_tokens(self):
+        from app import security
+
+        tokens = (await self._register()).json()
+        user = await self.db.user.find_unique(where={"email": self.address})
+        raw = uuid.uuid4().hex
+        await self.db.passwordresettoken.create(
+            data={
+                "userId": user.id,
+                "tokenHash": security.hash_refresh_token(raw),
+                "expiresAt": datetime.now(timezone.utc) + timedelta(minutes=5),
+            }
+        )
+        await self.client.post("/auth/reset-password", json={"token": raw, "newPassword": PASSWORD})
+        self.assertEqual((await self.client.get("/auth/me", headers=self._auth(tokens))).status_code, 401)
+
+    async def test_a_session_issued_before_a_generation_change_is_dead(self):
+        """A refresh or login racing a link gets issued against the old generation."""
+        from app.auth import _issue_tokens
+
+        await self._register()
+        user = await self.db.user.find_unique(where={"email": self.address})
+        await self.db.user.update(where={"id": user.id}, data={"sessionGeneration": 1})
+        stale = await _issue_tokens(user.id, 0)
+        self.assertEqual(
+            (await self.client.get("/auth/me", headers={"Authorization": f"Bearer {stale.accessToken}"})).status_code,
+            401,
+        )
+        refreshed = await self.client.post("/auth/refresh", json={"refreshToken": stale.refreshToken})
+        self.assertEqual(refreshed.status_code, 401)
+
+    async def test_tokens_from_before_this_build_keep_working(self):
+        """Access tokens already on build 4 phones carry no generation."""
+        import jwt
+
+        from app import security
+
+        tokens = (await self._register()).json()
+        claims = jwt.decode(tokens["accessToken"], security._secret(), algorithms=["HS256"])
+        claims.pop("gen", None)
+        old = jwt.encode(claims, security._secret(), algorithm="HS256")
+        self.assertEqual((await self.client.get("/auth/me", headers={"Authorization": f"Bearer {old}"})).status_code, 200)
+
     async def test_registering_alone_never_applies_a_pending_grant(self):
         from app.entitlements import effective_plan
 
@@ -245,6 +368,12 @@ class SealedFields(unittest.TestCase):
             self.assertNotIn("apple-refresh-token", stored)
             self.assertEqual(mfa.decrypt(stored), "apple-refresh-token")
         self.assertNotEqual(mfa.digest("123456", "email"), mfa.digest("123456", "recovery"))
+
+
+class ReviewAccount(unittest.TestCase):
+    def test_review_account_is_pre_confirmed(self):
+        source = open("scripts/seed_review_account.py", encoding="utf-8").read()
+        self.assertIn('"emailVerifiedAt"', source)
 
 
 if __name__ == "__main__":

@@ -87,19 +87,21 @@ def verify_password(password: str, password_hash: Optional[str]) -> bool:
 # ---- Access tokens (JWT) -----------------------------------------------------
 
 
-def create_access_token(user_id: str) -> str:
+def create_access_token(user_id: str, generation: int = 0) -> str:
     now = _now()
     payload = {
         "sub": user_id,
         "type": "access",
         "iat": now,
         "exp": now + _access_ttl(),
+        "gen": generation,
     }
     return jwt.encode(payload, _secret(), algorithm=_JWT_ALG)
 
 
-def decode_access_token(token: str) -> Optional[str]:
-    """Return the user id from a valid access token, or None if it's no good."""
+def decode_access_token(token: str) -> Optional[tuple[str, int]]:
+    """(user id, session generation) from a valid access token, or None if it's no
+    good. Tokens from before generations existed count as generation 0."""
     try:
         payload = jwt.decode(token, _secret(), algorithms=[_JWT_ALG])
     except jwt.PyJWTError:
@@ -107,7 +109,10 @@ def decode_access_token(token: str) -> Optional[str]:
     if payload.get("type") != "access":
         return None
     sub = payload.get("sub")
-    return sub if isinstance(sub, str) else None
+    generation = payload.get("gen", 0)
+    if not isinstance(sub, str) or type(generation) is not int:
+        return None
+    return sub, generation
 
 
 # ---- Refresh tokens (opaque, stored hashed) ----------------------------------

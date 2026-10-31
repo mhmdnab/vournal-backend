@@ -29,6 +29,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Request
 
+from app import email as mailer
 from app.db import db
 from app.entitlements import grant_plus, revoke_plus
 
@@ -57,6 +58,15 @@ def _when(value: str) -> datetime:
 
 
 router = APIRouter(prefix="/billing/paddle", tags=["billing"])
+
+
+async def _email_confirm_link(request: Request, user) -> None:
+    from app.auth import begin_confirm_link
+
+    base = (os.environ.get("RENDER_EXTERNAL_URL") or str(request.base_url)).rstrip("/")
+    token = await begin_confirm_link(user)
+    if not await mailer.send_plus_confirm_link(user.email, f"{base}/auth/email/confirm-link?token={token}"):
+        log.error("Plus confirm link for user %s could not be sent.", user.id)
 
 
 @router.post("/webhook")
@@ -98,6 +108,9 @@ async def webhook(request: Request):
         if user is not None and (user.emailVerifiedAt or user.paddleSubscriptionId == sub_id):
             await grant_plus(db, user.id, expires, "paddle", sub_id)
         elif email:
+            first_notice = (
+                await db.pendinggrant.find_unique(where={"externalId": sub_id}) is None
+            )
             await db.pendinggrant.upsert(
                 where={"externalId": sub_id},
                 data={
@@ -105,6 +118,10 @@ async def webhook(request: Request):
                     "update": {"email": email, "expiresAt": expires},
                 },
             )
+            # They've paid and have an account: every account from before build 5 is
+            # unconfirmed, and a build 4 phone can't ask. Email them the way in.
+            if user is not None and first_notice:
+                await _email_confirm_link(request, user)
     elif status in _ENDED:
         if user is not None:
             await revoke_plus(db, user.id, "paddle", sub_id)

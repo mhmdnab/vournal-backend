@@ -127,6 +127,14 @@ class Migrations(unittest.TestCase):
         )
         self.assertEqual(_psql('SELECT count(*) FROM "PendingGrant"'), "0")
         self.assertEqual(
+            _psql(
+                """SELECT "emailConfirmRequired", "sessionGeneration",
+                          "appleRefreshToken" IS NULL
+                   FROM "User" WHERE id = 'u1'"""
+            ),
+            "f|0|t",
+        )
+        self.assertEqual(
             _psql("""SELECT "recurrenceWeekdays" FROM "Todo" WHERE id = 't1'"""), "{}"
         )
 

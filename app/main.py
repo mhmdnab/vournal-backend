@@ -32,7 +32,7 @@ from app import db as database
 from app.auth import get_current_user, router as auth_router
 from app.billing_apple import router as billing_apple_router
 from app.billing_paddle import router as billing_paddle_router
-from app.oauth import router as oauth_router
+from app.oauth import config_problems as oauth_config_problems, router as oauth_router
 from app.entities import (
     ambiguous_norm_sets,
     known_names,
@@ -96,6 +96,8 @@ _ENTRY_INCLUDE = {
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Connect the Prisma client on startup, disconnect on shutdown."""
+    for problem in oauth_config_problems():
+        log.error("Sign in with Apple setup: %s", problem)
     await database.connect()
     # Reap orphaned jobs: extraction runs in in-process BackgroundTasks, which do
     # NOT survive a restart/deploy. Any entry still PENDING/PROCESSING at boot
