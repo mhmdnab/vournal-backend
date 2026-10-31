@@ -225,31 +225,65 @@ def _named_weekday(evidence) -> int | None:
     return named.pop() if len(named) == 1 else None
 
 
+def _names_several_days(evidence) -> bool:
+    """Whether the evidence names more than one weekday: it repeats the pattern
+    ("every Monday and Thursday") rather than saying when it starts."""
+    if not isinstance(evidence, str):
+        return False
+    text = _fold(evidence)
+    named = sum(
+        bool(re.search(rf"(?<!\w)و?(?:{bare}|{prefixed})(?!\w)", text))
+        for _, bare, prefixed in _WEEKDAY_NAMES
+    )
+    return named >= 2
+
+
+def _nearest_repeat_day(day: date, weekdays: list[str], today: date | None) -> date:
+    """The listed weekday closest to `day`, never before `today`."""
+    candidates = [day + timedelta(days=offset) for offset in range(-6, 14)]
+    allowed = [
+        candidate
+        for candidate in candidates
+        if WEEKDAYS[candidate.weekday()] in weekdays and (today is None or candidate >= today)
+    ]
+    return min(allowed, key=lambda candidate: (abs((candidate - day).days), candidate))
+
+
 def verified_day(item: dict, transcript: str, today: date | None = None) -> tuple:
     """(dueDate, time) — dropped when the model named a day but its evidence isn't
     in the transcript (an invented day, e.g. "today" for an urgent task). Replies
     without a dueDateEvidence key keep the model's values. When the evidence names
     one weekday and the date falls on another, the date moves to the nearest such
-    weekday (keeping the model's week), never before `today`."""
+    weekday (keeping the model's week), never before `today`. A weekly repeat on
+    named days always lands on one of them: the next one, if the person only said
+    the pattern, since the model's date arithmetic can't be trusted here."""
     due, time = item.get("dueDate"), item.get("time")
     evidence = item.get("dueDateEvidence")
     if due and "dueDateEvidence" in item and not _in_transcript(evidence, transcript):
         return None, None
+    if not isinstance(due, str):
+        return due, time
+    try:
+        day = date.fromisoformat(due)
+    except ValueError:
+        return due, time
+    repeat = item.get("recurrence")
+    repeat_days = []
+    if isinstance(repeat, dict) and repeat.get("freq") == "weekly" and isinstance(repeat.get("weekdays"), list):
+        repeat_days = [code for code in repeat["weekdays"] if code in WEEKDAYS]
+    if repeat_days and today and _names_several_days(evidence):
+        return first_occurrence_day("weekly", repeat_days, today).isoformat(), time
+    if repeat_days and WEEKDAYS[day.weekday()] in repeat_days and (today is None or day >= today):
+        return due, time  # "every Monday and Thursday": already on one of its days
     weekday = _named_weekday(evidence)
-    if isinstance(due, str) and weekday is not None:
-        try:
-            day = date.fromisoformat(due)
-        except ValueError:
-            return due, time
-        repeat = item.get("recurrence")
-        repeat_days = repeat.get("weekdays") if isinstance(repeat, dict) else None
-        if isinstance(repeat_days, list) and WEEKDAYS[day.weekday()] in repeat_days:
-            return due, time  # "every Monday and Thursday": already on one of its days
+    if weekday is not None and not repeat_days:
         forward = (weekday - day.weekday()) % 7
         day += timedelta(days=forward if forward <= 3 else forward - 7)
         while today and day < today:
             day += timedelta(days=7)
-        due = day.isoformat()
+        return day.isoformat(), time
+    if repeat_days:
+        return _nearest_repeat_day(day, repeat_days, today).isoformat(), time
     return due, time
 
 

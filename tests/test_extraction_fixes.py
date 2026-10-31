@@ -169,6 +169,42 @@ class HeldOutFixes(unittest.TestCase):
                 "recurrence": {"freq": "weekly", "interval": 1, "weekdays": ["MO", "TH"], "until": None}}
         self.assertEqual(verified_day(item, "النادي كل يوم إثنين وخميس", date(2026, 10, 28))[0], "2026-10-29")
 
+    def _repeat_day(self, due, evidence, transcript, today, days=("MO", "TH")):
+        item = {"dueDate": due, "time": "18:00", "dueDateEvidence": evidence,
+                "recurrence": {"freq": "weekly", "interval": 1, "weekdays": list(days), "until": None}}
+        return verified_day(item, transcript, today)
+
+    def test_a_repeat_said_without_a_start_begins_on_its_next_day(self):
+        """Seen on a phone: "every Monday and Thursday" saved on Tuesday 3 November."""
+        said = "Yoga every Monday and Thursday at 6pm"
+        sunday, tuesday = date(2026, 11, 1), date(2026, 11, 3)
+        self.assertEqual(self._repeat_day("2026-11-03", "every Monday and Thursday", said, sunday),
+                         ("2026-11-02", "18:00"))
+        self.assertEqual(self._repeat_day("2026-11-09", "every Monday and Thursday", said, tuesday)[0], "2026-11-05")
+        self.assertEqual(self._repeat_day("2026-11-03", "كل يوم إثنين وخميس", "النادي كل يوم إثنين وخميس", sunday)[0],
+                         "2026-11-02")
+        self.assertEqual(self._repeat_day("2026-11-03", "kel tnen w khamis", "el gym kel tnen w khamis", sunday)[0],
+                         "2026-11-02")
+
+    def test_a_repeat_date_off_its_days_moves_to_the_nearest_one(self):
+        said = "Yoga every Monday and Thursday from next week"
+        today = date(2026, 11, 1)
+        self.assertEqual(self._repeat_day("2026-11-10", "next week", said, today)[0], "2026-11-09")
+        # Never before today.
+        self.assertEqual(self._repeat_day("2026-11-03", "every Monday", "Yoga every Monday", date(2026, 11, 3), ("MO",))[0],
+                         "2026-11-09")
+
+    def test_a_chosen_start_on_a_repeat_day_stays(self):
+        self.assertEqual(self._repeat_day("2026-11-05", "starting Thursday", "Yoga Monday and Thursday starting Thursday",
+                                          date(2026, 11, 1))[0], "2026-11-05")
+        self.assertEqual(self._repeat_day("2026-11-09", "next week", "Yoga every Monday and Thursday from next week",
+                                          date(2026, 11, 1))[0], "2026-11-09")
+
+    def test_only_weekly_repeats_with_named_days_are_moved(self):
+        item = {"dueDate": "2026-11-03", "time": None, "dueDateEvidence": "tuesday",
+                "recurrence": {"freq": "monthly", "interval": 1, "weekdays": [], "until": None}}
+        self.assertEqual(verified_day(item, "rent on tuesday", date(2026, 11, 1))[0], "2026-11-03")
+
     def test_urgency_words_anywhere_in_the_tasks_sentence(self):
         for transcript, source, evidence in (
             ("This can't wait — I have to fix the car brakes before Monday.",
