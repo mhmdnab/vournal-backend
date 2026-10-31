@@ -139,7 +139,8 @@ def _recurrence(item: dict, tz=None) -> dict:
         "recurrenceInterval": 1,
         "recurrenceWeekdays": [],
         "recurrenceUntil": None,
-        "recurrenceUnclear": raw == "unclear",
+        # Either form the model uses: "unclear", or {"freq": "unclear", ...}.
+        "recurrenceUnclear": raw == "unclear" or (isinstance(raw, dict) and raw.get("freq") == "unclear"),
     }
     if isinstance(raw, str) and raw in RECURRENCES:  # flat legacy form
         raw = {"freq": raw, "interval": item.get("recurrenceInterval", 1)}

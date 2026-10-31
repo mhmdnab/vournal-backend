@@ -171,6 +171,15 @@ class HeldOutFixes(unittest.TestCase):
         )
         self.assertTrue(result["urgencyUnclear"])
 
+    def test_unclear_repeat_as_an_object_still_asks(self):
+        """Haiku sometimes nests it: {"freq": "unclear", ...} instead of "unclear"."""
+        result = normalize_metadata(
+            {"text": "Water the plants",
+             "recurrence": {"freq": "unclear", "interval": None, "weekdays": None, "until": None}},
+            "I want to water the plants every so often.",
+        )
+        self.assertEqual((result["recurrence"], result["recurrenceUnclear"]), (None, True))
+
     def test_the_models_kind_wins_over_keywords(self):
         booking = {"text": "Book dentist appointment for Sami", "kind": "task"}
         self.assertEqual(normalize_metadata(booking, "Need to book the dentist for Sami.")["kind"], "task")
