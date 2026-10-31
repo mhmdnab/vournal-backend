@@ -178,6 +178,9 @@ class CreateEntryRequest(BaseModel):
 
 class UpdateTodoRequest(BaseModel):
     done: bool
+    # Build 5 apps ask a repeating to-do to move to its next day. Without it (build 4
+    # phones), done means done.
+    advance: bool = False
 
 
 class TaskDetailsRequest(BaseModel):

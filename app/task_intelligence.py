@@ -253,6 +253,55 @@ def verified_day(item: dict, transcript: str, today: date | None = None) -> tupl
     return due, time
 
 
+def first_occurrence_day(freq, weekdays, today: date) -> date | None:
+    """The first day of a repeat that says when by itself: today for a daily one,
+    the next listed day (today included) for weekly on named days. Other repeats
+    need the person to name a day, so None."""
+    if freq == "daily":
+        return today
+    if freq != "weekly" or not weekdays:
+        return None
+    for offset in range(7):
+        day = today + timedelta(days=offset)
+        if WEEKDAYS[day.weekday()] in weekdays:
+            return day
+    return None
+
+
+def next_occurrence_day(
+    anchor: date, freq, interval, weekdays, after: date, until: date | None
+) -> date | None:
+    """The first occurrence later than both `anchor` and `after`, so a repeat ticked
+    weeks late lands in the future. None when there's no such day before `until`."""
+    interval = interval if isinstance(interval, int) and interval >= 1 else 1
+    floor = max(anchor, after)
+    found = None
+    if freq == "daily":
+        found = anchor + timedelta(days=((floor - anchor).days // interval + 1) * interval)
+    elif freq == "weekly":
+        days = [d for d in WEEKDAYS if d in (weekdays or [])] or [WEEKDAYS[anchor.weekday()]]
+        # Weeks count from the Monday of the anchor's week, so "every 2 weeks" holds.
+        first_week = anchor - timedelta(days=anchor.weekday())
+        for offset in range(1, 7 * interval + 8):
+            day = floor + timedelta(days=offset)
+            if ((day - first_week).days // 7) % interval == 0 and WEEKDAYS[day.weekday()] in days:
+                found = day
+                break
+    elif freq in ("monthly", "yearly"):
+        step = interval * (12 if freq == "yearly" else 1)
+        start = anchor.year * 12 + anchor.month - 1
+        for n in range(1, 401):
+            year, month = divmod(start + n * step, 12)
+            try:
+                day = date(year, month + 1, anchor.day)
+            except ValueError:
+                continue  # no 31 February: skip it and stay on the 31st
+            if day > floor:
+                found = day
+                break
+    return None if found and until and found > until else found
+
+
 def questions(task) -> list[dict]:
     """Ask only what the AI couldn't work out: an event's day and time, an
     urgency it couldn't judge, a repeat it couldn't pin down."""

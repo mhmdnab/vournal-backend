@@ -156,12 +156,15 @@ def estimate(cases: list[dict], typed_model: str | None) -> float:
 
 def _pipeline_todos(result: dict, transcript: str, tz, today=None) -> list[dict]:
     from app.main import _compose_start_at
-    from app.task_intelligence import normalize_metadata, questions, verified_day
+    from app.task_intelligence import first_occurrence_day, normalize_metadata, questions, verified_day
 
     todos = []
     for item in result.get("todos", []):
         due, time = verified_day(item, transcript, today)  # same checks as process_transcript
         meta = normalize_metadata(item, transcript, tz)
+        if not due and today:
+            first = first_occurrence_day(meta["recurrence"], meta["recurrenceWeekdays"], today)
+            due = first.isoformat() if first else None
         start = _compose_start_at(due, time, tz)
         task = SimpleNamespace(text=item["text"], dueDate=due, startAt=start,
                                dismissedQuestions=[], **meta)

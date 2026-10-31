@@ -70,7 +70,13 @@ from app.schemas import (
     UpdateTodoRequest,
     TaskDetailsRequest,
 )
-from app.task_intelligence import metadata_out, normalize_metadata, verified_day
+from app.task_intelligence import (
+    first_occurrence_day,
+    metadata_out,
+    next_occurrence_day,
+    normalize_metadata,
+    verified_day,
+)
 
 # Load environment variables from a local .env file if present.
 load_dotenv()
@@ -416,6 +422,11 @@ async def process_transcript(
         except Exception:  # noqa: BLE001 — one odd to-do must not lose the rest
             log.exception("Task metadata fell back to defaults for entry %s", entry_id)
             meta = normalize_metadata({"text": todo["text"]}, transcript, tz)
+        if not due:  # "every day", "every Monday and Thursday": the repeat says when
+            first = first_occurrence_day(
+                meta["recurrence"], meta["recurrenceWeekdays"], now.date()
+            )
+            due = first.isoformat() if first else None
         await db.todo.create(
             data={
                 "entryId": entry_id,
@@ -701,6 +712,25 @@ async def list_todos(done: Optional[bool] = None, current=Depends(get_current_us
     ]
 
 
+def _next_occurrence_update(task, tz) -> Optional[dict]:
+    """The fields that move a repeating to-do to its next day, or None when the
+    series has no next day. The clock time stays the same on the person's wall."""
+    today = datetime.now(tz).date()
+    until = task.recurrenceUntil.astimezone(tz).date() if task.recurrenceUntil else None
+    anchor = task.dueDate.date() if task.dueDate else today
+    day = next_occurrence_day(
+        anchor, task.recurrence, task.recurrenceInterval, task.recurrenceWeekdays, today, until
+    )
+    if day is None:
+        return None
+    clock = task.startAt.astimezone(tz).strftime("%H:%M") if task.startAt else None
+    return {
+        "done": False,
+        "dueDate": _parse_due(day.isoformat()),
+        "startAt": _compose_start_at(day.isoformat(), clock, tz),
+    }
+
+
 @app.patch("/todos/{todo_id}", response_model=TodoOut)
 async def update_todo(
     todo_id: str, body: UpdateTodoRequest, current=Depends(get_current_user)
@@ -708,7 +738,10 @@ async def update_todo(
     existing = await db.todo.find_unique(where={"id": todo_id})
     if existing is None or existing.userId != current.id:
         raise HTTPException(status_code=404, detail="Todo not found")
-    todo = await db.todo.update(where={"id": todo_id}, data={"done": body.done})
+    data = {"done": body.done}
+    if body.done and body.advance and existing.recurrence:
+        data = _next_occurrence_update(existing, _user_tz(current.timezone)) or data
+    todo = await db.todo.update(where={"id": todo_id}, data=data)
     return TodoOut(
         id=todo.id,
         text=todo.text,
@@ -764,6 +797,14 @@ async def update_task_details(
                     "That time occurs twice during the clock change. Choose an unambiguous time.",
                 )
         data.update(dueDate=_parse_due(day), startAt=start)
+    if not data.get("dueDate", task.dueDate):
+        first = first_occurrence_day(
+            data.get("recurrence", task.recurrence),
+            data.get("recurrenceWeekdays", task.recurrenceWeekdays),
+            datetime.now(tz).date(),
+        )
+        if first:
+            data["dueDate"] = _parse_due(first.isoformat())
     until = data.get("recurrenceUntil", task.recurrenceUntil)
     anchor = data.get("startAt", task.startAt) or data.get("dueDate", task.dueDate)
     if until and anchor and until < anchor:
