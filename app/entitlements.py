@@ -172,3 +172,14 @@ async def apply_pending_grants(db, user) -> None:
     for grant in pending:
         await grant_plus(db, user.id, grant.expiresAt, grant.source, grant.externalId)
         await db.pendinggrant.update(where={"id": grant.id}, data={"appliedAt": now})
+
+
+async def confirm_email(db, user):
+    """This address is proven theirs: mark it, and give them what was bought with it.
+    The only place pending grants apply, so claiming an email can't claim a purchase."""
+    if user.emailVerifiedAt is None:
+        user = await db.user.update(
+            where={"id": user.id}, data={"emailVerifiedAt": datetime.now(timezone.utc)}
+        )
+    await apply_pending_grants(db, user)
+    return await db.user.find_unique(where={"id": user.id})

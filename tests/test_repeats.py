@@ -82,8 +82,6 @@ class Endpoints(unittest.IsolatedAsyncioTestCase):
         self.db = db
         await db.connect()
         self.address = f"repeats-{uuid.uuid4().hex}@example.test"
-        self.env = patch.dict(os.environ, VOURNAL_ENHANCEMENTS="0")
-        self.env.start()
         from app.rate_limit import limiter
 
         limiter.reset()  # the suite registers more than 3 accounts per hour
@@ -103,7 +101,6 @@ class Endpoints(unittest.IsolatedAsyncioTestCase):
 
     async def asyncTearDown(self):
         await self.client.aclose()
-        self.env.stop()
         await self.db.user.delete_many(where={"email": self.address})
         await self.db.disconnect()
 

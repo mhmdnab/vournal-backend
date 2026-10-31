@@ -11,7 +11,6 @@ from typing import Literal, Protocol
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from app.enhancements import require_enabled
 
 router = APIRouter(prefix="/auth/oauth", tags=["auth"])
 
@@ -45,7 +44,6 @@ class ProviderVerifier(Protocol):
 
 @router.get("/providers")
 async def providers():
-    require_enabled()
     return {
         name: {
             "enabled": False,
@@ -57,7 +55,6 @@ async def providers():
 
 @router.post("/{provider}/exchange")
 async def exchange(provider: Literal["apple", "google"], body: AuthorizationCode):
-    require_enabled()
     # Explicit closed boundary until a real ProviderVerifier is configured.
     # Provider login will still flow through Vournal's verification/MFA policy.
     raise HTTPException(503, "This sign-in provider is not configured yet.")

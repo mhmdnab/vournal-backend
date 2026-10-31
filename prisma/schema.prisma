@@ -45,6 +45,11 @@ model User {
   // password. Registration always sets it; login rejects null-password users.
   passwordHash String?
   emailVerifiedAt DateTime?
+  // Signed up on an app that asks for the code: login asks again until confirmed.
+  // Older accounts stay false and are never blocked.
+  emailConfirmRequired Boolean @default(false)
+  // Sign in with Apple's refresh token, encrypted: deleting the account revokes it.
+  appleRefreshToken String?
   twoFactorSecret String?
   twoFactorEnabled Boolean @default(false)
   twoFactorLastStep Int @default(-1)
@@ -105,7 +110,7 @@ model ExternalIdentity {
   @@index([userId])
 }
 
-// Local enhancement challenges. Raw tokens/codes are never stored here.
+// Email-code challenges. Raw tokens/codes are never stored here.
 model AuthChallenge {
   id String @id @default(cuid())
   userId String
@@ -114,6 +119,9 @@ model AuthChallenge {
   purpose String
   codeHash String?
   pendingSecret String?
+  // The provider identity to link once the code proves this email is theirs.
+  pendingIssuer String?
+  pendingSubject String?
   attempts Int @default(0)
   expiresAt DateTime
   usedAt DateTime?

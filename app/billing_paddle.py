@@ -94,7 +94,8 @@ async def webhook(request: Request):
 
     if status in _ACTIVE and period_end and sub_id:
         expires = _when(period_end)
-        if user is not None:
+        # Only a confirmed account: anyone can register with someone else's email.
+        if user is not None and (user.emailVerifiedAt or user.paddleSubscriptionId == sub_id):
             await grant_plus(db, user.id, expires, "paddle", sub_id)
         elif email:
             await db.pendinggrant.upsert(

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from app.task_intelligence import local_extract, normalize_metadata, questions
+from app.task_intelligence import normalize_metadata, questions
 
 
 def _norm(item, transcript):
@@ -135,18 +135,6 @@ class TaskRules(unittest.TestCase):
                                dismissedQuestions=[])
         self.assertEqual(questions(task), [])
 
-    def test_offline_fixture_keeps_missing_time_and_explicit_repeat(self):
-        now = datetime(2030, 1, 1, tzinfo=timezone.utc)
-        result = local_extract(
-            "I have a meeting tomorrow !!; Add call doctor every 2 weeks at 2pm tomorrow to Apple Calendar",
-            now,
-        )
-        self.assertIsNone(result["todos"][0]["time"])
-        self.assertEqual(result["todos"][0]["dueDate"], "2030-01-02")
-        self.assertEqual(result["todos"][1]["recurrence"]["freq"], "weekly")
-        self.assertEqual(result["todos"][1]["recurrence"]["interval"], 2)
-        self.assertEqual(result["todos"][1]["time"], "14:00")
-
 
 class TasksIntegration(unittest.IsolatedAsyncioTestCase):
     async def test_entry_followup_correction_and_ownership(self):
@@ -163,15 +151,33 @@ class TasksIntegration(unittest.IsolatedAsyncioTestCase):
         other = await db.user.create(data={"email": "other-" + account})
         try:
             headers = {
-                "Authorization": f"Bearer {security.create_access_token(user.id, True)}"
+                "Authorization": f"Bearer {security.create_access_token(user.id)}"
             }
 
             async def extract(transcript, **kwargs):
                 return (
                     _normalize(
-                        local_extract(
-                            transcript, datetime(2030, 1, 1, tzinfo=timezone.utc)
-                        )
+                        {
+                            "summary": transcript,
+                            "mood": {"score": 3, "label": "neutral", "emotions": []},
+                            "todos": [
+                                {
+                                    "text": "Meeting",
+                                    "sourceText": transcript,
+                                    "dueDate": "2030-01-02",
+                                    "dueDateEvidence": "tomorrow",
+                                    "time": None,
+                                    "kind": "event",
+                                    "category": "work",
+                                    "urgency": 0,
+                                    "location": None,
+                                    "recurrence": None,
+                                }
+                            ],
+                            "topics": [],
+                            "people": [],
+                            "places": [],
+                        }
                     ),
                     None,
                 )
@@ -234,7 +240,7 @@ class TasksIntegration(unittest.IsolatedAsyncioTestCase):
                         422,
                     )
                 wrong_user_headers = {
-                    "Authorization": f"Bearer {security.create_access_token('missing-user', True)}"
+                    "Authorization": f"Bearer {security.create_access_token('missing-user')}"
                 }
                 self.assertEqual(
                     (
@@ -247,7 +253,7 @@ class TasksIntegration(unittest.IsolatedAsyncioTestCase):
                     401,
                 )
                 other_headers = {
-                    "Authorization": f"Bearer {security.create_access_token(other.id, True)}"
+                    "Authorization": f"Bearer {security.create_access_token(other.id)}"
                 }
                 self.assertEqual(
                     (

@@ -101,7 +101,10 @@ class Webhook(unittest.IsolatedAsyncioTestCase):
             )
 
     async def _user(self):
-        return await self.db.user.create(data={"email": self.email})
+        # A confirmed account: an unconfirmed one gets a pending grant (test_accounts).
+        return await self.db.user.create(
+            data={"email": self.email, "emailVerifiedAt": datetime.now(timezone.utc)}
+        )
 
     async def test_subscription_activated_grants_by_email(self):
         from app.entitlements import effective_plan
@@ -114,26 +117,15 @@ class Webhook(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(user.planSource, "paddle")
         self.assertEqual(user.paddleSubscriptionId, self.sub)
 
-    async def test_unknown_email_stores_pending_grant_then_applies_on_register(self):
-        from app.entitlements import effective_plan
-        from app.main import app
+    async def test_unknown_email_stores_pending_grant_then_applies_on_confirm(self):
+        from app.entitlements import confirm_email, effective_plan
 
         response = await self._send(_event("subscription.created", self.email, self.sub))
         self.assertEqual(response.status_code, 200, response.text)
         pending = await self.db.pendinggrant.find_unique(where={"externalId": self.sub})
         self.assertIsNotNone(pending)
-        from app.rate_limit import limiter
-
-        limiter.reset()  # the suite registers more than 3 accounts per hour
-        async with httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://paddle"
-        ) as client:
-            with patch.dict(os.environ, VOURNAL_ENHANCEMENTS="0"):
-                registered = await client.post(
-                    "/auth/register",
-                    json={"email": self.email, "password": "local-passphrase"},
-                )
-        self.assertEqual(registered.status_code, 200, registered.text)
+        user = await self.db.user.create(data={"email": self.email})
+        await confirm_email(self.db, user)
         user = await self.db.user.find_unique(where={"email": self.email})
         self.assertEqual(effective_plan(user), "plus")
         pending = await self.db.pendinggrant.find_unique(where={"externalId": self.sub})

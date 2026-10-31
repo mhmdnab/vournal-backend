@@ -22,7 +22,7 @@ def digest(value: str, purpose: str) -> str:
 
 def _fernet() -> Fernet:
     # Explicit key required. The isolated runner persists a local-only key.
-    return Fernet(os.environ["VOURNAL_MFA_ENCRYPTION_KEY"].encode())
+    return Fernet(os.environ["VOURNAL_FIELD_ENCRYPTION_KEY"].encode())
 
 
 def encrypt(secret: str) -> str:

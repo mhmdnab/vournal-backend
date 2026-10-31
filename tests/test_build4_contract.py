@@ -21,11 +21,8 @@ class Build4Contract(unittest.IsolatedAsyncioTestCase):
         self.db = db
         await db.connect()
         self.address = f"build4-{uuid.uuid4().hex}@example.test"
-        self.env = patch.dict(os.environ, VOURNAL_ENHANCEMENTS="0")
-        self.env.start()
 
     async def asyncTearDown(self):
-        self.env.stop()
         await self.db.user.delete_many(where={"email": self.address})
         await self.db.disconnect()
 

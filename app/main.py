@@ -32,7 +32,6 @@ from app import db as database
 from app.auth import get_current_user, router as auth_router
 from app.billing_apple import router as billing_apple_router
 from app.billing_paddle import router as billing_paddle_router
-from app.enhancements import enabled as enhancements_enabled
 from app.oauth import router as oauth_router
 from app.entities import (
     ambiguous_norm_sets,
@@ -97,7 +96,6 @@ _ENTRY_INCLUDE = {
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Connect the Prisma client on startup, disconnect on shutdown."""
-    enhancements_enabled()  # fail before any database access if isolation is invalid
     await database.connect()
     # Reap orphaned jobs: extraction runs in in-process BackgroundTasks, which do
     # NOT survive a restart/deploy. Any entry still PENDING/PROCESSING at boot

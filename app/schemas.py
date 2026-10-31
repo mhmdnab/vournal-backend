@@ -38,6 +38,8 @@ class RegisterRequest(BaseModel):
     # IANA timezone (e.g. "Asia/Beirut"), sent automatically by the client from
     # the device. Optional; invalid/absent falls back to UTC.
     timezone: Optional[str] = None
+    # Sent by apps that can show the code step. Build 4 phones don't, and get tokens.
+    confirmEmail: bool = False
 
     @field_validator("email")
     @classmethod
@@ -74,9 +76,11 @@ class UpdateMeRequest(BaseModel):
 
 
 class DeleteAccountRequest(BaseModel):
-    """Confirm irreversible account deletion by re-entering the password."""
+    """Confirm irreversible account deletion: the password, or the word DELETE
+    for an account that has no password (Apple or Google sign-in)."""
 
-    password: str
+    password: Optional[str] = None
+    confirmWord: Optional[str] = None
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -105,6 +109,7 @@ class ResetPasswordRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+    confirmEmail: bool = False
 
 
 class RefreshRequest(BaseModel):
@@ -119,15 +124,12 @@ class TokenResponse(BaseModel):
     accessToken: str
     refreshToken: str
     tokenType: str = "bearer"
-    recoveryCodes: Optional[List[str]] = None
 
 
 class AuthChallengeOut(BaseModel):
     challengeToken: str
-    step: Literal["verify_email", "enroll_totp", "verify_totp"]
+    step: Literal["verify_email", "link_identity"]
     expiresAt: datetime
-    secret: Optional[str] = None
-    provisioningUri: Optional[str] = None
 
 
 class VerifyChallengeRequest(BaseModel):
@@ -140,6 +142,10 @@ class VerifyChallengeRequest(BaseModel):
         if len(value) > 100:
             raise ValueError("Code too long")
         return value.strip()
+
+
+class ConfirmEmailRequest(BaseModel):
+    code: str = Field(max_length=100)
 
 
 class UsageOut(BaseModel):
@@ -164,6 +170,8 @@ class UserOut(BaseModel):
     # Live usage/limits for the plan surface (null only on older serializations).
     usage: Optional[UsageOut] = None
     createdAt: datetime
+    emailConfirmed: bool = False
+    hasPassword: bool = True
 
 
 # ---- Requests ----------------------------------------------------------------
