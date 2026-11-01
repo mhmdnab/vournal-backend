@@ -506,6 +506,18 @@ async def process_audio_entry(entry_id: str) -> None:
         update["sttSeconds"] = float(result["durationSec"])
     await db.entry.update(where={"id": entry_id}, data=update)
 
+    # Silence: there's nothing to organise, and a blank entry isn't an entry.
+    if not transcript.strip():
+        await db.entry.update(
+            where={"id": entry_id},
+            data={
+                "status": "FAILED",
+                "error": "We didn’t catch any words. Try recording again.",
+                "processedAt": _now(),
+            },
+        )
+        return
+
     # Audio takes the MERGED path (Step 10): extraction itself silently corrects
     # dialect mistranscriptions (e.g. Melia hears جدّد "renew" as جدة "Jeddah")
     # and extracts in one call — replacing the old two-call repair->extract. The

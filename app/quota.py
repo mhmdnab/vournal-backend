@@ -105,10 +105,15 @@ def usage_snapshot(user) -> dict:
     }
 
 
+# The phone stops within a moment of the limit and rounds the length it reports, so a
+# full-length recording can read a second or two over. It must not be thrown away.
+_RECORDING_GRACE_SECONDS = 2
+
+
 def reject_if_recording_too_long(duration_sec, user) -> None:
     """Reject an over-length recording BEFORE any upload/STT, per the user's plan."""
     limit = max_recording_seconds(user)
-    if duration_sec is not None and duration_sec > limit:
+    if duration_sec is not None and duration_sec > limit + _RECORDING_GRACE_SECONDS:
         raise HTTPException(
             status_code=413,
             detail={
