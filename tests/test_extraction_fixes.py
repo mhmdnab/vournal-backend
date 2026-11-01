@@ -11,7 +11,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from zoneinfo import ZoneInfo
 
-from app.task_intelligence import _in_transcript, normalize_metadata, verified_day
+from app.task_intelligence import _in_transcript, known_place_spelling, normalize_metadata, verified_day
 
 
 def _replies(*pairs):
@@ -204,6 +204,38 @@ class HeldOutFixes(unittest.TestCase):
         item = {"dueDate": "2026-11-03", "time": None, "dueDateEvidence": "tuesday",
                 "recurrence": {"freq": "monthly", "interval": 1, "weekdays": [], "until": None}}
         self.assertEqual(verified_day(item, "rent on tuesday", date(2026, 11, 1))[0], "2026-11-03")
+
+    def test_a_place_the_model_respelled_from_a_mishearing_is_kept(self):
+        for said, written in (
+            ("Yoga at 6 p.m. at M Sharif.", "Em Sherif"),
+            ("lunch at Mano Sheet tomorrow", "Manoushe Street"),
+            ("موعد في كليمنصو بكرا", "كليمنصوه"),
+        ):
+            result = normalize_metadata({"text": "Plan", "location": written}, said)
+            self.assertEqual(result["location"], written, said)
+
+    def test_a_misheard_place_takes_the_spelling_from_past_entries(self):
+        known = ["Em Sherif", "Hamra", "أم شريف"]
+        self.assertEqual(known_place_spelling("M Sharif", known), "Em Sherif")
+        self.assertEqual(known_place_spelling("em sherif", known), "Em Sherif")
+        self.assertEqual(known_place_spelling("ام شريف", known), "أم شريف")
+
+    def test_other_places_are_left_alone(self):
+        known = ["Em Sherif", "Hamra"]
+        for place in ("Sharif's place", "Kafeh Zaatar", "the office", "Homs", None, ""):
+            self.assertEqual(known_place_spelling(place, known), place)
+        self.assertEqual(known_place_spelling("M Sharif", []), "M Sharif")
+        self.assertEqual(known_place_spelling("M Sharif", None), "M Sharif")
+
+    def test_a_place_that_sounds_like_nothing_said_is_still_dropped(self):
+        for said, written in (
+            ("Yoga tomorrow at 6.", "Em Sherif"),
+            ("Call the bank tomorrow.", "the office"),
+            ("Meet Sami at the gym.", "Hamra"),
+            ("بكرا عندي موعد", "الحمرا"),
+        ):
+            result = normalize_metadata({"text": "Plan", "location": written}, said)
+            self.assertIsNone(result["location"], written)
 
     def test_urgency_words_anywhere_in_the_tasks_sentence(self):
         for transcript, source, evidence in (

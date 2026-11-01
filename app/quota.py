@@ -144,6 +144,14 @@ async def check_global_daily_cap(db) -> None:
         raise HTTPException(status_code=503, detail={"code": "SERVICE_BUSY"})
 
 
+async def release_entry_quota(db, user_id: str) -> None:
+    """Give back a reserved entry that turned out to hold nothing, such as silence."""
+    await db.user.update_many(
+        where={"id": user_id, "usagePeriodEntries": {"gt": 0}},
+        data={"usagePeriodEntries": {"decrement": 1}},
+    )
+
+
 async def reserve_entry_quota(db, user) -> None:
     """Reserve one entry against the user's monthly limit, rolling the window at
     the calendar month. Raises 429 (structured) when over. Fails closed."""

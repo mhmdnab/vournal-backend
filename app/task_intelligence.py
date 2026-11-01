@@ -9,6 +9,7 @@ a guess. Typed !, !! and !!! attached to a task always win.
 
 import re
 import unicodedata
+from difflib import SequenceMatcher
 from datetime import date, datetime, timedelta, timezone
 
 CATEGORIES = {"work", "health", "family", "finance", "personal", "learning", "errands"}
@@ -28,7 +29,7 @@ Each object in "todos" ALSO has these keys:
 - "urgency": how urgent the speaker says THIS to-do is — 3 high ("it's urgent", "very necessary", "ضروري كتير", "darure ktir", "عاجل جداً"), 2 medium, 1 low ("whenever I get a chance", "no rush", "mesh mesta3jel", "مش مستعجل", "لا داعي للعجلة"), 0 if they gave no sign. Plain obligation words — "need to", "have to", "must", "lezem", "لازم", "يجب" — are NOT urgency on their own: they just make it a to-do (0). Use the string "unclear" when they signal importance but not the level ("it's important", "soon", "mhem", "مهم", "قريباً"). Typed !, !! and !!! after a to-do mean 1, 2 and 3. Excitement or emotion about the day ("what a great day!!!", "شو هالنهار الحلو!!!") is NOT urgency for any to-do.
 - "urgencyEvidence": the exact words (verbatim from THIS to-do's part of the transcript) that show the urgency, or null when urgency is 0 or "unclear".
 - "dueDateEvidence": the exact words (verbatim from the transcript) that name the day ("tomorrow", "on Friday", "bukra", "نهار الجمعة"), or null when "dueDate" is null.
-- "location": a place said for THIS to-do, written exactly as spoken, or null. Never invent one.
+- "location": a place said for THIS to-do, or null. Never invent one. Write it as said; on a spoken entry, fix a misheard spelling as described in SPEECH-TO-TEXT CORRECTION.
 - "recurrence": null for a one-time to-do. If the speaker asks for it to repeat: {"freq": "daily"|"weekly"|"monthly"|"yearly", "interval": number (every 2 weeks -> 2), "weekdays": ["MO","TU","WE","TH","FR","SA","SU"] or null, "until": "YYYY-MM-DD" or null}. "every Monday and Thursday" -> {"freq":"weekly","interval":1,"weekdays":["MO","TH"],"until":null}. Use the string "unclear" when they want it to repeat but don't say how often ("every so often", "from time to time", "every now and then", "kel fatra", "كل فترة", "من وقت لآخر").
 - "category": one of work, health, family, finance, personal, learning, errands.
 Never invent a date, a clock time, a place or a repeat. Urgency is not a date: "Call the bank !!!" with no day keeps "dueDate": null. A meeting or appointment with a day but no clock time keeps "time": null; the app asks the user.
@@ -77,6 +78,35 @@ def _fold(text: str) -> str:
 
 def _in_transcript(phrase, transcript: str) -> bool:
     return isinstance(phrase, str) and bool(phrase.strip()) and _fold(phrase) in _fold(transcript)
+
+
+def _place_was_said(place, transcript: str) -> bool:
+    """Said word for word, or something that sounds like it: speech-to-text hears
+    "Em Sherif" as "M Sharif", and the model may write the right spelling. A place
+    that resembles nothing in the transcript is invented, so it's still dropped."""
+    if _in_transcript(place, transcript):
+        return True
+    if not isinstance(place, str):
+        return False
+    wanted = _fold(place)
+    words = _fold(transcript).split()
+    size = len(wanted.split())
+    for span in {max(size - 1, 1), size, size + 1}:
+        for start in range(len(words) - span + 1):
+            heard = " ".join(words[start : start + span]).strip(".,!?؟،")
+            if SequenceMatcher(None, wanted, heard).ratio() >= 0.7:
+                return True
+    return False
+
+
+def known_place_spelling(place, known: list[str] | None):
+    """The spelling from the person's own past entries, if this place sounds like one
+    of them: speech-to-text may hear "Em Sherif" as "M Sharif". Otherwise unchanged."""
+    if not isinstance(place, str) or not place.strip() or not known:
+        return place
+    wanted = _fold(place)
+    best = max(known, key=lambda name: SequenceMatcher(None, wanted, _fold(name)).ratio())
+    return best if SequenceMatcher(None, wanted, _fold(best)).ratio() >= 0.75 else place
 
 
 def _clauses(text: str) -> list[str]:
@@ -185,7 +215,7 @@ def normalize_metadata(item: dict, transcript: str, tz=None) -> dict:
         category=category
         if isinstance(category, str) and category in CATEGORIES
         else category_for(str(item.get("text") or "")),
-        location=location.strip() if _in_transcript(location, transcript) else None,
+        location=location.strip() if _place_was_said(location, transcript) else None,
         **_recurrence(item, tz),
     )
 

@@ -63,8 +63,16 @@ The transcript is raw speech-to-text output and may contain mistranscriptions. \
 Speech-to-text frequently mishears spoken Lebanese dialect words — especially \
 verbs and proper nouns — as similar-sounding but contextually wrong words. For \
 example the verb "جدّد" (to renew) is often misheard as the city name "جدة" \
-(Jeddah). Before extracting, silently infer the word the speaker almost certainly \
-meant from context, and extract from that corrected understanding.
+(Jeddah), and "ادفع الإيجار" (pay the rent) can come through broken apart as \
+"تفعل اي جار". When the words make no sense as written, work out what they sound \
+like. Before extracting, silently infer the word the speaker almost certainly \
+meant from context, and extract from that corrected understanding: the to-do and \
+the summary use the corrected words, spelled correctly.
+
+Names get misheard too. When a person or place sounds like someone in KNOWN PEOPLE \
+or a place in KNOWN PLACES and is written in the same script, use that spelling, \
+even for "location". Any other name stays exactly as heard: never swap in a \
+different one, and never change its script.
 
 This is the ONLY inference you are permitted, and it does NOT relax any rule \
 above. Correcting a misheard word may change WHICH word was meant; it must never \

@@ -44,6 +44,7 @@ from app.threads import router as threads_router
 from app.extraction import extract
 from app.extraction_merged import extract_merged
 from app.quota import (
+    release_entry_quota,
     check_global_daily_cap,
     reject_if_recording_too_long,
     reserve_entry_quota,
@@ -71,6 +72,7 @@ from app.schemas import (
 )
 from app.task_intelligence import (
     first_occurrence_day,
+    known_place_spelling,
     metadata_out,
     next_occurrence_day,
     normalize_metadata,
@@ -422,6 +424,8 @@ async def process_transcript(
         except Exception:  # noqa: BLE001 — one odd to-do must not lose the rest
             log.exception("Task metadata fell back to defaults for entry %s", entry_id)
             meta = normalize_metadata({"text": todo["text"]}, transcript, tz)
+        if use_merged:  # only speech gets a name wrong
+            meta["location"] = known_place_spelling(meta["location"], known.get("places"))
         if not due:  # "every day", "every Monday and Thursday": the repeat says when
             first = first_occurrence_day(
                 meta["recurrence"], meta["recurrenceWeekdays"], now.date()
@@ -506,16 +510,20 @@ async def process_audio_entry(entry_id: str) -> None:
         update["sttSeconds"] = float(result["durationSec"])
     await db.entry.update(where={"id": entry_id}, data=update)
 
-    # Silence: there's nothing to organise, and a blank entry isn't an entry.
+    # Silence: there's nothing to organise, and a blank entry isn't an entry. The row
+    # stays so the waiting screen can read why, but it costs nothing and isn't listed.
     if not transcript.strip():
+        await delete_audio(entry.audioUrl)
         await db.entry.update(
             where={"id": entry_id},
             data={
                 "status": "FAILED",
                 "error": "We didn’t catch any words. Try recording again.",
+                "audioUrl": None,
                 "processedAt": _now(),
             },
         )
+        await release_entry_quota(db, entry.userId)
         return
 
     # Audio takes the MERGED path (Step 10): extraction itself silently corrects
@@ -616,7 +624,11 @@ async def create_audio_entry(
 @app.get("/entries", response_model=List[EntryOut])
 async def list_entries(limit: int = 20, current=Depends(get_current_user)):
     entries = await db.entry.find_many(
-        where={"userId": current.id},
+        where={
+            "userId": current.id,
+            # Silence (see process_audio_entry): a real failure keeps its audio.
+            "NOT": {"status": "FAILED", "rawTranscript": "", "audioUrl": None},
+        },
         order={"createdAt": "desc"},
         take=limit,
         include=_ENTRY_INCLUDE,

@@ -60,10 +60,49 @@ class SilentRecording(unittest.IsolatedAsyncioTestCase):
 
     async def test_no_words_fails_kindly_and_spends_no_ai(self):
         for text in ("", "   "):
-            entry, extract = await self._run(text)
+            with patch.object(__import__("app.main", fromlist=["main"]), "delete_audio", AsyncMock(return_value=True)):
+                entry, extract = await self._run(text)
             self.assertEqual(entry.status, "FAILED")
             self.assertIn("didn’t catch any words", entry.error)
             extract.assert_not_awaited()
+
+    async def test_silence_costs_nothing_and_leaves_nothing_behind(self):
+        from app import main
+
+        await self.db.user.update(where={"id": self.user.id}, data={"usagePeriodEntries": 5})
+        with patch.object(main, "delete_audio", AsyncMock(return_value=True)) as delete:
+            entry, _ = await self._run("")
+        delete.assert_awaited_once_with("local.m4a")
+        self.assertIsNone(entry.audioUrl)
+        user = await self.db.user.find_unique(where={"id": self.user.id})
+        self.assertEqual(user.usagePeriodEntries, 4)
+
+    async def test_the_refund_never_goes_below_zero(self):
+        from app import main
+
+        await self.db.user.update(where={"id": self.user.id}, data={"usagePeriodEntries": 0})
+        with patch.object(main, "delete_audio", AsyncMock(return_value=True)):
+            await self._run("")
+        user = await self.db.user.find_unique(where={"id": self.user.id})
+        self.assertEqual(user.usagePeriodEntries, 0)
+
+    async def test_the_journal_hides_silence_but_keeps_real_failures(self):
+        from app import main
+
+        with patch.object(main, "delete_audio", AsyncMock(return_value=True)):
+            silent, _ = await self._run("")
+        real = await self.db.entry.create(
+            data={"userId": self.user.id, "rawTranscript": "", "audioUrl": "kept.m4a", "status": "FAILED"}
+        )
+        words = await self.db.entry.create(
+            data={"userId": self.user.id, "rawTranscript": "Call the bank", "status": "DONE"}
+        )
+        listed = await main.list_entries(limit=20, current=self.user)
+        ids = {entry.id for entry in listed}
+        self.assertNotIn(silent.id, ids)
+        self.assertLessEqual({real.id, words.id}, ids)
+        # The screen waiting on it can still read why.
+        self.assertEqual((await main.get_entry(silent.id, current=self.user)).status, "FAILED")
 
     async def test_words_go_on_to_extraction(self):
         _, extract = await self._run("Call the bank")
