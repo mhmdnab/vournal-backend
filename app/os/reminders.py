@@ -21,6 +21,7 @@ from app.os.calendar_utils import (
     safe_tz,
 )
 from app.os.common import dates, rrule, validators
+from app.os.common.query import _query_bool, _query_date, _query_int, unknown_params
 from app.os.common.jsparse import js_number
 from app.os.common.activity import log_activity
 from app.os.common.deps import plus_user
@@ -29,11 +30,16 @@ from app.os.common.i18n import to_lang
 from app.os.common.ownership import ENTITY_TYPE_MODEL, assert_entity
 from app.os.common.prayer import TimeAnchor, read_anchor, resolve_or_fail, resolver
 from app.os.profile import ensure_os_profile
-from app.os.tasks import _query_bool, _query_date, _query_int
 
 router = nest_router("/reminders")
 
 STATUSES = ("active", "upcoming", "overdue", "today", "done", "all")
+# Prisma's EntityType in schema order, as class-validator's IsEnum lists it
+ENTITY_TYPES = (
+    "TASK", "EVENT", "PROJECT", "TRANSACTION", "RECURRING_PAYMENT", "BUDGET", "GOAL", "HABIT", "MAINTENANCE", "DOCUMENT",
+    "SHOPPING_LIST", "SHOPPING_ITEM", "MEAL", "RECIPE", "NOTE", "COURSE", "ASSESSMENT", "TRIP", "PERSON", "IMPORTANT_DATE",
+    "REMINDER", "DEBT",
+)
 EntityTypeName = Literal[tuple(ENTITY_TYPE_MODEL)]  # type: ignore[valid-type]
 DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE = 50, 200
 _ONE_MS = timedelta(milliseconds=1)
@@ -261,11 +267,16 @@ def _bound(value: str, tz: str, side: str) -> datetime:
     return dates.parse_instant(value)
 
 
+_LIST_REMINDERS_QUERY = (  # the NestJS query DTO's fields
+    "status", "from", "to", "recurring", "deadline", "entityType", "entityId", "q", "page", "pageSize",
+)
+
+
 @router.get("")
 async def list_reminders(request: Request, user=Depends(plus_user)):
     tz, lang = await _locale(user)
     q = request.query_params
-    errors: list[str] = []
+    errors = unknown_params(request, _LIST_REMINDERS_QUERY)
     status = q.get("status")
     if status is not None and status not in STATUSES:
         errors.append(f"status must be one of the following values: {', '.join(STATUSES)}")
@@ -274,7 +285,7 @@ async def list_reminders(request: Request, user=Depends(plus_user)):
     deadline = _query_bool(request, "deadline", errors)
     entity_type = q.get("entityType")
     if entity_type is not None and entity_type not in ENTITY_TYPE_MODEL:
-        errors.append("entityType must be one of the following values")
+        errors.append(f"entityType must be one of the following values: {', '.join(ENTITY_TYPES)}")
     page = _query_int(request, "page", errors)
     page_size = _query_int(request, "pageSize", errors, MAX_PAGE_SIZE)
     text = q.get("q")

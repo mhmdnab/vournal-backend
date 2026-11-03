@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, Strict
 from app.db import db
 from app.os.calendar_utils import local_date_time
 from app.os.common import dates, rrule, validators
+from app.os.common.query import unknown_params
 from app.os.common.activity import log_activity
 from app.os.common.currency import get_converter, round_money, to_number
 from app.os.common.defaults import SUPPORTED_CURRENCIES
@@ -432,10 +433,13 @@ class StatusBody(BaseModel):
 # ----- routes --------------------------------------------------------------------------------
 
 
+_LIST_DEBTS_QUERY = ("status", "direction", "personId", "q")  # the NestJS query DTO's fields
+
+
 @router.get("")
 async def list_debts(request: Request, user=Depends(plus_user)):
     q = request.query_params
-    errors: list[str] = []
+    errors = unknown_params(request, _LIST_DEBTS_QUERY)
     status = q.get("status")
     if status is not None and status not in ("open", "closed", "all"):
         errors.append("status must be one of the following values: open, closed, all")

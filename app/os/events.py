@@ -31,10 +31,10 @@ from app.os.common.http import invalid_data, nest_error, nest_router
 from app.os.common.i18n import to_lang
 from app.os.common.ownership import assert_owned
 from app.os.common.prayer import TimeAnchor, resolve_or_fail, resolver
-from app.os.common.query import string_list
+from app.os.common.query import _query_bool, _query_date, _query_int, string_list, unknown_params
 from app.os.event_occurrences import expand_event
 from app.os.profile import ensure_os_profile
-from app.os.tasks import PRIORITIES, PriorityName, _query_bool, _query_date, _query_int
+from app.os.tasks import PRIORITIES, PriorityName
 
 router = nest_router("/events")
 
@@ -346,11 +346,17 @@ def _range_bound(value: str, tz: str, side: str) -> datetime:
 # Routes
 
 
+_LIST_EVENTS_QUERY = (  # the NestJS query DTO's fields
+    "from", "to", "expand", "taskId", "projectId", "goalId", "tripId", "courseId", "categoryId", "type",
+    "priority", "recurring", "q", "page", "pageSize",
+)
+
+
 @router.get("")
 async def list_events(request: Request, user=Depends(plus_user)):
     tz, lang = await _locale(user)
     q = request.query_params
-    errors: list[str] = []
+    errors = unknown_params(request, _LIST_EVENTS_QUERY)
     start_s, end_s = _query_date(request, "from", errors), _query_date(request, "to", errors)
     expand = _query_bool(request, "expand", errors)
     recurring = _query_bool(request, "recurring", errors)

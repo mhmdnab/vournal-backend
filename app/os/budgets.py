@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, Strict
 from app.db import db
 from app.os import finance_utils as fu
 from app.os.common import validators
+from app.os.common.query import _query_bool, unknown_params
 from app.os.common.activity import log_activity
 from app.os.common.currency import get_converter, round_money, to_number
 from app.os.common.defaults import SUPPORTED_CURRENCIES
@@ -20,7 +21,6 @@ from app.os.common.deps import plus_user
 from app.os.common.http import nest_error, nest_router
 from app.os.common.i18n import to_lang
 from app.os.profile import ensure_os_profile
-from app.os.tasks import _query_bool
 from app.os.transactions import as_decimal
 
 router = nest_router("/budgets")
@@ -213,9 +213,12 @@ async def _get(user, id: str, period: str | None) -> dict:
     return view
 
 
+_BUDGET_QUERY = ("period", "periodType", "includeInactive")  # NestJS's BudgetQueryDto (list and get)
+
+
 @router.get("")
 async def list_budgets(request: Request, user=Depends(plus_user)):
-    errors: list[str] = []
+    errors = unknown_params(request, _BUDGET_QUERY)
     period, kind = _period_query(request, errors)
     include_inactive = _query_bool(request, "includeInactive", errors)
     if errors:
@@ -278,7 +281,7 @@ async def create(body: CreateBody, user=Depends(plus_user)):
 
 @router.get("/{id}")
 async def get(id: str, request: Request, user=Depends(plus_user)):
-    errors: list[str] = []
+    errors = unknown_params(request, _BUDGET_QUERY)
     period, _ = _period_query(request, errors)
     if errors:
         raise nest_error(400, errors)

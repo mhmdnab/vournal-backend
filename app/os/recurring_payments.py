@@ -26,7 +26,7 @@ from app.os.common.defaults import SUPPORTED_CURRENCIES
 from app.os.common.deps import plus_user
 from app.os.common.http import nest_error, nest_router
 from app.os.common.i18n import to_lang
-from app.os.common.query import string_list
+from app.os.common.query import string_list, unknown_params
 from app.os.profile import ensure_os_profile
 from app.os.transactions import as_decimal
 
@@ -357,17 +357,20 @@ async def _get(user, id: str) -> dict:
 # Routes
 
 
+_LIST_PAYMENTS_QUERY = ("kind", "excludeKind", "status", "q", "categoryId", "accountId")  # the NestJS query DTO's fields
+
+
 @router.get("")
 async def list_payments(request: Request, user=Depends(plus_user)):
     q = request.query_params
-    errors: list[str] = []
+    errors = unknown_params(request, _LIST_PAYMENTS_QUERY)
     kind = _kind_filters(request, errors)
     statuses = string_list(q.getlist("status"))
     if statuses and any(s not in STATUSES for s in statuses):
         errors.append(f"each value in status must be one of the following values: {', '.join(STATUSES)}")
     text = q.get("q")
-    if text is not None and not 1 <= len(text) <= 100:
-        errors.append("q must be longer than or equal to 1 and shorter than or equal to 100 characters")
+    if text is not None and (problem := validators.length_message("q", text, 1, 100)):
+        errors.append(problem)
     if errors:
         raise nest_error(400, errors)
     await auto_log_due(user.id)
@@ -389,10 +392,13 @@ async def list_payments(request: Request, user=Depends(plus_user)):
     return {"items": items, "total": len(items)}
 
 
+_SUMMARY_QUERY = ("kind", "excludeKind", "days")  # the NestJS query DTO's fields
+
+
 @router.get("/summary")
 async def summary(request: Request, user=Depends(plus_user)):
     """Totals of ACTIVE payments in the default currency, and what falls due in the next `days`."""
-    errors: list[str] = []
+    errors = unknown_params(request, _SUMMARY_QUERY)
     kind = _kind_filters(request, errors)
     raw_days = request.query_params.get("days")
     days = 30

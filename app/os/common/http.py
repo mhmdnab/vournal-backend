@@ -8,6 +8,9 @@ Every other path keeps FastAPI's own handlers, so the app's routes don't change.
 
 import functools
 import json
+import re
+import types
+import typing
 from http import HTTPStatus
 from typing import Any
 
@@ -18,6 +21,7 @@ from fastapi.exception_handlers import (
 )
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from fastapi.routing import APIRoute
 from starlette.responses import Response
 from prisma.errors import ForeignKeyViolationError, RecordNotFoundError, UniqueViolationError
@@ -96,17 +100,108 @@ async def _http_error(request: Request, exc: StarletteHTTPException):
     return response
 
 
-def _validation_message(error: dict) -> str:
-    field = ".".join(str(part) for part in error.get("loc", ())[1:]) or "body"
-    if error.get("type") == "extra_forbidden":
-        return f"property {field} should not exist"
-    return f"{field} {error.get('msg', 'is invalid')}"
+_NUMBER = "must be a number conforming to the specified constraints"
+# pydantic's error types in class-validator's words
+_TYPE_WORDS = {
+    "string_type": "must be a string",
+    "int_type": "must be an integer number", "int_parsing": "must be an integer number", "int_from_float": "must be an integer number",
+    "bool_type": "must be a boolean value", "bool_parsing": "must be a boolean value",
+    "float_type": _NUMBER, "float_parsing": _NUMBER, "finite_number": _NUMBER,
+    "list_type": "must be an array",
+}
+
+
+def _unwrap(annotation):
+    """X | None → X; list[X] stays a list."""
+    args = [a for a in typing.get_args(annotation) if a is not type(None)]
+    if typing.get_origin(annotation) in (typing.Union, types.UnionType) and len(args) == 1:
+        return args[0]
+    return annotation
+
+
+def _choices(annotation) -> list[str] | None:
+    annotation = _unwrap(annotation)
+    return [str(a) for a in typing.get_args(annotation)] if typing.get_origin(annotation) is typing.Literal else None
+
+
+def _leaf_annotation(model, path: list):
+    """The declared type at a body path (fields and list items), or None."""
+    annotation = model
+    for part in path:
+        annotation = _unwrap(annotation)
+        if isinstance(part, int):
+            args = typing.get_args(annotation)
+            annotation = args[0] if args else None
+        elif isinstance(annotation, type) and issubclass(annotation, BaseModel) and part in annotation.model_fields:
+            annotation = annotation.model_fields[part].annotation
+        else:
+            return None
+    return annotation
+
+
+def _missing_words(annotation) -> str:
+    """What class-validator said about an absent required field, from its type."""
+    if (choices := _choices(annotation)) is not None:
+        return f"must be one of the following values: {', '.join(choices)}"
+    annotation = _unwrap(annotation)
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        return "nested property"
+    if typing.get_origin(annotation) is list:
+        return "must be an array"
+    words = {str: "must be a string", int: "must be an integer number", bool: "must be a boolean value", object: _NUMBER}
+    return words.get(annotation if isinstance(annotation, type) else None, "should not be empty")
+
+
+def _validation_message(error: dict, model=None) -> str:
+    """One pydantic error in class-validator's words. NestJS's ValidationPipe prefixes a
+    nested property's message with its parent path ("schedule.day must …")."""
+    path = list(error.get("loc", ())[1:])
+    kind, msg, ctx = error.get("type"), error.get("msg", ""), error.get("ctx") or {}
+    if not path:
+        return msg.removeprefix("Value error, ")
+    leaf, parent = path[-1], path[:-1]
+    if isinstance(leaf, int):  # a list item: class-validator's "each value in …"
+        prop, parent = f"each value in {parent[-1]}" if parent else "each value", parent[:-1]
+    else:
+        prop = str(leaf)
+    if kind == "value_error":
+        core = msg.removeprefix("Value error, ")
+    elif kind == "extra_forbidden":
+        core = f"property {prop} should not exist"
+    elif kind in ("literal_error", "enum"):
+        choices = re.findall(r"'([^']*)'", ctx.get("expected", ""))
+        core = f"{prop} must be one of the following values: {', '.join(choices)}"
+    elif kind == "greater_than_equal":
+        core = f"{prop} must not be less than {ctx.get('ge')}"
+    elif kind == "less_than_equal":
+        core = f"{prop} must not be greater than {ctx.get('le')}"
+    elif kind == "string_too_long":
+        core = f"{prop} must be shorter than or equal to {ctx.get('max_length')} characters"
+    elif kind == "string_too_short":
+        core = f"{prop} must be longer than or equal to {ctx.get('min_length')} characters"
+    elif kind == "too_long":
+        core = f"{prop} must contain no more than {ctx.get('max_length')} elements"
+    elif kind in ("model_type", "model_attributes_type", "dict_type"):
+        core = f"nested property {prop} must be either object or array"
+    elif kind == "missing":
+        words = _missing_words(_leaf_annotation(model, path)) if model is not None else "should not be empty"
+        core = f"nested property {prop} must be either object or array" if words == "nested property" else f"{prop} {words}"
+    else:
+        core = f"{prop} {_TYPE_WORDS.get(kind, msg)}"
+    return ".".join(str(p) for p in parent) + "." + core if parent else core
+
+
+def _body_model(request: Request):
+    field = getattr(request.scope.get("route"), "body_field", None)
+    annotation = getattr(getattr(field, "field_info", None), "annotation", None) or getattr(field, "type_", None)
+    return annotation if isinstance(annotation, type) and issubclass(annotation, BaseModel) else None
 
 
 async def _validation_error(request: Request, exc: RequestValidationError):
     if not _is_api(request):
         return await request_validation_exception_handler(request, exc)
-    return _body(400, [_validation_message(e) for e in exc.errors()])
+    model = _body_model(request)
+    return _body(400, [_validation_message(e, model) for e in exc.errors()])
 
 
 def _unique_message(exc: UniqueViolationError) -> str:

@@ -17,14 +17,13 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictFloat, Stri
 
 from app.db import db
 from app.os.common import dates, rrule, validators
-from app.os.common.jsparse import js_number
 from app.os.common.activity import log_activity
 from app.os.common.deps import plus_user
 from app.os.common.http import invalid_data, nest_error, nest_router
 from app.os.common.i18n import to_lang
 from app.os.common.ownership import assert_many_owned, assert_owned
 from app.os.common.prayer import TimeAnchor, read_anchor, resolve_or_fail, resolver
-from app.os.common.query import string_list
+from app.os.common.query import _query_bool, _query_date, _query_int, _query_list, string_list, unknown_params
 from app.os.profile import ensure_os_profile
 
 log = logging.getLogger("vournal.os")
@@ -361,44 +360,6 @@ def _order(sort: str | None, direction: str | None) -> list:
     ]
 
 
-def _query_bool(request: Request, name: str, errors: list) -> bool | None:
-    value = request.query_params.get(name)
-    if value is None or value == "":
-        return None
-    v = value.lower()
-    if v in ("true", "1", "yes"):
-        return True
-    if v in ("false", "0", "no"):
-        return False
-    errors.append(f"{name} must be a boolean value")
-    return None
-
-
-def _query_int(request: Request, name: str, errors: list, maximum: int | None = None) -> int | None:
-    value = request.query_params.get(name)
-    if value is None:
-        return None
-    number = js_number(value)  # @Type(() => Number)
-    if not math.isfinite(number) or number != int(number) or number < 1 or (maximum and number > maximum):
-        errors.append(f"{name} must be an integer between 1 and {maximum or 'infinity'}")
-        return None
-    return int(number)
-
-
-def _query_list(request: Request, name: str, allowed, errors: list) -> list[str] | None:
-    values = string_list(request.query_params.getlist(name))
-    if values and any(v not in allowed for v in values):
-        errors.append(f"each value in {name} must be one of the following values: {', '.join(allowed)}")
-    return values
-
-
-def _query_date(request: Request, name: str, errors: list) -> str | None:
-    value = request.query_params.get(name)
-    if value is not None and not dates.is_iso_date_string(value):
-        errors.append(f"{name} must be a valid ISO 8601 date string")
-    return value
-
-
 def _focus_date(value: str | None, tz: str) -> datetime:
     if not value:
         return dates.today_date_only(tz)
@@ -537,10 +498,17 @@ async def _spawn_next(user_id: str, task, ctx: Ctx):
 # Routes
 
 
+_LIST_TASKS_QUERY = (  # the NestJS query DTO's fields
+    "status", "overdue", "priority", "categoryId", "projectId", "goalId", "courseId", "tripId", "lifeArea",
+    "tagId", "dueFrom", "dueTo", "hasDue", "completedFrom", "completedTo", "q", "parentId", "topLevel",
+    "sort", "order", "page", "pageSize",
+)
+
+
 @router.get("")
 async def list_tasks(request: Request, user=Depends(plus_user)):
     ctx = await task_ctx(user)
-    errors: list[str] = []
+    errors = unknown_params(request, _LIST_TASKS_QUERY)
     q = request.query_params
     statuses = _query_list(request, "status", ("TODO", "IN_PROGRESS", "COMPLETED", "OVERDUE"), errors)
     overdue = _query_bool(request, "overdue", errors)
@@ -621,9 +589,12 @@ async def list_tasks(request: Request, user=Depends(plus_user)):
 
 @router.get("/focus")
 async def get_focus(request: Request, user=Depends(plus_user)):
+    errors = unknown_params(request, ("date",))
     value = request.query_params.get("date")
     if value is not None and not dates.is_iso_date_string(value):
-        raise nest_error(400, ["date must be a valid ISO 8601 date string"])
+        errors.append("date must be a valid ISO 8601 date string")
+    if errors:
+        raise nest_error(400, errors)
     ctx = await task_ctx(user)
     return await _focus_view(user.id, _focus_date(value, ctx.tz), ctx)
 

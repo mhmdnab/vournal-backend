@@ -22,9 +22,8 @@ from app.os.common.deps import plus_user
 from app.os.common.http import nest_error, nest_router
 from app.os.common.i18n import to_lang
 from app.os.common.ownership import assert_many_owned
-from app.os.common.query import string_list
+from app.os.common.query import _query_bool, string_list, unknown_params
 from app.os.profile import ensure_os_profile
-from app.os.tasks import _query_bool
 from app.os.transactions import as_decimal, materialize_due
 
 router = nest_router("/accounts")
@@ -178,9 +177,12 @@ async def _get(user_id: str, id: str) -> dict:
     return view
 
 
+_LIST_ACCOUNTS_QUERY = ("includeArchived", "type")  # the NestJS query DTO's fields
+
+
 @router.get("")
 async def list_accounts(request: Request, user=Depends(plus_user)):
-    errors: list[str] = []
+    errors = unknown_params(request, _LIST_ACCOUNTS_QUERY)
     include_archived = _query_bool(request, "includeArchived", errors)
     types = string_list(request.query_params.getlist("type"))
     if types and any(t not in TYPES for t in types):

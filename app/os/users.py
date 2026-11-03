@@ -13,6 +13,7 @@ from app import security
 from app.auth import delete_account
 from app.db import db
 from app.os.auth import clear_session_cookies, web_user_out
+from app.os.common import validators
 from app.os.common.deps import plus_user, web_user
 from app.os.common.http import nest_error, nest_router
 from app.os.profile import ensure_os_profile
@@ -32,10 +33,7 @@ class UpdateMeBody(BaseModel):
     def _name(cls, v):
         if v is None:
             return v
-        v = v.strip()
-        if not 1 <= len(v) <= 80:
-            raise ValueError("name must be longer than or equal to 1 and shorter than or equal to 80 characters")
-        return v
+        return validators.trimmed(v, "name", 1, 80)
 
     @field_validator("avatarColor")
     @classmethod

@@ -26,9 +26,8 @@ from app.os.common.deps import plus_user
 from app.os.common.http import nest_error, nest_router
 from app.os.common.i18n import to_lang
 from app.os.common.ownership import assert_owned
-from app.os.common.query import string_list
+from app.os.common.query import _query_int, string_list, unknown_params
 from app.os.profile import ensure_os_profile
-from app.os.tasks import _query_int
 from app.os.transactions_import import mark_duplicates, suggest_categories
 
 router = nest_router("/transactions")
@@ -329,10 +328,12 @@ async def category_tree_ids(user_id: str, category_id: str) -> list[str]:
     return [category_id, *(c.id for c in children)]
 
 
-async def build_where(user_id: str, request: Request, tz: str) -> dict:
-    """List filters (shared with the finance reports). Raises 400 on a bad value."""
+async def build_where(user_id: str, request: Request, tz: str, errors: list[str] | None = None) -> dict:
+    """List filters (shared with the finance reports). A bad value is a 400, or a
+    message added to the caller's `errors` when it collects them itself."""
     q = request.query_params
-    errors: list[str] = []
+    collect = errors is not None
+    errors = errors if collect else []
     types = string_list(q.getlist("type"))
     if types and any(t not in TYPES for t in types):
         errors.append(f"each value in type must be one of the following values: {', '.join(TYPES)}")
@@ -340,8 +341,8 @@ async def build_where(user_id: str, request: Request, tz: str) -> dict:
         if q.get(name) is not None and not dates.is_iso_date_string(q.get(name)):
             errors.append(f"{name} must be a valid ISO 8601 date string")
     text = q.get("q")
-    if text is not None and not 1 <= len(text) <= 100:
-        errors.append("q must be longer than or equal to 1 and shorter than or equal to 100 characters")
+    if text is not None and (problem := validators.length_message("q", text, 1, 100)):
+        errors.append(problem)
     amounts = {}
     for name in ("minAmount", "maxAmount"):
         raw = q.get(name)
@@ -355,7 +356,7 @@ async def build_where(user_id: str, request: Request, tz: str) -> dict:
             errors.append(f"{name} must not be less than 0")
     if q.get("sort") is not None and q.get("sort") not in SORTS:
         errors.append(f"sort must be one of the following values: {', '.join(SORTS)}")
-    if errors:
+    if errors and not collect:
         raise nest_error(400, errors)
 
     and_: list[dict] = [{"userId": user_id}]
@@ -410,16 +411,22 @@ async def _get(user_id: str, id: str, fx: Converter, tz: str, lang: str) -> dict
 # Routes
 
 
+_LIST_TRANSACTIONS_QUERY = (  # the NestJS query DTO's fields
+    "type", "from", "to", "categoryId", "accountId", "q", "projectId", "tripId", "goalId",
+    "recurringPaymentId", "minAmount", "maxAmount", "sort", "page", "pageSize",
+)
+
+
 @router.get("")
 async def list_transactions(request: Request, user=Depends(plus_user)):
-    errors: list[str] = []
+    errors = unknown_params(request, _LIST_TRANSACTIONS_QUERY)
     page = _query_int(request, "page", errors)
     page_size = _query_int(request, "pageSize", errors, MAX_PAGE_SIZE)
-    if errors:
+    settings, tz, lang = await _settings(user)
+    where = await build_where(user.id, request, tz, errors)
+    if errors:  # the whole query is checked before anything is written, as NestJS's pipe did
         raise nest_error(400, errors)
     await materialize_due(user.id)
-    settings, tz, lang = await _settings(user)
-    where = await build_where(user.id, request, tz)
     sort = request.query_params.get("sort")
     order = {
         "amount": [{"amount": "asc"}, {"date": "desc"}],

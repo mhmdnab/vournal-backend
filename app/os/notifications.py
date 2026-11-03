@@ -10,9 +10,9 @@ from datetime import datetime, timezone
 from fastapi import Depends, Request
 
 from app.db import db
+from app.os.common.query import _query_bool, _query_int, unknown_params
 from app.os.common.deps import plus_user
 from app.os.common.http import nest_error, nest_router
-from app.os.tasks import _query_bool, _query_int
 
 router = nest_router("/notifications")
 
@@ -31,9 +31,12 @@ async def _owned(user_id: str, id: str):
     return row
 
 
+_LIST_NOTIFICATIONS_QUERY = ("unread", "noSync", "page", "pageSize")  # the NestJS query DTO's fields
+
+
 @router.get("")
 async def list_notifications(request: Request, user=Depends(plus_user)):
-    errors: list[str] = []
+    errors = unknown_params(request, _LIST_NOTIFICATIONS_QUERY)
     unread = _query_bool(request, "unread", errors)
     _query_bool(request, "noSync", errors)  # accepted; there is no lazy sync yet
     page = _query_int(request, "page", errors)

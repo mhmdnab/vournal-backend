@@ -10,6 +10,16 @@ ICON_NAME = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*\Z")
 HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d\Z", re.ASCII)
 
 
+def length_message(field: str, text: str, low: int, high: int) -> str | None:
+    """class-validator's Length(low, high) message for `text`, or None when it fits:
+    it names only the bound that failed."""
+    if len(text) < low:
+        return f"{field} must be longer than or equal to {low} characters"
+    if len(text) > high:
+        return f"{field} must be shorter than or equal to {high} characters"
+    return None
+
+
 def trimmed(value, field: str, low: int, high: int):
     """Trim, then check the length (Trim() + Length(low, high))."""
     if value is None:
@@ -17,10 +27,8 @@ def trimmed(value, field: str, low: int, high: int):
     if not isinstance(value, str):
         raise ValueError(f"{field} must be a string")
     value = value.strip()
-    if not low <= len(value) <= high:
-        raise ValueError(
-            f"{field} must be longer than or equal to {low} and shorter than or equal to {high} characters"
-        )
+    if problem := length_message(field, value, low, high):
+        raise ValueError(problem)
     return value
 
 

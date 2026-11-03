@@ -7,7 +7,7 @@ it when the parent is NULL (NULLs are distinct), so it's checked here.
 
 from typing import Literal
 
-from fastapi import Depends, Query
+from fastapi import Depends, Request
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr, field_validator
 
 from app.db import db
@@ -16,7 +16,7 @@ from app.os.common.activity import log_activity
 from app.os.common.deps import plus_user
 from app.os.common.http import invalid_data, nest_error, nest_router
 from app.os.common.ownership import assert_many_owned
-from app.os.common.query import string_list
+from app.os.common.query import string_list, unknown_params
 
 router = nest_router("/categories")
 
@@ -124,10 +124,13 @@ async def _assert_unique_name(user_id: str, scope: str, name: str, parent_id, ex
 
 
 @router.get("")
-async def list_categories(scope: list[str] | None = Query(default=None), user=Depends(plus_user)):
-    scopes = string_list(scope)
+async def list_categories(request: Request, user=Depends(plus_user)):
+    errors = unknown_params(request, ("scope",))
+    scopes = string_list(request.query_params.getlist("scope"))
     if scopes and any(s not in SCOPES for s in scopes):
-        raise nest_error(400, [f"each value in scope must be one of the following values: {', '.join(SCOPES)}"])
+        errors.append(f"each value in scope must be one of the following values: {', '.join(SCOPES)}")
+    if errors:
+        raise nest_error(400, errors)
     where = {"userId": user.id, **({"scope": {"in": scopes}} if scopes else {})}
     rows = await db.category.find_many(
         where=where, order=[{"scope": "asc"}, {"sortOrder": "asc"}, {"name": "asc"}]

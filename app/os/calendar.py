@@ -29,11 +29,10 @@ from app.os.common import dates, rrule
 from app.os.common.deps import plus_user
 from app.os.common.http import nest_error, nest_router
 from app.os.common.i18n import to_lang
-from app.os.common.query import string_list
+from app.os.common.query import _query_bool, string_list, unknown_params
 from app.os.common.prayer import resolver
 from app.os.event_occurrences import expand_event
 from app.os.profile import ensure_os_profile
-from app.os.tasks import _query_bool
 
 router = nest_router("/calendar")
 
@@ -602,9 +601,12 @@ def _bound(value: str, tz: str, side: str) -> datetime:
     return moment
 
 
+_FEED_FOR_QUERY = ("from", "to", "types", "includeCompleted")  # the NestJS query DTO's fields
+
+
 async def feed_for(user, request: Request, include_completed: bool | None = None) -> dict:
     q = request.query_params
-    errors: list[str] = []
+    errors = unknown_params(request, _FEED_FOR_QUERY)
     for name in ("from", "to"):
         value = q.get(name)
         if value is None or not dates.is_iso_date_string(value):
