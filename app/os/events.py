@@ -25,6 +25,7 @@ from app.os.calendar_utils import (
     to_all_day_instant,
 )
 from app.os.common import dates, rrule, validators
+from app.os.common.dbnull import DB_NULL, pop_db_nulls, set_db_null
 from app.os.common.activity import log_activity
 from app.os.common.deps import plus_user
 from app.os.common.http import invalid_data, nest_error, nest_router
@@ -493,7 +494,7 @@ async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
     elif ("timeAnchor" in sent and body.timeAnchor is None) or all_day or (
         ("startAt" in sent or "endAt" in sent) and existing.timeAnchor
     ):
-        time_anchor = Json(None)
+        time_anchor = DB_NULL
     delta = start - old_start
     _assert_range(start, end)
 
@@ -523,7 +524,9 @@ async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
         data["timeAnchor"] = time_anchor
     if "shared" in sent:
         data["householdId"] = await _household_for(user.id) if body.shared else None
+    nulls = pop_db_nulls(data)
     row = await db.event.update(where={"id": existing.id}, data=data, include=_INCLUDE)
+    await set_db_null(db, "Event", existing.id, nulls)
     await log_activity(user.id, "event.updated", entity_id=row.id, title=row.title)
     return event_view(row, tz, datetime.now(timezone.utc), lang)
 

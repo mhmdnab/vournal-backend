@@ -350,6 +350,26 @@ def between(
     return out
 
 
+_PLAIN_MONTHLY = re.compile(r"(^|;)FREQ=MONTHLY(;|$)")
+_DAY_PARTS = re.compile(r"(^|;)BY(MONTHDAY|DAY|SETPOS|YEARDAY|WEEKNO)=")
+
+
+def pin_month_day(rule: str, day: int) -> str:
+    """FREQ=MONTHLY with no BY* part → add BYMONTHDAY=<day>, so a series on the 31st
+    keeps each month's last day instead of drifting to the 28th after February."""
+    if not _PLAIN_MONTHLY.search(rule) or _DAY_PARTS.search(rule):
+        return rule
+    return f"{rule};BYMONTHDAY={day}"
+
+
+def repin_month_day(rule: str, old_day: int, new_day: int) -> str:
+    """A pin added for `old_day` follows the series to `new_day`; any other rule stays."""
+    suffix = f";BYMONTHDAY={old_day}"
+    if rule.endswith(suffix) and pin_month_day(rule[: -len(suffix)], old_day) == rule:
+        return pin_month_day(rule[: -len(suffix)], new_day)
+    return rule
+
+
 def monthly_factor(rule: str) -> float:
     """Average occurrences per month (the "monthly cost" of a recurring payment)."""
     try:

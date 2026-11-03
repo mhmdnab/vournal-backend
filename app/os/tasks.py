@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictFloat, Stri
 
 from app.db import db
 from app.os.common import dates, rrule, validators
+from app.os.common.dbnull import DB_NULL, pop_db_nulls, set_db_null
 from app.os.common.activity import log_activity
 from app.os.common.deps import plus_user
 from app.os.common.http import invalid_data, nest_error, nest_router
@@ -764,13 +765,13 @@ async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
         or ("dueAt" in sent and body.dueAt is None)
         or ("hasDueTime" in sent and body.hasDueTime is False)
     ):
-        data["timeAnchor"] = Json(None)
+        data["timeAnchor"] = DB_NULL
     elif existing.timeAnchor and isinstance(body.dueAt, str):
         if dates.DATE_ONLY_RE.match(body.dueAt):
             data["dueAt"] = await _anchored_due(user.id, read_anchor(existing.timeAnchor), data["dueAt"], ctx.tz)
             data["hasDueTime"] = True
         else:
-            data["timeAnchor"] = Json(None)
+            data["timeAnchor"] = DB_NULL
     if "reminderAt" in sent:
         data["reminderAt"] = dates.parse_instant(body.reminderAt) if body.reminderAt else None
     if "rrule" in sent:
@@ -788,8 +789,10 @@ async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
     if transition == "reopened":
         data["completedAt"] = None
 
+    nulls = pop_db_nulls(data)
     async with db.tx() as tx:
         await tx.task.update(where={"id": existing.id}, data=data)
+        await set_db_null(tx, "Task", existing.id, nulls)
         # Subtasks stay in their parent's project (project progress counts them).
         if "projectId" in sent and existing.parentId is None and body.projectId != existing.projectId:
             await tx.task.update_many(where={"userId": user.id, "parentId": id}, data={"projectId": body.projectId})

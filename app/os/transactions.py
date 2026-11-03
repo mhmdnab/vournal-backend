@@ -253,16 +253,6 @@ def as_decimal(value) -> Decimal:
     return Decimal(repr(value)) if isinstance(value, float) else Decimal(value)
 
 
-def _pin_month_day(rule: str, moment: datetime, tz: str) -> str:
-    """FREQ=MONTHLY with no BY* part → add BYMONTHDAY=<local day of the anchor>, so a
-    series on the 31st keeps the month's last day instead of drifting to the 28th."""
-    if not re.search(r"(^|;)FREQ=MONTHLY(;|$)", rule):
-        return rule
-    if re.search(r"(^|;)BY(MONTHDAY|DAY|SETPOS|YEARDAY|WEEKNO)=", rule):
-        return rule
-    return f"{rule};BYMONTHDAY={int(fu.day_key(moment, tz)[8:10])}"
-
-
 async def _resolve(user_id: str, tz: str, default_currency: str, v: dict, previous_rule: str | None = None) -> dict:
     """Checks a full (merged) state and returns the row data: ownership of every
     linked id, the category's scope matches the type, a transfer has two different
@@ -300,7 +290,7 @@ async def _resolve(user_id: str, tz: str, default_currency: str, v: dict, previo
             )
     rule = rrule.normalize_rrule(v["rrule"]) if v["rrule"] else None
     if rule and rule != previous_rule:
-        rule = _pin_month_day(rule, v["date"], tz)
+        rule = rrule.pin_month_day(rule, int(fu.day_key(v["date"], tz)[8:10]))
     return {
         "type": v["type"],
         "amount": as_decimal(v["amount"]),

@@ -49,6 +49,21 @@ class RemindersParity(ParityCase):
         ends = await self.make({"title": "Ends", "remindAt": "2026-11-01T06:00:00.000Z", "rrule": "FREQ=DAILY;COUNT=2"})
         self.assertParity(*await self.on_both("POST", ends, "/done"))
 
+    async def test_monthly_on_the_31st_deliberately_differs(self):
+        """A deliberate difference: NestJS anchored a plain monthly repeat on the current
+        remindAt, so the 31st drifted to the 28th for good after February. Python pins
+        the day of the month and keeps each month's last day."""
+        nest, py = await self.both("POST", "/reminders", {"title": "Rent", "remindAt": "2027-01-31T09:00:00.000Z", "rrule": "FREQ=MONTHLY"})
+        self.assertEqual((nest.json()["rrule"], py.json()["rrule"]), ("FREQ=MONTHLY", "FREQ=MONTHLY;BYMONTHDAY=31"))
+        ids = nest.json()["id"], py.json()["id"]
+        seen = {"nest": [], "py": []}
+        for _ in range(3):
+            nest, py = await self.on_both("POST", ids, "/done", {})
+            seen["nest"].append(nest.json()["remindAt"][:10])
+            seen["py"].append(py.json()["remindAt"][:10])
+        self.assertEqual(seen["nest"], ["2027-02-28", "2027-03-28", "2027-04-28"])
+        self.assertEqual(seen["py"], ["2027-02-28", "2027-03-31", "2027-04-30"])
+
     async def test_snooze(self):
         ids = await self.make({"title": "Stretch", "remindAt": "2026-11-01T06:00:00.000Z"})
         self.assertParity(*await self.on_both("POST", ids, "/snooze", {"until": "2026-12-24T06:00:00.000Z"}))

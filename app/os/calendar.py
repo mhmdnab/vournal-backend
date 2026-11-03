@@ -5,6 +5,7 @@ Timed items carry ISO instants in start/end; all-day items carry local dates
 always show. Within a day all-day items come first, then by start, then title.
 """
 
+import asyncio
 import functools
 from datetime import datetime, timedelta, timezone
 
@@ -102,6 +103,14 @@ class Ctx:
         self.include_completed = True
 
 
+_SOURCE_CONCURRENCY = 4
+
+
+def _coalesce(*values):
+    """a ?? b ?? c: an empty string counts as a value."""
+    return next((v for v in values if v is not None), None)
+
+
 def _item(id, source_type, source_id, title, start, end, all_day, color, link, priority=None, meta=None) -> dict:
     item = {
         "id": id, "sourceType": source_type, "sourceId": source_id, "title": title, "start": start, "end": end,
@@ -143,7 +152,7 @@ async def _events(ctx: Ctx) -> list[dict]:
     names = {}
     if owners:
         for s in await db.usersettings.find_many(where={"userId": {"in": list(owners)}}):
-            names[s.userId] = s.name or ""
+            names[s.userId] = s.name
     resolve = await resolver(ctx.user_id)
     out = []
     for ev in rows:
@@ -191,7 +200,7 @@ async def _events(ctx: Ctx) -> list[dict]:
                         "courseName": (ev.course.name if ev.course else None) if mine else None,
                         "shared": bool(ev.householdId),
                         "readOnly": not mine,
-                        "sharedBy": None if mine else names.get(ev.userId, ""),
+                        "sharedBy": None if mine else names.get(ev.userId),  # ev.user.name: null without one
                     },
                 )
             )
@@ -385,7 +394,7 @@ async def _debts(ctx: Ctx) -> list[dict]:
     out = []
     for d in rows:
         day = date_only_str(d.dueDate)
-        who = (d.person.name if d.person else None) or d.counterparty or d.title
+        who = _coalesce(d.person.name if d.person else None, d.counterparty, d.title)  # ?? keeps an empty string
         remaining = max(0, float(d.principal) - sum(float(p.amount) for p in d.payments or []))
         title = _fmt(ctx.titles["debtPay"], name=d.title) if d.direction == "I_OWE" else _fmt(ctx.titles["debtCollect"], who=who)
         out.append(
@@ -492,7 +501,7 @@ async def _assessments(ctx: Ctx) -> list[dict]:
         when = local_date_str(due, ctx.tz) if all_day else _iso(due)
         out.append(
             _item(
-                f"assessment:{a.id}", "assessment", a.id, f"{a.course.code or a.course.name}: {a.title}", when, when, all_day,
+                f"assessment:{a.id}", "assessment", a.id, f"{_coalesce(a.course.code, a.course.name)}: {a.title}", when, when, all_day,
                 a.course.color, f"/study?id={a.courseId}&assessment={a.id}", "HIGH" if a.type == "EXAM" else None,
                 {
                     "type": a.type,
@@ -520,7 +529,8 @@ async def _study_sessions(ctx: Ctx) -> list[dict]:
         if end < ctx.start:
             continue
         course_name = s.course.name if s.course else None
-        title = _fmt(ctx.titles["studyTopic"], topic=s.topic or course_name) if s.topic or course_name else ctx.titles["studySession"]
+        # s.topic || course?.name decides; s.topic ?? course?.name fills (an empty topic stays empty)
+        title = _fmt(ctx.titles["studyTopic"], topic=_coalesce(s.topic, course_name)) if s.topic or course_name else ctx.titles["studySession"]
         out.append(
             _item(
                 f"studySession:{s.id}", "studySession", s.id, title, _iso(start), _iso(end), False,
@@ -632,21 +642,33 @@ async def feed_for(user, request: Request, include_completed: bool | None = None
     ctx.include_completed = True if choice is None else choice
 
     has = lambda *kinds: any(k in wanted for k in kinds)  # noqa: E731
-    parts = [
-        await _events(ctx) if has("event") else [],
-        await _tasks(ctx) if has("task") else [],
-        await _recurring_payments(ctx, wanted) if has("bill", "subscription") else [],
-        await _people(ctx, wanted) if has("birthday", "anniversary") else [],
-        await _important_dates(ctx) if has("importantDate") else [],
-        await _documents(ctx) if has("document") else [],
-        await _maintenance(ctx) if has("maintenance") else [],
-        await _trips(ctx) if has("trip") else [],
-        await _trip_items(ctx) if has("tripItem") else [],
-        await _assessments(ctx) if has("assessment") else [],
-        await _study_sessions(ctx) if has("studySession") else [],
-        await _reminders(ctx) if has("reminder") else [],
-        await _debts(ctx) if has("debt") else [],
+    sources = [
+        source
+        for source, wanted_here in (
+            (lambda: _events(ctx), has("event")),
+            (lambda: _tasks(ctx), has("task")),
+            (lambda: _recurring_payments(ctx, wanted), has("bill", "subscription")),
+            (lambda: _people(ctx, wanted), has("birthday", "anniversary")),
+            (lambda: _important_dates(ctx), has("importantDate")),
+            (lambda: _documents(ctx), has("document")),
+            (lambda: _maintenance(ctx), has("maintenance")),
+            (lambda: _trips(ctx), has("trip")),
+            (lambda: _trip_items(ctx), has("tripItem")),
+            (lambda: _assessments(ctx), has("assessment")),
+            (lambda: _study_sessions(ctx), has("studySession")),
+            (lambda: _reminders(ctx), has("reminder")),
+            (lambda: _debts(ctx), has("debt")),
+        )
+        if wanted_here
     ]
+    # at once, as NestJS's Promise.all; at most 4 at a time to spare the pool the iOS app shares
+    gate = asyncio.Semaphore(_SOURCE_CONCURRENCY)
+
+    async def run(source):
+        async with gate:
+            return await source()
+
+    parts = await asyncio.gather(*(run(source) for source in sources))
     items = sorted((item for part in parts for item in part), key=functools.cmp_to_key(_compare))
     return {"from": _iso(start), "to": _iso(end), "timezone": tz, "items": items, "total": len(items)}
 

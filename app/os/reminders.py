@@ -21,6 +21,7 @@ from app.os.calendar_utils import (
     safe_tz,
 )
 from app.os.common import dates, rrule, validators
+from app.os.common.dbnull import DB_NULL, pop_db_nulls, set_db_null
 from app.os.common.query import _query_bool, _query_date, _query_int, unknown_params
 from app.os.common.jsparse import js_number
 from app.os.common.activity import log_activity
@@ -221,6 +222,17 @@ def _norm_rrule(value):
     return (rrule.normalize_rrule(value) or None) if value else None
 
 
+def _local_day(moment, tz: str) -> int:
+    return int(dates.local_date_string(moment, tz)[8:10])
+
+
+def _pin_monthly(rule, remind_at, tz: str):
+    """A plain monthly repeat keeps its day of the month: on the 31st it stays on each
+    month's last day. NestJS anchored on the current remindAt, so after February a
+    reminder on the 31st drifted to the 28th for good."""
+    return rrule.pin_month_day(rule, _local_day(remind_at, tz)) if rule else rule
+
+
 def _resolve_remind_at(body, tz: str, existing: datetime | None) -> datetime:
     """remindAt from `remindAt` (ISO → timed, "YYYY-MM-DD" → date-based) or `date` +
     optional `time`; `allDay` forces date-based. Defaults to the next full hour."""
@@ -364,7 +376,7 @@ async def create(body: CreateBody, user=Depends(plus_user)):
         "title": body.title,
         "notes": body.notes,
         "remindAt": remind_at,
-        "rrule": _norm_rrule(body.rrule),
+        "rrule": _pin_monthly(_norm_rrule(body.rrule), remind_at, tz),
         "isDeadline": bool(body.isDeadline),
         "entityType": body.entityType,
         "entityId": body.entityId if body.entityType else None,
@@ -402,7 +414,7 @@ async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
         resolved = await _anchored_at(user.id, anchor, resolved, tz)
         time_anchor = Json(anchor)
     elif kept and (("timeAnchor" in sent and body.timeAnchor is None) or "time" in sent or "remindAt" in sent):
-        time_anchor = Json(None)
+        time_anchor = DB_NULL
     elif kept and "date" in sent:
         resolved = await _anchored_at(user.id, kept, resolved, tz)
     # Only a real change of time re-arms the reminder (a new title mustn't re-notify).
@@ -412,7 +424,12 @@ async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
         raise invalid_data()
     data = {f: getattr(body, f) for f in ("title", "notes", "isDeadline", "isDone", "entityType") if f in sent}
     if "rrule" in sent:
-        data["rrule"] = _norm_rrule(body.rrule)
+        rule = _norm_rrule(body.rrule)
+        data["rrule"] = rule if rule == existing.rrule else _pin_monthly(rule, resolved, tz)
+    elif existing.rrule and time_changed:
+        old_day, new_day = (_local_day(m, tz) for m in (existing.remindAt, resolved))
+        if old_day != new_day:
+            data["rrule"] = rrule.repin_month_day(existing.rrule, old_day, new_day)
     if "entityType" in sent and body.entityType is None:
         data["entityId"] = None
     elif "entityId" in sent:
@@ -424,7 +441,9 @@ async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
         data.update(remindAt=resolved, snoozedUntil=None, lastFiredAt=None)
     if body.isDone is False and existing.isDone:
         data["lastFiredAt"] = None
+    nulls = pop_db_nulls(data)
     row = await db.reminder.update(where={"id": existing.id}, data=data)
+    await set_db_null(db, "Reminder", existing.id, nulls)
     await log_activity(user.id, "reminder.updated", entity_id=row.id, title=row.title)
     return await _get(user.id, row.id, tz, lang)
 
