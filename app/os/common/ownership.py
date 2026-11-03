@@ -86,3 +86,42 @@ async def assert_many_owned(model: str, ids: list[str] | None, user_id: str) -> 
 
 async def owns(model: str, id: str, user_id: str) -> bool:
     return await getattr(db, model).count(where={"id": id, **_scope(model, user_id)}) > 0
+
+
+# Polymorphic links (attachments, reminders, notifications): EntityType → model.
+ENTITY_TYPE_MODEL: dict[str, str] = {
+    "TASK": "task",
+    "EVENT": "event",
+    "PROJECT": "project",
+    "TRANSACTION": "transaction",
+    "RECURRING_PAYMENT": "recurringpayment",
+    "BUDGET": "budget",
+    "GOAL": "goal",
+    "HABIT": "habit",
+    "MAINTENANCE": "maintenanceitem",
+    "DOCUMENT": "document",
+    "SHOPPING_LIST": "shoppinglist",
+    "SHOPPING_ITEM": "shoppingitem",
+    "MEAL": "mealplanentry",
+    "RECIPE": "recipe",
+    "NOTE": "note",
+    "COURSE": "course",
+    "ASSESSMENT": "assessment",
+    "TRIP": "trip",
+    "PERSON": "person",
+    "IMPORTANT_DATE": "importantdate",
+    "REMINDER": "reminder",
+    "DEBT": "debt",
+}
+
+
+async def assert_entity(entity_type: str | None, entity_id: str | None, user_id: str) -> None:
+    """For (entityType, entityId) pairs: both empty → fine; only one → 400."""
+    if not entity_type and not entity_id:
+        return
+    if not entity_type or not entity_id:
+        raise nest_error(400, "entityType and entityId must be provided together")
+    model = ENTITY_TYPE_MODEL.get(entity_type)
+    if model is None:
+        raise nest_error(400, "Unsupported entityType")
+    await assert_owned(model, entity_id, user_id)

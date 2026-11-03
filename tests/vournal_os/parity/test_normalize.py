@@ -40,6 +40,12 @@ class Normalize(unittest.TestCase):
         body = normalize({"statusCode": 400, "message": ["a", "b"], "error": "Bad Request"})
         self.assertEqual(body, {"statusCode": 400, "message": "<validation>", "error": "Bad Request"})
 
+    def test_ids_inside_strings_are_masked(self):
+        self.assertEqual(
+            normalize([{"id": ID_A, "link": f"/tasks?id={ID_A}"}, {"link": f"/calendar?id={ID_B}"}]),
+            [{"id": "<id:1>", "link": "/tasks?id=<id:1>"}, {"link": "/calendar?id=<id:2>"}],
+        )
+
     def test_plain_words_are_kept(self):
         self.assertEqual(normalize({"name": "cash", "code": "c1"}), {"name": "cash", "code": "c1"})
 

@@ -24,6 +24,7 @@ PARITY_PASSWORD = "parity-passphrase-1"
 PYTHON_BASE = "https://life.test"
 
 _CUID = re.compile(r"^c[a-z0-9]{20,}$")
+_CUID_INSIDE = re.compile(r"(?<![a-z0-9])c[a-z0-9]{20,}(?![a-z0-9])")
 _ISO = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$")
 _NOW_WINDOW = timedelta(minutes=10)
 
@@ -55,6 +56,8 @@ def normalize(body: Any) -> Any:
                 return ids.setdefault(node, f"<id:{len(ids) + 1}>")
             if _ISO.match(node) and _is_now(node):
                 return "<now>"
+            # ids inside longer text, e.g. a link "/tasks?id=<id>"
+            return _CUID_INSIDE.sub(lambda m: ids.setdefault(m[0], f"<id:{len(ids) + 1}>"), node)
         return node
 
     return walk(body)

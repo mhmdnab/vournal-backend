@@ -4,6 +4,7 @@ import re
 
 HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 ICON_NAME = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 
 def trimmed(value, field: str, low: int, high: int):
