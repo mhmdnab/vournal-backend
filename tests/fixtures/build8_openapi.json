@@ -1,0 +1,7433 @@
+{
+ "/auth/challenge/verify": {
+  "post": {
+   "description": "Answer the code step of sign-up, or of linking a provider to an account.",
+   "operationId": "verify_challenge_auth_challenge_verify_post",
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "challengeToken": {
+         "title": "Challengetoken",
+         "type": "string"
+        },
+        "code": {
+         "title": "Code",
+         "type": "string"
+        }
+       },
+       "required": [
+        "challengeToken",
+        "code"
+       ],
+       "title": "VerifyChallengeRequest",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "accessToken": {
+          "title": "Accesstoken",
+          "type": "string"
+         },
+         "refreshToken": {
+          "title": "Refreshtoken",
+          "type": "string"
+         },
+         "tokenType": {
+          "default": "bearer",
+          "title": "Tokentype",
+          "type": "string"
+         }
+        },
+        "required": [
+         "accessToken",
+         "refreshToken"
+        ],
+        "title": "TokenResponse",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Verify Challenge",
+   "tags": [
+    "auth"
+   ]
+  }
+ },
+ "/auth/email/confirm": {
+  "post": {
+   "operationId": "confirm_email_code_auth_email_confirm_post",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "code": {
+         "maxLength": 100,
+         "title": "Code",
+         "type": "string"
+        }
+       },
+       "required": [
+        "code"
+       ],
+       "title": "ConfirmEmailRequest",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+         },
+         "email": {
+          "title": "Email",
+          "type": "string"
+         },
+         "emailConfirmed": {
+          "default": false,
+          "title": "Emailconfirmed",
+          "type": "boolean"
+         },
+         "hasPassword": {
+          "default": true,
+          "title": "Haspassword",
+          "type": "boolean"
+         },
+         "id": {
+          "title": "Id",
+          "type": "string"
+         },
+         "plan": {
+          "default": "free",
+          "title": "Plan",
+          "type": "string"
+         },
+         "planExpiresAt": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Planexpiresat"
+         },
+         "timezone": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Timezone"
+         },
+         "usage": {
+          "anyOf": [
+           {
+            "description": "Live entitlement usage for the plan/usage surface \u2014 all derived from the\neffective plan (app.quota.usage_snapshot), so it matches what's enforced.",
+            "properties": {
+             "maxRecordingSeconds": {
+              "title": "Maxrecordingseconds",
+              "type": "integer"
+             },
+             "monthlyLimit": {
+              "title": "Monthlylimit",
+              "type": "integer"
+             },
+             "monthlyUsed": {
+              "title": "Monthlyused",
+              "type": "integer"
+             },
+             "resetAt": {
+              "title": "Resetat",
+              "type": "string"
+             }
+            },
+            "required": [
+             "monthlyLimit",
+             "monthlyUsed",
+             "maxRecordingSeconds",
+             "resetAt"
+            ],
+            "title": "UsageOut",
+            "type": "object"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "email",
+         "createdAt"
+        ],
+        "title": "UserOut",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Confirm Email Code",
+   "tags": [
+    "auth"
+   ]
+  }
+ },
+ "/auth/email/confirm-link": {
+  "get": {
+   "description": "Only shows a button: mail scanners open links, and that mustn't confirm.",
+   "operationId": "confirm_link_page_auth_email_confirm_link_get",
+   "parameters": [
+    {
+     "in": "query",
+     "name": "token",
+     "required": true,
+     "schema": {
+      "title": "Token",
+      "type": "string"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "text/html": {
+       "schema": {
+        "type": "string"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Confirm Link Page",
+   "tags": [
+    "auth"
+   ]
+  },
+  "post": {
+   "operationId": "confirm_link_auth_email_confirm_link_post",
+   "parameters": [
+    {
+     "in": "query",
+     "name": "token",
+     "required": true,
+     "schema": {
+      "title": "Token",
+      "type": "string"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "text/html": {
+       "schema": {
+        "type": "string"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Confirm Link",
+   "tags": [
+    "auth"
+   ]
+  }
+ },
+ "/auth/email/send-code": {
+  "post": {
+   "description": "Profile's \"Confirm your email\" prompt, for accounts older than the code step.",
+   "operationId": "send_confirmation_code_auth_email_send_code_post",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {}
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Send Confirmation Code",
+   "tags": [
+    "auth"
+   ]
+  }
+ },
+ "/auth/forgot-password": {
+  "post": {
+   "description": "Start a password reset. ALWAYS returns 200, whether or not the email is\nregistered \u2014 never reveal which addresses have accounts. If it exists, a\nsingle-use, short-lived token is stored (hash only) and a reset link emailed.",
+   "operationId": "forgot_password_auth_forgot_password_post",
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "email": {
+         "title": "Email",
+         "type": "string"
+        }
+       },
+       "required": [
+        "email"
+       ],
+       "title": "ForgotPasswordRequest",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {}
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Forgot Password",
+   "tags": [
+    "auth"
+   ]
+  }
+ },
+ "/auth/login": {
+  "post": {
+   "operationId": "login_auth_login_post",
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "confirmEmail": {
+         "default": false,
+         "title": "Confirmemail",
+         "type": "boolean"
+        },
+        "email": {
+         "title": "Email",
+         "type": "string"
+        },
+        "password": {
+         "title": "Password",
+         "type": "string"
+        }
+       },
+       "required": [
+        "email",
+        "password"
+       ],
+       "title": "LoginRequest",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "anyOf": [
+         {
+          "properties": {
+           "accessToken": {
+            "title": "Accesstoken",
+            "type": "string"
+           },
+           "refreshToken": {
+            "title": "Refreshtoken",
+            "type": "string"
+           },
+           "tokenType": {
+            "default": "bearer",
+            "title": "Tokentype",
+            "type": "string"
+           }
+          },
+          "required": [
+           "accessToken",
+           "refreshToken"
+          ],
+          "title": "TokenResponse",
+          "type": "object"
+         },
+         {
+          "properties": {
+           "challengeToken": {
+            "title": "Challengetoken",
+            "type": "string"
+           },
+           "clearsPassword": {
+            "default": false,
+            "title": "Clearspassword",
+            "type": "boolean"
+           },
+           "expiresAt": {
+            "format": "date-time",
+            "title": "Expiresat",
+            "type": "string"
+           },
+           "step": {
+            "enum": [
+             "verify_email",
+             "link_identity"
+            ],
+            "title": "Step",
+            "type": "string"
+           }
+          },
+          "required": [
+           "challengeToken",
+           "step",
+           "expiresAt"
+          ],
+          "title": "AuthChallengeOut",
+          "type": "object"
+         }
+        ],
+        "title": "Response Login Auth Login Post"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Login",
+   "tags": [
+    "auth"
+   ]
+  }
+ },
+ "/auth/logout": {
+  "post": {
+   "description": "Revoke the presented refresh token. Idempotent and always 200 \u2014 it must\nnot reveal whether the token existed.",
+   "operationId": "logout_auth_logout_post",
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "refreshToken": {
+         "title": "Refreshtoken",
+         "type": "string"
+        }
+       },
+       "required": [
+        "refreshToken"
+       ],
+       "title": "LogoutRequest",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {}
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Logout",
+   "tags": [
+    "auth"
+   ]
+  }
+ },
+ "/auth/me": {
+  "delete": {
+   "description": "Permanently delete the account \u2014 required by App Store review, and the\nright default for a privacy product: no soft-delete, \"deleted\" means deleted.\n\nRe-confirm with the password, or the word DELETE for an account with none\n(deletion is irreversible). ORDER MATTERS: the\nrecordings live in external storage the DB cascade knows nothing about, so we\nenumerate and delete every audio object FIRST (while the rows still tell us the\nkeys), THEN delete the user \u2014 whose cascade removes entries, todos, topics,\npeople, and refresh tokens. Getting this backwards orphans every recording in\nthe bucket forever.",
+   "operationId": "delete_me_auth_me_delete",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "description": "Confirm irreversible account deletion: the password, or the word DELETE\nfor an account that has no password (Apple or Google sign-in).",
+       "properties": {
+        "confirmWord": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Confirmword"
+        },
+        "password": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Password"
+        }
+       },
+       "title": "DeleteAccountRequest",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "204": {
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Delete Me",
+   "tags": [
+    "auth"
+   ]
+  },
+  "get": {
+   "operationId": "me_auth_me_get",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+         },
+         "email": {
+          "title": "Email",
+          "type": "string"
+         },
+         "emailConfirmed": {
+          "default": false,
+          "title": "Emailconfirmed",
+          "type": "boolean"
+         },
+         "hasPassword": {
+          "default": true,
+          "title": "Haspassword",
+          "type": "boolean"
+         },
+         "id": {
+          "title": "Id",
+          "type": "string"
+         },
+         "plan": {
+          "default": "free",
+          "title": "Plan",
+          "type": "string"
+         },
+         "planExpiresAt": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Planexpiresat"
+         },
+         "timezone": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Timezone"
+         },
+         "usage": {
+          "anyOf": [
+           {
+            "description": "Live entitlement usage for the plan/usage surface \u2014 all derived from the\neffective plan (app.quota.usage_snapshot), so it matches what's enforced.",
+            "properties": {
+             "maxRecordingSeconds": {
+              "title": "Maxrecordingseconds",
+              "type": "integer"
+             },
+             "monthlyLimit": {
+              "title": "Monthlylimit",
+              "type": "integer"
+             },
+             "monthlyUsed": {
+              "title": "Monthlyused",
+              "type": "integer"
+             },
+             "resetAt": {
+              "title": "Resetat",
+              "type": "string"
+             }
+            },
+            "required": [
+             "monthlyLimit",
+             "monthlyUsed",
+             "maxRecordingSeconds",
+             "resetAt"
+            ],
+            "title": "UsageOut",
+            "type": "object"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "email",
+         "createdAt"
+        ],
+        "title": "UserOut",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Me",
+   "tags": [
+    "auth"
+   ]
+  },
+  "patch": {
+   "description": "Update mutable profile fields (timezone only). The client sends the device\ntimezone here when it changes, so times keep composing against the right\nclock without any UI.",
+   "operationId": "update_me_auth_me_patch",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "description": "Update mutable profile fields. Only timezone for now.",
+       "properties": {
+        "timezone": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Timezone"
+        }
+       },
+       "title": "UpdateMeRequest",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+         },
+         "email": {
+          "title": "Email",
+          "type": "string"
+         },
+         "emailConfirmed": {
+          "default": false,
+          "title": "Emailconfirmed",
+          "type": "boolean"
+         },
+         "hasPassword": {
+          "default": true,
+          "title": "Haspassword",
+          "type": "boolean"
+         },
+         "id": {
+          "title": "Id",
+          "type": "string"
+         },
+         "plan": {
+          "default": "free",
+          "title": "Plan",
+          "type": "string"
+         },
+         "planExpiresAt": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Planexpiresat"
+         },
+         "timezone": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Timezone"
+         },
+         "usage": {
+          "anyOf": [
+           {
+            "description": "Live entitlement usage for the plan/usage surface \u2014 all derived from the\neffective plan (app.quota.usage_snapshot), so it matches what's enforced.",
+            "properties": {
+             "maxRecordingSeconds": {
+              "title": "Maxrecordingseconds",
+              "type": "integer"
+             },
+             "monthlyLimit": {
+              "title": "Monthlylimit",
+              "type": "integer"
+             },
+             "monthlyUsed": {
+              "title": "Monthlyused",
+              "type": "integer"
+             },
+             "resetAt": {
+              "title": "Resetat",
+              "type": "string"
+             }
+            },
+            "required": [
+             "monthlyLimit",
+             "monthlyUsed",
+             "maxRecordingSeconds",
+             "resetAt"
+            ],
+            "title": "UsageOut",
+            "type": "object"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "email",
+         "createdAt"
+        ],
+        "title": "UserOut",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Update Me",
+   "tags": [
+    "auth"
+   ]
+  }
+ },
+ "/auth/oauth/providers": {
+  "get": {
+   "operationId": "providers_auth_oauth_providers_get",
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {}
+      }
+     },
+     "description": "Successful Response"
+    }
+   },
+   "summary": "Providers",
+   "tags": [
+    "auth"
+   ]
+  }
+ },
+ "/auth/oauth/{provider}": {
+  "post": {
+   "operationId": "sign_in_auth_oauth__provider__post",
+   "parameters": [
+    {
+     "in": "path",
+     "name": "provider",
+     "required": true,
+     "schema": {
+      "enum": [
+       "apple",
+       "google"
+      ],
+      "title": "Provider",
+      "type": "string"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "authorizationCode": {
+         "anyOf": [
+          {
+           "maxLength": 4096,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Authorizationcode"
+        },
+        "idToken": {
+         "maxLength": 8192,
+         "minLength": 1,
+         "title": "Idtoken",
+         "type": "string"
+        },
+        "nonce": {
+         "maxLength": 256,
+         "minLength": 1,
+         "title": "Nonce",
+         "type": "string"
+        },
+        "timezone": {
+         "anyOf": [
+          {
+           "maxLength": 64,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Timezone"
+        }
+       },
+       "required": [
+        "idToken",
+        "nonce"
+       ],
+       "title": "ProviderSignIn",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "anyOf": [
+         {
+          "properties": {
+           "accessToken": {
+            "title": "Accesstoken",
+            "type": "string"
+           },
+           "refreshToken": {
+            "title": "Refreshtoken",
+            "type": "string"
+           },
+           "tokenType": {
+            "default": "bearer",
+            "title": "Tokentype",
+            "type": "string"
+           }
+          },
+          "required": [
+           "accessToken",
+           "refreshToken"
+          ],
+          "title": "TokenResponse",
+          "type": "object"
+         },
+         {
+          "properties": {
+           "challengeToken": {
+            "title": "Challengetoken",
+            "type": "string"
+           },
+           "clearsPassword": {
+            "default": false,
+            "title": "Clearspassword",
+            "type": "boolean"
+           },
+           "expiresAt": {
+            "format": "date-time",
+            "title": "Expiresat",
+            "type": "string"
+           },
+           "step": {
+            "enum": [
+             "verify_email",
+             "link_identity"
+            ],
+            "title": "Step",
+            "type": "string"
+           }
+          },
+          "required": [
+           "challengeToken",
+           "step",
+           "expiresAt"
+          ],
+          "title": "AuthChallengeOut",
+          "type": "object"
+         }
+        ],
+        "title": "Response Sign In Auth Oauth  Provider  Post"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Sign In",
+   "tags": [
+    "auth"
+   ]
+  }
+ },
+ "/auth/refresh": {
+  "post": {
+   "operationId": "refresh_auth_refresh_post",
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "refreshToken": {
+         "title": "Refreshtoken",
+         "type": "string"
+        }
+       },
+       "required": [
+        "refreshToken"
+       ],
+       "title": "RefreshRequest",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "accessToken": {
+          "title": "Accesstoken",
+          "type": "string"
+         },
+         "refreshToken": {
+          "title": "Refreshtoken",
+          "type": "string"
+         },
+         "tokenType": {
+          "default": "bearer",
+          "title": "Tokentype",
+          "type": "string"
+         }
+        },
+        "required": [
+         "accessToken",
+         "refreshToken"
+        ],
+        "title": "TokenResponse",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Refresh",
+   "tags": [
+    "auth"
+   ]
+  }
+ },
+ "/auth/register": {
+  "post": {
+   "operationId": "register_auth_register_post",
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "confirmEmail": {
+         "default": false,
+         "title": "Confirmemail",
+         "type": "boolean"
+        },
+        "email": {
+         "title": "Email",
+         "type": "string"
+        },
+        "password": {
+         "title": "Password",
+         "type": "string"
+        },
+        "timezone": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Timezone"
+        }
+       },
+       "required": [
+        "email",
+        "password"
+       ],
+       "title": "RegisterRequest",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "anyOf": [
+         {
+          "properties": {
+           "accessToken": {
+            "title": "Accesstoken",
+            "type": "string"
+           },
+           "refreshToken": {
+            "title": "Refreshtoken",
+            "type": "string"
+           },
+           "tokenType": {
+            "default": "bearer",
+            "title": "Tokentype",
+            "type": "string"
+           }
+          },
+          "required": [
+           "accessToken",
+           "refreshToken"
+          ],
+          "title": "TokenResponse",
+          "type": "object"
+         },
+         {
+          "properties": {
+           "challengeToken": {
+            "title": "Challengetoken",
+            "type": "string"
+           },
+           "clearsPassword": {
+            "default": false,
+            "title": "Clearspassword",
+            "type": "boolean"
+           },
+           "expiresAt": {
+            "format": "date-time",
+            "title": "Expiresat",
+            "type": "string"
+           },
+           "step": {
+            "enum": [
+             "verify_email",
+             "link_identity"
+            ],
+            "title": "Step",
+            "type": "string"
+           }
+          },
+          "required": [
+           "challengeToken",
+           "step",
+           "expiresAt"
+          ],
+          "title": "AuthChallengeOut",
+          "type": "object"
+         }
+        ],
+        "title": "Response Register Auth Register Post"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Register",
+   "tags": [
+    "auth"
+   ]
+  }
+ },
+ "/auth/reset-password": {
+  "post": {
+   "description": "Complete a reset: verify the token (hash + unused + unexpired), set the new\npassword, mark the token used, and REVOKE ALL of the user's refresh tokens \u2014 a\nreset must log out every existing session.",
+   "operationId": "reset_password_auth_reset_password_post",
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "newPassword": {
+         "title": "Newpassword",
+         "type": "string"
+        },
+        "token": {
+         "title": "Token",
+         "type": "string"
+        }
+       },
+       "required": [
+        "token",
+        "newPassword"
+       ],
+       "title": "ResetPasswordRequest",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {}
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Reset Password",
+   "tags": [
+    "auth"
+   ]
+  }
+ },
+ "/billing/apple/account-token": {
+  "get": {
+   "operationId": "account_token_billing_apple_account_token_get",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "appAccountToken": {
+          "title": "Appaccounttoken",
+          "type": "string"
+         }
+        },
+        "required": [
+         "appAccountToken"
+        ],
+        "title": "AccountTokenOut",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Account Token",
+   "tags": [
+    "billing"
+   ]
+  }
+ },
+ "/billing/apple/notifications": {
+  "post": {
+   "operationId": "notifications_billing_apple_notifications_post",
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "signedPayload": {
+         "title": "Signedpayload",
+         "type": "string"
+        }
+       },
+       "required": [
+        "signedPayload"
+       ],
+       "title": "SignedNotificationIn",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {}
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Notifications",
+   "tags": [
+    "billing"
+   ]
+  }
+ },
+ "/billing/apple/transactions": {
+  "post": {
+   "operationId": "submit_transaction_billing_apple_transactions_post",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "signedTransaction": {
+         "title": "Signedtransaction",
+         "type": "string"
+        }
+       },
+       "required": [
+        "signedTransaction"
+       ],
+       "title": "SignedTransactionIn",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+         },
+         "email": {
+          "title": "Email",
+          "type": "string"
+         },
+         "emailConfirmed": {
+          "default": false,
+          "title": "Emailconfirmed",
+          "type": "boolean"
+         },
+         "hasPassword": {
+          "default": true,
+          "title": "Haspassword",
+          "type": "boolean"
+         },
+         "id": {
+          "title": "Id",
+          "type": "string"
+         },
+         "plan": {
+          "default": "free",
+          "title": "Plan",
+          "type": "string"
+         },
+         "planExpiresAt": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Planexpiresat"
+         },
+         "timezone": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Timezone"
+         },
+         "usage": {
+          "anyOf": [
+           {
+            "description": "Live entitlement usage for the plan/usage surface \u2014 all derived from the\neffective plan (app.quota.usage_snapshot), so it matches what's enforced.",
+            "properties": {
+             "maxRecordingSeconds": {
+              "title": "Maxrecordingseconds",
+              "type": "integer"
+             },
+             "monthlyLimit": {
+              "title": "Monthlylimit",
+              "type": "integer"
+             },
+             "monthlyUsed": {
+              "title": "Monthlyused",
+              "type": "integer"
+             },
+             "resetAt": {
+              "title": "Resetat",
+              "type": "string"
+             }
+            },
+            "required": [
+             "monthlyLimit",
+             "monthlyUsed",
+             "maxRecordingSeconds",
+             "resetAt"
+            ],
+            "title": "UsageOut",
+            "type": "object"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "email",
+         "createdAt"
+        ],
+        "title": "UserOut",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Submit Transaction",
+   "tags": [
+    "billing"
+   ]
+  }
+ },
+ "/billing/paddle/webhook": {
+  "post": {
+   "operationId": "webhook_billing_paddle_webhook_post",
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {}
+      }
+     },
+     "description": "Successful Response"
+    }
+   },
+   "summary": "Webhook",
+   "tags": [
+    "billing"
+   ]
+  }
+ },
+ "/entries": {
+  "get": {
+   "operationId": "list_entries_entries_get",
+   "parameters": [
+    {
+     "in": "query",
+     "name": "limit",
+     "required": false,
+     "schema": {
+      "default": 20,
+      "title": "Limit",
+      "type": "integer"
+     }
+    },
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "properties": {
+          "audioUrl": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Audiourl"
+          },
+          "createdAt": {
+           "format": "date-time",
+           "title": "Createdat",
+           "type": "string"
+          },
+          "durationSec": {
+           "anyOf": [
+            {
+             "type": "integer"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Durationsec"
+          },
+          "error": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Error"
+          },
+          "id": {
+           "title": "Id",
+           "type": "string"
+          },
+          "mood": {
+           "properties": {
+            "emotions": {
+             "default": [],
+             "items": {
+              "type": "string"
+             },
+             "title": "Emotions",
+             "type": "array"
+            },
+            "label": {
+             "anyOf": [
+              {
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Label"
+            },
+            "score": {
+             "title": "Score",
+             "type": "integer"
+            }
+           },
+           "required": [
+            "score"
+           ],
+           "title": "Mood",
+           "type": "object"
+          },
+          "people": {
+           "default": [],
+           "items": {
+            "description": "A tappable person/topic/place on an entry (Step 17, Phase 4). Carries the\nentity id + kind so the chip can open its thread; `ambiguous` is true when this\nsurface form is shared by 2+ entities of the kind, so the client can offer a\ndisambiguation sheet instead of navigating.",
+            "properties": {
+             "ambiguous": {
+              "default": false,
+              "title": "Ambiguous",
+              "type": "boolean"
+             },
+             "id": {
+              "title": "Id",
+              "type": "string"
+             },
+             "kind": {
+              "enum": [
+               "people",
+               "topics",
+               "places"
+              ],
+              "title": "Kind",
+              "type": "string"
+             },
+             "name": {
+              "title": "Name",
+              "type": "string"
+             }
+            },
+            "required": [
+             "id",
+             "kind",
+             "name"
+            ],
+            "title": "EntityChip",
+            "type": "object"
+           },
+           "title": "People",
+           "type": "array"
+          },
+          "places": {
+           "default": [],
+           "items": {
+            "description": "A tappable person/topic/place on an entry (Step 17, Phase 4). Carries the\nentity id + kind so the chip can open its thread; `ambiguous` is true when this\nsurface form is shared by 2+ entities of the kind, so the client can offer a\ndisambiguation sheet instead of navigating.",
+            "properties": {
+             "ambiguous": {
+              "default": false,
+              "title": "Ambiguous",
+              "type": "boolean"
+             },
+             "id": {
+              "title": "Id",
+              "type": "string"
+             },
+             "kind": {
+              "enum": [
+               "people",
+               "topics",
+               "places"
+              ],
+              "title": "Kind",
+              "type": "string"
+             },
+             "name": {
+              "title": "Name",
+              "type": "string"
+             }
+            },
+            "required": [
+             "id",
+             "kind",
+             "name"
+            ],
+            "title": "EntityChip",
+            "type": "object"
+           },
+           "title": "Places",
+           "type": "array"
+          },
+          "processedAt": {
+           "anyOf": [
+            {
+             "format": "date-time",
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Processedat"
+          },
+          "rawTranscript": {
+           "title": "Rawtranscript",
+           "type": "string"
+          },
+          "source": {
+           "title": "Source",
+           "type": "string"
+          },
+          "status": {
+           "title": "Status",
+           "type": "string"
+          },
+          "summary": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Summary"
+          },
+          "todos": {
+           "default": [],
+           "items": {
+            "properties": {
+             "category": {
+              "default": "personal",
+              "title": "Category",
+              "type": "string"
+             },
+             "done": {
+              "title": "Done",
+              "type": "boolean"
+             },
+             "dueDate": {
+              "anyOf": [
+               {
+                "format": "date-time",
+                "type": "string"
+               },
+               {
+                "type": "null"
+               }
+              ],
+              "title": "Duedate"
+             },
+             "followUps": {
+              "default": [],
+              "items": {
+               "additionalProperties": true,
+               "type": "object"
+              },
+              "title": "Followups",
+              "type": "array"
+             },
+             "id": {
+              "title": "Id",
+              "type": "string"
+             },
+             "kind": {
+              "default": "task",
+              "title": "Kind",
+              "type": "string"
+             },
+             "location": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "null"
+               }
+              ],
+              "title": "Location"
+             },
+             "locationLatitude": {
+              "anyOf": [
+               {
+                "type": "number"
+               },
+               {
+                "type": "null"
+               }
+              ],
+              "title": "Locationlatitude"
+             },
+             "locationLongitude": {
+              "anyOf": [
+               {
+                "type": "number"
+               },
+               {
+                "type": "null"
+               }
+              ],
+              "title": "Locationlongitude"
+             },
+             "recurrence": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "null"
+               }
+              ],
+              "title": "Recurrence"
+             },
+             "recurrenceInterval": {
+              "default": 1,
+              "title": "Recurrenceinterval",
+              "type": "integer"
+             },
+             "recurrenceUntil": {
+              "anyOf": [
+               {
+                "format": "date-time",
+                "type": "string"
+               },
+               {
+                "type": "null"
+               }
+              ],
+              "title": "Recurrenceuntil"
+             },
+             "recurrenceWeekdays": {
+              "default": [],
+              "items": {
+               "type": "string"
+              },
+              "title": "Recurrenceweekdays",
+              "type": "array"
+             },
+             "startAt": {
+              "anyOf": [
+               {
+                "format": "date-time",
+                "type": "string"
+               },
+               {
+                "type": "null"
+               }
+              ],
+              "title": "Startat"
+             },
+             "text": {
+              "title": "Text",
+              "type": "string"
+             },
+             "urgency": {
+              "default": 0,
+              "title": "Urgency",
+              "type": "integer"
+             }
+            },
+            "required": [
+             "id",
+             "text",
+             "done"
+            ],
+            "title": "TodoOut",
+            "type": "object"
+           },
+           "title": "Todos",
+           "type": "array"
+          },
+          "topics": {
+           "default": [],
+           "items": {
+            "description": "A tappable person/topic/place on an entry (Step 17, Phase 4). Carries the\nentity id + kind so the chip can open its thread; `ambiguous` is true when this\nsurface form is shared by 2+ entities of the kind, so the client can offer a\ndisambiguation sheet instead of navigating.",
+            "properties": {
+             "ambiguous": {
+              "default": false,
+              "title": "Ambiguous",
+              "type": "boolean"
+             },
+             "id": {
+              "title": "Id",
+              "type": "string"
+             },
+             "kind": {
+              "enum": [
+               "people",
+               "topics",
+               "places"
+              ],
+              "title": "Kind",
+              "type": "string"
+             },
+             "name": {
+              "title": "Name",
+              "type": "string"
+             }
+            },
+            "required": [
+             "id",
+             "kind",
+             "name"
+            ],
+            "title": "EntityChip",
+            "type": "object"
+           },
+           "title": "Topics",
+           "type": "array"
+          },
+          "userId": {
+           "title": "Userid",
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "userId",
+          "source",
+          "status",
+          "mood",
+          "rawTranscript",
+          "createdAt"
+         ],
+         "title": "EntryOut",
+         "type": "object"
+        },
+        "title": "Response List Entries Entries Get",
+        "type": "array"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "List Entries"
+  },
+  "post": {
+   "operationId": "create_entry_entries_post",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "audioUrl": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Audiourl"
+        },
+        "durationSec": {
+         "anyOf": [
+          {
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Durationsec"
+        },
+        "source": {
+         "anyOf": [
+          {
+           "enum": [
+            "TEXT",
+            "VOICE"
+           ],
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Source"
+        },
+        "transcript": {
+         "title": "Transcript",
+         "type": "string"
+        }
+       },
+       "required": [
+        "transcript"
+       ],
+       "title": "CreateEntryRequest",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "audioUrl": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Audiourl"
+         },
+         "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+         },
+         "durationSec": {
+          "anyOf": [
+           {
+            "type": "integer"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Durationsec"
+         },
+         "error": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Error"
+         },
+         "id": {
+          "title": "Id",
+          "type": "string"
+         },
+         "mood": {
+          "properties": {
+           "emotions": {
+            "default": [],
+            "items": {
+             "type": "string"
+            },
+            "title": "Emotions",
+            "type": "array"
+           },
+           "label": {
+            "anyOf": [
+             {
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ],
+            "title": "Label"
+           },
+           "score": {
+            "title": "Score",
+            "type": "integer"
+           }
+          },
+          "required": [
+           "score"
+          ],
+          "title": "Mood",
+          "type": "object"
+         },
+         "people": {
+          "default": [],
+          "items": {
+           "description": "A tappable person/topic/place on an entry (Step 17, Phase 4). Carries the\nentity id + kind so the chip can open its thread; `ambiguous` is true when this\nsurface form is shared by 2+ entities of the kind, so the client can offer a\ndisambiguation sheet instead of navigating.",
+           "properties": {
+            "ambiguous": {
+             "default": false,
+             "title": "Ambiguous",
+             "type": "boolean"
+            },
+            "id": {
+             "title": "Id",
+             "type": "string"
+            },
+            "kind": {
+             "enum": [
+              "people",
+              "topics",
+              "places"
+             ],
+             "title": "Kind",
+             "type": "string"
+            },
+            "name": {
+             "title": "Name",
+             "type": "string"
+            }
+           },
+           "required": [
+            "id",
+            "kind",
+            "name"
+           ],
+           "title": "EntityChip",
+           "type": "object"
+          },
+          "title": "People",
+          "type": "array"
+         },
+         "places": {
+          "default": [],
+          "items": {
+           "description": "A tappable person/topic/place on an entry (Step 17, Phase 4). Carries the\nentity id + kind so the chip can open its thread; `ambiguous` is true when this\nsurface form is shared by 2+ entities of the kind, so the client can offer a\ndisambiguation sheet instead of navigating.",
+           "properties": {
+            "ambiguous": {
+             "default": false,
+             "title": "Ambiguous",
+             "type": "boolean"
+            },
+            "id": {
+             "title": "Id",
+             "type": "string"
+            },
+            "kind": {
+             "enum": [
+              "people",
+              "topics",
+              "places"
+             ],
+             "title": "Kind",
+             "type": "string"
+            },
+            "name": {
+             "title": "Name",
+             "type": "string"
+            }
+           },
+           "required": [
+            "id",
+            "kind",
+            "name"
+           ],
+           "title": "EntityChip",
+           "type": "object"
+          },
+          "title": "Places",
+          "type": "array"
+         },
+         "processedAt": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Processedat"
+         },
+         "rawTranscript": {
+          "title": "Rawtranscript",
+          "type": "string"
+         },
+         "source": {
+          "title": "Source",
+          "type": "string"
+         },
+         "status": {
+          "title": "Status",
+          "type": "string"
+         },
+         "summary": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Summary"
+         },
+         "todos": {
+          "default": [],
+          "items": {
+           "properties": {
+            "category": {
+             "default": "personal",
+             "title": "Category",
+             "type": "string"
+            },
+            "done": {
+             "title": "Done",
+             "type": "boolean"
+            },
+            "dueDate": {
+             "anyOf": [
+              {
+               "format": "date-time",
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Duedate"
+            },
+            "followUps": {
+             "default": [],
+             "items": {
+              "additionalProperties": true,
+              "type": "object"
+             },
+             "title": "Followups",
+             "type": "array"
+            },
+            "id": {
+             "title": "Id",
+             "type": "string"
+            },
+            "kind": {
+             "default": "task",
+             "title": "Kind",
+             "type": "string"
+            },
+            "location": {
+             "anyOf": [
+              {
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Location"
+            },
+            "locationLatitude": {
+             "anyOf": [
+              {
+               "type": "number"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Locationlatitude"
+            },
+            "locationLongitude": {
+             "anyOf": [
+              {
+               "type": "number"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Locationlongitude"
+            },
+            "recurrence": {
+             "anyOf": [
+              {
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Recurrence"
+            },
+            "recurrenceInterval": {
+             "default": 1,
+             "title": "Recurrenceinterval",
+             "type": "integer"
+            },
+            "recurrenceUntil": {
+             "anyOf": [
+              {
+               "format": "date-time",
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Recurrenceuntil"
+            },
+            "recurrenceWeekdays": {
+             "default": [],
+             "items": {
+              "type": "string"
+             },
+             "title": "Recurrenceweekdays",
+             "type": "array"
+            },
+            "startAt": {
+             "anyOf": [
+              {
+               "format": "date-time",
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Startat"
+            },
+            "text": {
+             "title": "Text",
+             "type": "string"
+            },
+            "urgency": {
+             "default": 0,
+             "title": "Urgency",
+             "type": "integer"
+            }
+           },
+           "required": [
+            "id",
+            "text",
+            "done"
+           ],
+           "title": "TodoOut",
+           "type": "object"
+          },
+          "title": "Todos",
+          "type": "array"
+         },
+         "topics": {
+          "default": [],
+          "items": {
+           "description": "A tappable person/topic/place on an entry (Step 17, Phase 4). Carries the\nentity id + kind so the chip can open its thread; `ambiguous` is true when this\nsurface form is shared by 2+ entities of the kind, so the client can offer a\ndisambiguation sheet instead of navigating.",
+           "properties": {
+            "ambiguous": {
+             "default": false,
+             "title": "Ambiguous",
+             "type": "boolean"
+            },
+            "id": {
+             "title": "Id",
+             "type": "string"
+            },
+            "kind": {
+             "enum": [
+              "people",
+              "topics",
+              "places"
+             ],
+             "title": "Kind",
+             "type": "string"
+            },
+            "name": {
+             "title": "Name",
+             "type": "string"
+            }
+           },
+           "required": [
+            "id",
+            "kind",
+            "name"
+           ],
+           "title": "EntityChip",
+           "type": "object"
+          },
+          "title": "Topics",
+          "type": "array"
+         },
+         "userId": {
+          "title": "Userid",
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "userId",
+         "source",
+         "status",
+         "mood",
+         "rawTranscript",
+         "createdAt"
+        ],
+        "title": "EntryOut",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Create Entry"
+  }
+ },
+ "/entries/audio": {
+  "post": {
+   "description": "Ingest an audio recording. Returns a PENDING entry immediately; the\ntranscript + extraction fill in via a background task. Poll GET /entries/{id}\nuntil status is DONE (or FAILED).",
+   "operationId": "create_audio_entry_entries_audio_post",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "multipart/form-data": {
+      "schema": {
+       "properties": {
+        "durationSec": {
+         "anyOf": [
+          {
+           "type": "number"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Durationsec"
+        },
+        "file": {
+         "contentMediaType": "application/octet-stream",
+         "title": "File",
+         "type": "string"
+        }
+       },
+       "required": [
+        "file"
+       ],
+       "title": "Body_create_audio_entry_entries_audio_post",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "audioUrl": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Audiourl"
+         },
+         "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+         },
+         "durationSec": {
+          "anyOf": [
+           {
+            "type": "integer"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Durationsec"
+         },
+         "error": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Error"
+         },
+         "id": {
+          "title": "Id",
+          "type": "string"
+         },
+         "mood": {
+          "properties": {
+           "emotions": {
+            "default": [],
+            "items": {
+             "type": "string"
+            },
+            "title": "Emotions",
+            "type": "array"
+           },
+           "label": {
+            "anyOf": [
+             {
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ],
+            "title": "Label"
+           },
+           "score": {
+            "title": "Score",
+            "type": "integer"
+           }
+          },
+          "required": [
+           "score"
+          ],
+          "title": "Mood",
+          "type": "object"
+         },
+         "people": {
+          "default": [],
+          "items": {
+           "description": "A tappable person/topic/place on an entry (Step 17, Phase 4). Carries the\nentity id + kind so the chip can open its thread; `ambiguous` is true when this\nsurface form is shared by 2+ entities of the kind, so the client can offer a\ndisambiguation sheet instead of navigating.",
+           "properties": {
+            "ambiguous": {
+             "default": false,
+             "title": "Ambiguous",
+             "type": "boolean"
+            },
+            "id": {
+             "title": "Id",
+             "type": "string"
+            },
+            "kind": {
+             "enum": [
+              "people",
+              "topics",
+              "places"
+             ],
+             "title": "Kind",
+             "type": "string"
+            },
+            "name": {
+             "title": "Name",
+             "type": "string"
+            }
+           },
+           "required": [
+            "id",
+            "kind",
+            "name"
+           ],
+           "title": "EntityChip",
+           "type": "object"
+          },
+          "title": "People",
+          "type": "array"
+         },
+         "places": {
+          "default": [],
+          "items": {
+           "description": "A tappable person/topic/place on an entry (Step 17, Phase 4). Carries the\nentity id + kind so the chip can open its thread; `ambiguous` is true when this\nsurface form is shared by 2+ entities of the kind, so the client can offer a\ndisambiguation sheet instead of navigating.",
+           "properties": {
+            "ambiguous": {
+             "default": false,
+             "title": "Ambiguous",
+             "type": "boolean"
+            },
+            "id": {
+             "title": "Id",
+             "type": "string"
+            },
+            "kind": {
+             "enum": [
+              "people",
+              "topics",
+              "places"
+             ],
+             "title": "Kind",
+             "type": "string"
+            },
+            "name": {
+             "title": "Name",
+             "type": "string"
+            }
+           },
+           "required": [
+            "id",
+            "kind",
+            "name"
+           ],
+           "title": "EntityChip",
+           "type": "object"
+          },
+          "title": "Places",
+          "type": "array"
+         },
+         "processedAt": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Processedat"
+         },
+         "rawTranscript": {
+          "title": "Rawtranscript",
+          "type": "string"
+         },
+         "source": {
+          "title": "Source",
+          "type": "string"
+         },
+         "status": {
+          "title": "Status",
+          "type": "string"
+         },
+         "summary": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Summary"
+         },
+         "todos": {
+          "default": [],
+          "items": {
+           "properties": {
+            "category": {
+             "default": "personal",
+             "title": "Category",
+             "type": "string"
+            },
+            "done": {
+             "title": "Done",
+             "type": "boolean"
+            },
+            "dueDate": {
+             "anyOf": [
+              {
+               "format": "date-time",
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Duedate"
+            },
+            "followUps": {
+             "default": [],
+             "items": {
+              "additionalProperties": true,
+              "type": "object"
+             },
+             "title": "Followups",
+             "type": "array"
+            },
+            "id": {
+             "title": "Id",
+             "type": "string"
+            },
+            "kind": {
+             "default": "task",
+             "title": "Kind",
+             "type": "string"
+            },
+            "location": {
+             "anyOf": [
+              {
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Location"
+            },
+            "locationLatitude": {
+             "anyOf": [
+              {
+               "type": "number"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Locationlatitude"
+            },
+            "locationLongitude": {
+             "anyOf": [
+              {
+               "type": "number"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Locationlongitude"
+            },
+            "recurrence": {
+             "anyOf": [
+              {
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Recurrence"
+            },
+            "recurrenceInterval": {
+             "default": 1,
+             "title": "Recurrenceinterval",
+             "type": "integer"
+            },
+            "recurrenceUntil": {
+             "anyOf": [
+              {
+               "format": "date-time",
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Recurrenceuntil"
+            },
+            "recurrenceWeekdays": {
+             "default": [],
+             "items": {
+              "type": "string"
+             },
+             "title": "Recurrenceweekdays",
+             "type": "array"
+            },
+            "startAt": {
+             "anyOf": [
+              {
+               "format": "date-time",
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Startat"
+            },
+            "text": {
+             "title": "Text",
+             "type": "string"
+            },
+            "urgency": {
+             "default": 0,
+             "title": "Urgency",
+             "type": "integer"
+            }
+           },
+           "required": [
+            "id",
+            "text",
+            "done"
+           ],
+           "title": "TodoOut",
+           "type": "object"
+          },
+          "title": "Todos",
+          "type": "array"
+         },
+         "topics": {
+          "default": [],
+          "items": {
+           "description": "A tappable person/topic/place on an entry (Step 17, Phase 4). Carries the\nentity id + kind so the chip can open its thread; `ambiguous` is true when this\nsurface form is shared by 2+ entities of the kind, so the client can offer a\ndisambiguation sheet instead of navigating.",
+           "properties": {
+            "ambiguous": {
+             "default": false,
+             "title": "Ambiguous",
+             "type": "boolean"
+            },
+            "id": {
+             "title": "Id",
+             "type": "string"
+            },
+            "kind": {
+             "enum": [
+              "people",
+              "topics",
+              "places"
+             ],
+             "title": "Kind",
+             "type": "string"
+            },
+            "name": {
+             "title": "Name",
+             "type": "string"
+            }
+           },
+           "required": [
+            "id",
+            "kind",
+            "name"
+           ],
+           "title": "EntityChip",
+           "type": "object"
+          },
+          "title": "Topics",
+          "type": "array"
+         },
+         "userId": {
+          "title": "Userid",
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "userId",
+         "source",
+         "status",
+         "mood",
+         "rawTranscript",
+         "createdAt"
+        ],
+        "title": "EntryOut",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Create Audio Entry"
+  }
+ },
+ "/entries/{entry_id}": {
+  "delete": {
+   "description": "Delete an entry, its recording, and its todos/topic-and-person links.\n\nThe DB delete cascades Todo + EntryTopic + EntryPerson (schema onDelete).\nThe shared Topic/Person rows are user-level and may still be used by other\nentries, so they're deliberately left \u2014 orphans are harmless.",
+   "operationId": "delete_entry_entries__entry_id__delete",
+   "parameters": [
+    {
+     "in": "path",
+     "name": "entry_id",
+     "required": true,
+     "schema": {
+      "title": "Entry Id",
+      "type": "string"
+     }
+    },
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "responses": {
+    "204": {
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Delete Entry"
+  },
+  "get": {
+   "operationId": "get_entry_entries__entry_id__get",
+   "parameters": [
+    {
+     "in": "path",
+     "name": "entry_id",
+     "required": true,
+     "schema": {
+      "title": "Entry Id",
+      "type": "string"
+     }
+    },
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "audioUrl": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Audiourl"
+         },
+         "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+         },
+         "durationSec": {
+          "anyOf": [
+           {
+            "type": "integer"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Durationsec"
+         },
+         "error": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Error"
+         },
+         "id": {
+          "title": "Id",
+          "type": "string"
+         },
+         "mood": {
+          "properties": {
+           "emotions": {
+            "default": [],
+            "items": {
+             "type": "string"
+            },
+            "title": "Emotions",
+            "type": "array"
+           },
+           "label": {
+            "anyOf": [
+             {
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ],
+            "title": "Label"
+           },
+           "score": {
+            "title": "Score",
+            "type": "integer"
+           }
+          },
+          "required": [
+           "score"
+          ],
+          "title": "Mood",
+          "type": "object"
+         },
+         "people": {
+          "default": [],
+          "items": {
+           "description": "A tappable person/topic/place on an entry (Step 17, Phase 4). Carries the\nentity id + kind so the chip can open its thread; `ambiguous` is true when this\nsurface form is shared by 2+ entities of the kind, so the client can offer a\ndisambiguation sheet instead of navigating.",
+           "properties": {
+            "ambiguous": {
+             "default": false,
+             "title": "Ambiguous",
+             "type": "boolean"
+            },
+            "id": {
+             "title": "Id",
+             "type": "string"
+            },
+            "kind": {
+             "enum": [
+              "people",
+              "topics",
+              "places"
+             ],
+             "title": "Kind",
+             "type": "string"
+            },
+            "name": {
+             "title": "Name",
+             "type": "string"
+            }
+           },
+           "required": [
+            "id",
+            "kind",
+            "name"
+           ],
+           "title": "EntityChip",
+           "type": "object"
+          },
+          "title": "People",
+          "type": "array"
+         },
+         "places": {
+          "default": [],
+          "items": {
+           "description": "A tappable person/topic/place on an entry (Step 17, Phase 4). Carries the\nentity id + kind so the chip can open its thread; `ambiguous` is true when this\nsurface form is shared by 2+ entities of the kind, so the client can offer a\ndisambiguation sheet instead of navigating.",
+           "properties": {
+            "ambiguous": {
+             "default": false,
+             "title": "Ambiguous",
+             "type": "boolean"
+            },
+            "id": {
+             "title": "Id",
+             "type": "string"
+            },
+            "kind": {
+             "enum": [
+              "people",
+              "topics",
+              "places"
+             ],
+             "title": "Kind",
+             "type": "string"
+            },
+            "name": {
+             "title": "Name",
+             "type": "string"
+            }
+           },
+           "required": [
+            "id",
+            "kind",
+            "name"
+           ],
+           "title": "EntityChip",
+           "type": "object"
+          },
+          "title": "Places",
+          "type": "array"
+         },
+         "processedAt": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Processedat"
+         },
+         "rawTranscript": {
+          "title": "Rawtranscript",
+          "type": "string"
+         },
+         "source": {
+          "title": "Source",
+          "type": "string"
+         },
+         "status": {
+          "title": "Status",
+          "type": "string"
+         },
+         "summary": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Summary"
+         },
+         "todos": {
+          "default": [],
+          "items": {
+           "properties": {
+            "category": {
+             "default": "personal",
+             "title": "Category",
+             "type": "string"
+            },
+            "done": {
+             "title": "Done",
+             "type": "boolean"
+            },
+            "dueDate": {
+             "anyOf": [
+              {
+               "format": "date-time",
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Duedate"
+            },
+            "followUps": {
+             "default": [],
+             "items": {
+              "additionalProperties": true,
+              "type": "object"
+             },
+             "title": "Followups",
+             "type": "array"
+            },
+            "id": {
+             "title": "Id",
+             "type": "string"
+            },
+            "kind": {
+             "default": "task",
+             "title": "Kind",
+             "type": "string"
+            },
+            "location": {
+             "anyOf": [
+              {
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Location"
+            },
+            "locationLatitude": {
+             "anyOf": [
+              {
+               "type": "number"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Locationlatitude"
+            },
+            "locationLongitude": {
+             "anyOf": [
+              {
+               "type": "number"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Locationlongitude"
+            },
+            "recurrence": {
+             "anyOf": [
+              {
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Recurrence"
+            },
+            "recurrenceInterval": {
+             "default": 1,
+             "title": "Recurrenceinterval",
+             "type": "integer"
+            },
+            "recurrenceUntil": {
+             "anyOf": [
+              {
+               "format": "date-time",
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Recurrenceuntil"
+            },
+            "recurrenceWeekdays": {
+             "default": [],
+             "items": {
+              "type": "string"
+             },
+             "title": "Recurrenceweekdays",
+             "type": "array"
+            },
+            "startAt": {
+             "anyOf": [
+              {
+               "format": "date-time",
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Startat"
+            },
+            "text": {
+             "title": "Text",
+             "type": "string"
+            },
+            "urgency": {
+             "default": 0,
+             "title": "Urgency",
+             "type": "integer"
+            }
+           },
+           "required": [
+            "id",
+            "text",
+            "done"
+           ],
+           "title": "TodoOut",
+           "type": "object"
+          },
+          "title": "Todos",
+          "type": "array"
+         },
+         "topics": {
+          "default": [],
+          "items": {
+           "description": "A tappable person/topic/place on an entry (Step 17, Phase 4). Carries the\nentity id + kind so the chip can open its thread; `ambiguous` is true when this\nsurface form is shared by 2+ entities of the kind, so the client can offer a\ndisambiguation sheet instead of navigating.",
+           "properties": {
+            "ambiguous": {
+             "default": false,
+             "title": "Ambiguous",
+             "type": "boolean"
+            },
+            "id": {
+             "title": "Id",
+             "type": "string"
+            },
+            "kind": {
+             "enum": [
+              "people",
+              "topics",
+              "places"
+             ],
+             "title": "Kind",
+             "type": "string"
+            },
+            "name": {
+             "title": "Name",
+             "type": "string"
+            }
+           },
+           "required": [
+            "id",
+            "kind",
+            "name"
+           ],
+           "title": "EntityChip",
+           "type": "object"
+          },
+          "title": "Topics",
+          "type": "array"
+         },
+         "userId": {
+          "title": "Userid",
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "userId",
+         "source",
+         "status",
+         "mood",
+         "rawTranscript",
+         "createdAt"
+        ],
+        "title": "EntryOut",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Get Entry"
+  }
+ },
+ "/entries/{entry_id}/audio": {
+  "delete": {
+   "description": "Remove just the recording, keeping the written entry.\n\nA real privacy affordance for a voice product: you can strip the audio and\nkeep the journal text. Returns the updated entry (audioUrl now null).",
+   "operationId": "delete_entry_audio_entries__entry_id__audio_delete",
+   "parameters": [
+    {
+     "in": "path",
+     "name": "entry_id",
+     "required": true,
+     "schema": {
+      "title": "Entry Id",
+      "type": "string"
+     }
+    },
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "audioUrl": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Audiourl"
+         },
+         "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+         },
+         "durationSec": {
+          "anyOf": [
+           {
+            "type": "integer"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Durationsec"
+         },
+         "error": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Error"
+         },
+         "id": {
+          "title": "Id",
+          "type": "string"
+         },
+         "mood": {
+          "properties": {
+           "emotions": {
+            "default": [],
+            "items": {
+             "type": "string"
+            },
+            "title": "Emotions",
+            "type": "array"
+           },
+           "label": {
+            "anyOf": [
+             {
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ],
+            "title": "Label"
+           },
+           "score": {
+            "title": "Score",
+            "type": "integer"
+           }
+          },
+          "required": [
+           "score"
+          ],
+          "title": "Mood",
+          "type": "object"
+         },
+         "people": {
+          "default": [],
+          "items": {
+           "description": "A tappable person/topic/place on an entry (Step 17, Phase 4). Carries the\nentity id + kind so the chip can open its thread; `ambiguous` is true when this\nsurface form is shared by 2+ entities of the kind, so the client can offer a\ndisambiguation sheet instead of navigating.",
+           "properties": {
+            "ambiguous": {
+             "default": false,
+             "title": "Ambiguous",
+             "type": "boolean"
+            },
+            "id": {
+             "title": "Id",
+             "type": "string"
+            },
+            "kind": {
+             "enum": [
+              "people",
+              "topics",
+              "places"
+             ],
+             "title": "Kind",
+             "type": "string"
+            },
+            "name": {
+             "title": "Name",
+             "type": "string"
+            }
+           },
+           "required": [
+            "id",
+            "kind",
+            "name"
+           ],
+           "title": "EntityChip",
+           "type": "object"
+          },
+          "title": "People",
+          "type": "array"
+         },
+         "places": {
+          "default": [],
+          "items": {
+           "description": "A tappable person/topic/place on an entry (Step 17, Phase 4). Carries the\nentity id + kind so the chip can open its thread; `ambiguous` is true when this\nsurface form is shared by 2+ entities of the kind, so the client can offer a\ndisambiguation sheet instead of navigating.",
+           "properties": {
+            "ambiguous": {
+             "default": false,
+             "title": "Ambiguous",
+             "type": "boolean"
+            },
+            "id": {
+             "title": "Id",
+             "type": "string"
+            },
+            "kind": {
+             "enum": [
+              "people",
+              "topics",
+              "places"
+             ],
+             "title": "Kind",
+             "type": "string"
+            },
+            "name": {
+             "title": "Name",
+             "type": "string"
+            }
+           },
+           "required": [
+            "id",
+            "kind",
+            "name"
+           ],
+           "title": "EntityChip",
+           "type": "object"
+          },
+          "title": "Places",
+          "type": "array"
+         },
+         "processedAt": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Processedat"
+         },
+         "rawTranscript": {
+          "title": "Rawtranscript",
+          "type": "string"
+         },
+         "source": {
+          "title": "Source",
+          "type": "string"
+         },
+         "status": {
+          "title": "Status",
+          "type": "string"
+         },
+         "summary": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Summary"
+         },
+         "todos": {
+          "default": [],
+          "items": {
+           "properties": {
+            "category": {
+             "default": "personal",
+             "title": "Category",
+             "type": "string"
+            },
+            "done": {
+             "title": "Done",
+             "type": "boolean"
+            },
+            "dueDate": {
+             "anyOf": [
+              {
+               "format": "date-time",
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Duedate"
+            },
+            "followUps": {
+             "default": [],
+             "items": {
+              "additionalProperties": true,
+              "type": "object"
+             },
+             "title": "Followups",
+             "type": "array"
+            },
+            "id": {
+             "title": "Id",
+             "type": "string"
+            },
+            "kind": {
+             "default": "task",
+             "title": "Kind",
+             "type": "string"
+            },
+            "location": {
+             "anyOf": [
+              {
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Location"
+            },
+            "locationLatitude": {
+             "anyOf": [
+              {
+               "type": "number"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Locationlatitude"
+            },
+            "locationLongitude": {
+             "anyOf": [
+              {
+               "type": "number"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Locationlongitude"
+            },
+            "recurrence": {
+             "anyOf": [
+              {
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Recurrence"
+            },
+            "recurrenceInterval": {
+             "default": 1,
+             "title": "Recurrenceinterval",
+             "type": "integer"
+            },
+            "recurrenceUntil": {
+             "anyOf": [
+              {
+               "format": "date-time",
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Recurrenceuntil"
+            },
+            "recurrenceWeekdays": {
+             "default": [],
+             "items": {
+              "type": "string"
+             },
+             "title": "Recurrenceweekdays",
+             "type": "array"
+            },
+            "startAt": {
+             "anyOf": [
+              {
+               "format": "date-time",
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Startat"
+            },
+            "text": {
+             "title": "Text",
+             "type": "string"
+            },
+            "urgency": {
+             "default": 0,
+             "title": "Urgency",
+             "type": "integer"
+            }
+           },
+           "required": [
+            "id",
+            "text",
+            "done"
+           ],
+           "title": "TodoOut",
+           "type": "object"
+          },
+          "title": "Todos",
+          "type": "array"
+         },
+         "topics": {
+          "default": [],
+          "items": {
+           "description": "A tappable person/topic/place on an entry (Step 17, Phase 4). Carries the\nentity id + kind so the chip can open its thread; `ambiguous` is true when this\nsurface form is shared by 2+ entities of the kind, so the client can offer a\ndisambiguation sheet instead of navigating.",
+           "properties": {
+            "ambiguous": {
+             "default": false,
+             "title": "Ambiguous",
+             "type": "boolean"
+            },
+            "id": {
+             "title": "Id",
+             "type": "string"
+            },
+            "kind": {
+             "enum": [
+              "people",
+              "topics",
+              "places"
+             ],
+             "title": "Kind",
+             "type": "string"
+            },
+            "name": {
+             "title": "Name",
+             "type": "string"
+            }
+           },
+           "required": [
+            "id",
+            "kind",
+            "name"
+           ],
+           "title": "EntityChip",
+           "type": "object"
+          },
+          "title": "Topics",
+          "type": "array"
+         },
+         "userId": {
+          "title": "Userid",
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "userId",
+         "source",
+         "status",
+         "mood",
+         "rawTranscript",
+         "createdAt"
+        ],
+        "title": "EntryOut",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Delete Entry Audio"
+  },
+  "get": {
+   "description": "Mint a short-lived signed URL for an entry's recording.\n\nAuthenticated and ownership-checked (404 for non-owners \u2014 a user must not be\nable to tell whether someone else's entry exists). Returns {\"url\": ...}; the\nCLIENT fetches the audio bytes directly from Supabase Storage with that URL,\nso we never proxy (and never pay egress for) the audio.\n\nThis closes the old auth gap: the previous route streamed bytes with no token\nbecause <audio> can't send an Authorization header. Now an authenticated call\nmints the URL and the media element loads *that*.",
+   "operationId": "get_entry_audio_entries__entry_id__audio_get",
+   "parameters": [
+    {
+     "in": "path",
+     "name": "entry_id",
+     "required": true,
+     "schema": {
+      "title": "Entry Id",
+      "type": "string"
+     }
+    },
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {}
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Get Entry Audio"
+  }
+ },
+ "/health": {
+  "get": {
+   "operationId": "health_health_get",
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {}
+      }
+     },
+     "description": "Successful Response"
+    }
+   },
+   "summary": "Health"
+  }
+ },
+ "/insights": {
+  "get": {
+   "operationId": "insights_insights_get",
+   "parameters": [
+    {
+     "in": "query",
+     "name": "days",
+     "required": false,
+     "schema": {
+      "default": 14,
+      "title": "Days",
+      "type": "integer"
+     }
+    },
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "days": {
+          "title": "Days",
+          "type": "integer"
+         },
+         "entryCount": {
+          "title": "Entrycount",
+          "type": "integer"
+         },
+         "moodTrend": {
+          "default": [],
+          "items": {
+           "properties": {
+            "avgScore": {
+             "title": "Avgscore",
+             "type": "number"
+            },
+            "count": {
+             "title": "Count",
+             "type": "integer"
+            },
+            "date": {
+             "title": "Date",
+             "type": "string"
+            }
+           },
+           "required": [
+            "date",
+            "avgScore",
+            "count"
+           ],
+           "title": "MoodTrendPoint",
+           "type": "object"
+          },
+          "title": "Moodtrend",
+          "type": "array"
+         },
+         "openTodos": {
+          "title": "Opentodos",
+          "type": "integer"
+         },
+         "topPeople": {
+          "default": [],
+          "items": {
+           "properties": {
+            "count": {
+             "title": "Count",
+             "type": "integer"
+            },
+            "name": {
+             "title": "Name",
+             "type": "string"
+            }
+           },
+           "required": [
+            "name",
+            "count"
+           ],
+           "title": "NameCount",
+           "type": "object"
+          },
+          "title": "Toppeople",
+          "type": "array"
+         },
+         "topTopics": {
+          "default": [],
+          "items": {
+           "properties": {
+            "count": {
+             "title": "Count",
+             "type": "integer"
+            },
+            "name": {
+             "title": "Name",
+             "type": "string"
+            }
+           },
+           "required": [
+            "name",
+            "count"
+           ],
+           "title": "NameCount",
+           "type": "object"
+          },
+          "title": "Toptopics",
+          "type": "array"
+         },
+         "userId": {
+          "title": "Userid",
+          "type": "string"
+         }
+        },
+        "required": [
+         "userId",
+         "days",
+         "entryCount",
+         "openTodos"
+        ],
+        "title": "InsightsOut",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Insights"
+  }
+ },
+ "/threads": {
+  "get": {
+   "description": "The index for one kind, most-relevant first (moments desc, recency tiebreak).\nOne grouped query; the mood series is built per thread from its ordered rows.",
+   "operationId": "list_threads_threads_get",
+   "parameters": [
+    {
+     "description": "people | topics | places",
+     "in": "query",
+     "name": "kind",
+     "required": true,
+     "schema": {
+      "description": "people | topics | places",
+      "enum": [
+       "people",
+       "topics",
+       "places"
+      ],
+      "title": "Kind",
+      "type": "string"
+     }
+    },
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "description": "One row of the life index \u2014 a person/topic/place and the shape of its arc.",
+         "properties": {
+          "firstDate": {
+           "format": "date-time",
+           "title": "Firstdate",
+           "type": "string"
+          },
+          "id": {
+           "title": "Id",
+           "type": "string"
+          },
+          "kind": {
+           "enum": [
+            "people",
+            "topics",
+            "places"
+           ],
+           "title": "Kind",
+           "type": "string"
+          },
+          "lastDate": {
+           "format": "date-time",
+           "title": "Lastdate",
+           "type": "string"
+          },
+          "momentCount": {
+           "title": "Momentcount",
+           "type": "integer"
+          },
+          "moodSeries": {
+           "default": [],
+           "items": {
+            "type": "integer"
+           },
+           "title": "Moodseries",
+           "type": "array"
+          },
+          "name": {
+           "title": "Name",
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "kind",
+          "name",
+          "momentCount",
+          "firstDate",
+          "lastDate"
+         ],
+         "title": "ThreadSummary",
+         "type": "object"
+        },
+        "title": "Response List Threads Threads Get",
+        "type": "array"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "List Threads",
+   "tags": [
+    "threads"
+   ]
+  }
+ },
+ "/threads/{kind}/{thread_id}": {
+  "get": {
+   "description": "One thread opened up: its span, average mood, and ordered moments. 404 if the\nid isn't this user's (ownership is checked before any moment is read).",
+   "operationId": "get_thread_threads__kind___thread_id__get",
+   "parameters": [
+    {
+     "in": "path",
+     "name": "kind",
+     "required": true,
+     "schema": {
+      "enum": [
+       "people",
+       "topics",
+       "places"
+      ],
+      "title": "Kind",
+      "type": "string"
+     }
+    },
+    {
+     "in": "path",
+     "name": "thread_id",
+     "required": true,
+     "schema": {
+      "title": "Thread Id",
+      "type": "string"
+     }
+    },
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "description": "One thread opened up: its span, average mood, and ordered moments.",
+        "properties": {
+         "averageMood": {
+          "anyOf": [
+           {
+            "type": "number"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Averagemood"
+         },
+         "firstDate": {
+          "format": "date-time",
+          "title": "Firstdate",
+          "type": "string"
+         },
+         "id": {
+          "title": "Id",
+          "type": "string"
+         },
+         "kind": {
+          "enum": [
+           "people",
+           "topics",
+           "places"
+          ],
+          "title": "Kind",
+          "type": "string"
+         },
+         "lastDate": {
+          "format": "date-time",
+          "title": "Lastdate",
+          "type": "string"
+         },
+         "momentCount": {
+          "title": "Momentcount",
+          "type": "integer"
+         },
+         "moments": {
+          "default": [],
+          "items": {
+           "description": "One appearance of a thread \u2014 an entry it was mentioned in.",
+           "properties": {
+            "date": {
+             "format": "date-time",
+             "title": "Date",
+             "type": "string"
+            },
+            "entryId": {
+             "title": "Entryid",
+             "type": "string"
+            },
+            "moodScore": {
+             "anyOf": [
+              {
+               "type": "integer"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Moodscore"
+            },
+            "summary": {
+             "title": "Summary",
+             "type": "string"
+            }
+           },
+           "required": [
+            "entryId",
+            "date",
+            "summary"
+           ],
+           "title": "ThreadMoment",
+           "type": "object"
+          },
+          "title": "Moments",
+          "type": "array"
+         },
+         "name": {
+          "title": "Name",
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "kind",
+         "name",
+         "momentCount",
+         "firstDate",
+         "lastDate"
+        ],
+        "title": "ThreadDetail",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Get Thread",
+   "tags": [
+    "threads"
+   ]
+  }
+ },
+ "/threads/{kind}/{thread_id}/disambiguate": {
+  "get": {
+   "description": "The candidates a shared surface form could mean \u2014 with distinguishing\ncontext \u2014 plus a distinct default name for \"Someone new\".",
+   "operationId": "disambiguate_threads__kind___thread_id__disambiguate_get",
+   "parameters": [
+    {
+     "in": "path",
+     "name": "kind",
+     "required": true,
+     "schema": {
+      "enum": [
+       "people",
+       "topics",
+       "places"
+      ],
+      "title": "Kind",
+      "type": "string"
+     }
+    },
+    {
+     "in": "path",
+     "name": "thread_id",
+     "required": true,
+     "schema": {
+      "title": "Thread Id",
+      "type": "string"
+     }
+    },
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "candidates": {
+          "default": [],
+          "items": {
+           "description": "One entity a shared surface form could mean \u2014 with context that actually\ndistinguishes it (so \"Which Karim?\" is answerable).",
+           "properties": {
+            "id": {
+             "title": "Id",
+             "type": "string"
+            },
+            "lastMoment": {
+             "anyOf": [
+              {
+               "format": "date-time",
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Lastmoment"
+            },
+            "momentCount": {
+             "title": "Momentcount",
+             "type": "integer"
+            },
+            "name": {
+             "title": "Name",
+             "type": "string"
+            },
+            "topTopics": {
+             "default": [],
+             "items": {
+              "type": "string"
+             },
+             "title": "Toptopics",
+             "type": "array"
+            }
+           },
+           "required": [
+            "id",
+            "name",
+            "momentCount"
+           ],
+           "title": "DisambiguationCandidate",
+           "type": "object"
+          },
+          "title": "Candidates",
+          "type": "array"
+         },
+         "kind": {
+          "enum": [
+           "people",
+           "topics",
+           "places"
+          ],
+          "title": "Kind",
+          "type": "string"
+         },
+         "name": {
+          "title": "Name",
+          "type": "string"
+         },
+         "suggestedName": {
+          "title": "Suggestedname",
+          "type": "string"
+         }
+        },
+        "required": [
+         "kind",
+         "name",
+         "suggestedName"
+        ],
+        "title": "DisambiguationOut",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Disambiguate",
+   "tags": [
+    "threads"
+   ]
+  }
+ },
+ "/threads/{kind}/{thread_id}/merge": {
+  "post": {
+   "description": "Absorb this thread INTO body.intoId: reassign every moment, fold the surface\nforms in as aliases, delete the now-empty source. Touches no entry.",
+   "operationId": "merge_thread_threads__kind___thread_id__merge_post",
+   "parameters": [
+    {
+     "in": "path",
+     "name": "kind",
+     "required": true,
+     "schema": {
+      "enum": [
+       "people",
+       "topics",
+       "places"
+      ],
+      "title": "Kind",
+      "type": "string"
+     }
+    },
+    {
+     "in": "path",
+     "name": "thread_id",
+     "required": true,
+     "schema": {
+      "title": "Thread Id",
+      "type": "string"
+     }
+    },
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "intoId": {
+         "title": "Intoid",
+         "type": "string"
+        }
+       },
+       "required": [
+        "intoId"
+       ],
+       "title": "MergeRequest",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {}
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Merge Thread",
+   "tags": [
+    "threads"
+   ]
+  }
+ },
+ "/threads/{kind}/{thread_id}/moments/{entry_id}/move": {
+  "post": {
+   "description": "Reassign one moment off this thread onto another (existing toId, or a new/\nexisting one by toName). An optional alias \u2014 the surface form being split off \u2014\nis attached to the target so future mentions of it read as ambiguous.",
+   "operationId": "move_moment_threads__kind___thread_id__moments__entry_id__move_post",
+   "parameters": [
+    {
+     "in": "path",
+     "name": "kind",
+     "required": true,
+     "schema": {
+      "enum": [
+       "people",
+       "topics",
+       "places"
+      ],
+      "title": "Kind",
+      "type": "string"
+     }
+    },
+    {
+     "in": "path",
+     "name": "thread_id",
+     "required": true,
+     "schema": {
+      "title": "Thread Id",
+      "type": "string"
+     }
+    },
+    {
+     "in": "path",
+     "name": "entry_id",
+     "required": true,
+     "schema": {
+      "title": "Entry Id",
+      "type": "string"
+     }
+    },
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "description": "Reassign one moment (entry) off this thread onto another. Exactly one of\ntoId (an existing thread) or toName (create/find one) \u2014 with an optional alias\nto attach (the surface form being split off, so ambiguity forms correctly).",
+       "properties": {
+        "alias": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Alias"
+        },
+        "toId": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Toid"
+        },
+        "toName": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Toname"
+        }
+       },
+       "title": "MoveMomentRequest",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {}
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Move Moment",
+   "tags": [
+    "threads"
+   ]
+  }
+ },
+ "/todos": {
+  "get": {
+   "description": "The user's todos across every entry, soonest-first.\n\n`?done=true|false` filters by completion; omit it for everything. Timed items\n(startAt) and dated items (dueDate) come first in chronological order, then\nundated ones. Each carries its source entryId so the client can link back.",
+   "operationId": "list_todos_todos_get",
+   "parameters": [
+    {
+     "in": "query",
+     "name": "done",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Done"
+     }
+    },
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "description": "A todo in the standalone list \u2014 carries its source entry for linking.",
+         "properties": {
+          "category": {
+           "default": "personal",
+           "title": "Category",
+           "type": "string"
+          },
+          "done": {
+           "title": "Done",
+           "type": "boolean"
+          },
+          "dueDate": {
+           "anyOf": [
+            {
+             "format": "date-time",
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Duedate"
+          },
+          "entryId": {
+           "title": "Entryid",
+           "type": "string"
+          },
+          "followUps": {
+           "default": [],
+           "items": {
+            "additionalProperties": true,
+            "type": "object"
+           },
+           "title": "Followups",
+           "type": "array"
+          },
+          "id": {
+           "title": "Id",
+           "type": "string"
+          },
+          "kind": {
+           "default": "task",
+           "title": "Kind",
+           "type": "string"
+          },
+          "location": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Location"
+          },
+          "locationLatitude": {
+           "anyOf": [
+            {
+             "type": "number"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Locationlatitude"
+          },
+          "locationLongitude": {
+           "anyOf": [
+            {
+             "type": "number"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Locationlongitude"
+          },
+          "recurrence": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Recurrence"
+          },
+          "recurrenceInterval": {
+           "default": 1,
+           "title": "Recurrenceinterval",
+           "type": "integer"
+          },
+          "recurrenceUntil": {
+           "anyOf": [
+            {
+             "format": "date-time",
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Recurrenceuntil"
+          },
+          "recurrenceWeekdays": {
+           "default": [],
+           "items": {
+            "type": "string"
+           },
+           "title": "Recurrenceweekdays",
+           "type": "array"
+          },
+          "startAt": {
+           "anyOf": [
+            {
+             "format": "date-time",
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Startat"
+          },
+          "text": {
+           "title": "Text",
+           "type": "string"
+          },
+          "urgency": {
+           "default": 0,
+           "title": "Urgency",
+           "type": "integer"
+          }
+         },
+         "required": [
+          "id",
+          "text",
+          "done",
+          "entryId"
+         ],
+         "title": "TodoListItem",
+         "type": "object"
+        },
+        "title": "Response List Todos Todos Get",
+        "type": "array"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "List Todos"
+  }
+ },
+ "/todos/{todo_id}": {
+  "delete": {
+   "operationId": "delete_todo_todos__todo_id__delete",
+   "parameters": [
+    {
+     "in": "path",
+     "name": "todo_id",
+     "required": true,
+     "schema": {
+      "title": "Todo Id",
+      "type": "string"
+     }
+    },
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "responses": {
+    "204": {
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Delete Todo"
+  },
+  "patch": {
+   "operationId": "update_todo_todos__todo_id__patch",
+   "parameters": [
+    {
+     "in": "path",
+     "name": "todo_id",
+     "required": true,
+     "schema": {
+      "title": "Todo Id",
+      "type": "string"
+     }
+    },
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "advance": {
+         "default": false,
+         "title": "Advance",
+         "type": "boolean"
+        },
+        "done": {
+         "title": "Done",
+         "type": "boolean"
+        }
+       },
+       "required": [
+        "done"
+       ],
+       "title": "UpdateTodoRequest",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "category": {
+          "default": "personal",
+          "title": "Category",
+          "type": "string"
+         },
+         "done": {
+          "title": "Done",
+          "type": "boolean"
+         },
+         "dueDate": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Duedate"
+         },
+         "followUps": {
+          "default": [],
+          "items": {
+           "additionalProperties": true,
+           "type": "object"
+          },
+          "title": "Followups",
+          "type": "array"
+         },
+         "id": {
+          "title": "Id",
+          "type": "string"
+         },
+         "kind": {
+          "default": "task",
+          "title": "Kind",
+          "type": "string"
+         },
+         "location": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Location"
+         },
+         "locationLatitude": {
+          "anyOf": [
+           {
+            "type": "number"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Locationlatitude"
+         },
+         "locationLongitude": {
+          "anyOf": [
+           {
+            "type": "number"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Locationlongitude"
+         },
+         "recurrence": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Recurrence"
+         },
+         "recurrenceInterval": {
+          "default": 1,
+          "title": "Recurrenceinterval",
+          "type": "integer"
+         },
+         "recurrenceUntil": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Recurrenceuntil"
+         },
+         "recurrenceWeekdays": {
+          "default": [],
+          "items": {
+           "type": "string"
+          },
+          "title": "Recurrenceweekdays",
+          "type": "array"
+         },
+         "startAt": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Startat"
+         },
+         "text": {
+          "title": "Text",
+          "type": "string"
+         },
+         "urgency": {
+          "default": 0,
+          "title": "Urgency",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "id",
+         "text",
+         "done"
+        ],
+        "title": "TodoOut",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Update Todo"
+  }
+ },
+ "/todos/{todo_id}/details": {
+  "patch": {
+   "operationId": "update_task_details_todos__todo_id__details_patch",
+   "parameters": [
+    {
+     "in": "path",
+     "name": "todo_id",
+     "required": true,
+     "schema": {
+      "title": "Todo Id",
+      "type": "string"
+     }
+    },
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "calendarRequested": {
+         "anyOf": [
+          {
+           "type": "boolean"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Calendarrequested"
+        },
+        "category": {
+         "anyOf": [
+          {
+           "enum": [
+            "work",
+            "health",
+            "family",
+            "finance",
+            "personal",
+            "learning",
+            "errands"
+           ],
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Category"
+        },
+        "date": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Date"
+        },
+        "dismiss": {
+         "default": [],
+         "items": {
+          "enum": [
+           "date",
+           "time",
+           "urgency",
+           "recurrence"
+          ],
+          "type": "string"
+         },
+         "title": "Dismiss",
+         "type": "array"
+        },
+        "location": {
+         "anyOf": [
+          {
+           "maxLength": 200,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Location"
+        },
+        "locationLatitude": {
+         "anyOf": [
+          {
+           "maximum": 90.0,
+           "minimum": -90.0,
+           "type": "number"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Locationlatitude"
+        },
+        "locationLongitude": {
+         "anyOf": [
+          {
+           "maximum": 180.0,
+           "minimum": -180.0,
+           "type": "number"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Locationlongitude"
+        },
+        "recurrence": {
+         "anyOf": [
+          {
+           "enum": [
+            "daily",
+            "weekly",
+            "monthly",
+            "yearly"
+           ],
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Recurrence"
+        },
+        "recurrenceInterval": {
+         "anyOf": [
+          {
+           "maximum": 365.0,
+           "minimum": 1.0,
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Recurrenceinterval"
+        },
+        "recurrenceUntil": {
+         "anyOf": [
+          {
+           "format": "date-time",
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Recurrenceuntil"
+        },
+        "recurrenceWeekdays": {
+         "anyOf": [
+          {
+           "items": {
+            "enum": [
+             "MO",
+             "TU",
+             "WE",
+             "TH",
+             "FR",
+             "SA",
+             "SU"
+            ],
+            "type": "string"
+           },
+           "type": "array"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Recurrenceweekdays"
+        },
+        "remindersRequested": {
+         "anyOf": [
+          {
+           "type": "boolean"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Remindersrequested"
+        },
+        "time": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Time"
+        },
+        "urgency": {
+         "anyOf": [
+          {
+           "maximum": 3.0,
+           "minimum": 0.0,
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Urgency"
+        }
+       },
+       "title": "TaskDetailsRequest",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "category": {
+          "default": "personal",
+          "title": "Category",
+          "type": "string"
+         },
+         "done": {
+          "title": "Done",
+          "type": "boolean"
+         },
+         "dueDate": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Duedate"
+         },
+         "followUps": {
+          "default": [],
+          "items": {
+           "additionalProperties": true,
+           "type": "object"
+          },
+          "title": "Followups",
+          "type": "array"
+         },
+         "id": {
+          "title": "Id",
+          "type": "string"
+         },
+         "kind": {
+          "default": "task",
+          "title": "Kind",
+          "type": "string"
+         },
+         "location": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Location"
+         },
+         "locationLatitude": {
+          "anyOf": [
+           {
+            "type": "number"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Locationlatitude"
+         },
+         "locationLongitude": {
+          "anyOf": [
+           {
+            "type": "number"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Locationlongitude"
+         },
+         "recurrence": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Recurrence"
+         },
+         "recurrenceInterval": {
+          "default": 1,
+          "title": "Recurrenceinterval",
+          "type": "integer"
+         },
+         "recurrenceUntil": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Recurrenceuntil"
+         },
+         "recurrenceWeekdays": {
+          "default": [],
+          "items": {
+           "type": "string"
+          },
+          "title": "Recurrenceweekdays",
+          "type": "array"
+         },
+         "startAt": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Startat"
+         },
+         "text": {
+          "title": "Text",
+          "type": "string"
+         },
+         "urgency": {
+          "default": 0,
+          "title": "Urgency",
+          "type": "integer"
+         }
+        },
+        "required": [
+         "id",
+         "text",
+         "done"
+        ],
+        "title": "TodoOut",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Update Task Details"
+  }
+ }
+}
