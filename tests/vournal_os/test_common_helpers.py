@@ -67,6 +67,12 @@ class Activity(OsTestCase):
         await log_activity("no-such-user", "task.created", entity_id="x")
         self.assertEqual(await self.db.activitylog.count(where={"userId": "no-such-user"}), 0)
 
+    async def test_log_activity_never_raises_on_odd_metadata(self):
+        from app.os.common.activity import log_activity
+
+        me = await self.make_user()
+        await log_activity(me.id, "task.created", entity_id="t1", odd=object())
+
     async def test_system_actions_not_logged(self):
         from app.os.common.activity import log_activity
 

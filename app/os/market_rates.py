@@ -12,7 +12,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 import httpx
 
@@ -74,7 +74,7 @@ def _number(value) -> float | None:
         return None
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
     return number if number == number and number not in (float("inf"), float("-inf")) else None
 
@@ -193,6 +193,6 @@ async def _do_refresh() -> bool:
             )
             log.info("Market rates updated from %s (%d currencies)", name, len(rates))
             return True
-        except (httpx.HTTPError, ValueError, InvalidOperation, RuntimeError) as exc:
+        except Exception as exc:  # noqa: BLE001 — any failure: try the next provider
             log.warning('Rates provider "%s" failed: %s', name, exc)
     return False

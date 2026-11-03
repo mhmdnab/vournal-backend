@@ -75,6 +75,18 @@ class MarketRates(OsTestCase):
         after = {r.currency: r.ratePerUsd for r in await self.db.marketrate.find_many()}
         self.assertEqual(before, after)
 
+    async def test_refresh_survives_any_provider_error(self):
+        # Whatever goes wrong with one provider, the next is tried and nothing raises.
+        usd = {code.lower(): rate for code, rate in GOOD.items()}
+        with self._answers(KeyError("boom"), {"usd": usd}):
+            self.assertTrue(await self.market.refresh(force=True))
+        self.assertEqual((await self.market.current()).source, "Currency API")
+
+    def test_sanitize_ignores_absurd_numbers(self):
+        from app.os.market_rates import sanitize_rates
+
+        self.assertEqual(sanitize_rates({"EUR": 10**400, "GBP": 0.8}, {}), {"GBP": 0.8})
+
     async def test_refresh_gap(self):
         with self._answers({"result": "success", "rates": GOOD}):
             self.assertTrue(await self.market.refresh())

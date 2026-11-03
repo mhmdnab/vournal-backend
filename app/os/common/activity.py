@@ -67,12 +67,12 @@ async def log_activity(
 ) -> None:
     if not user_id or not action or action.startswith("system."):
         return
-    kind = entity_type if entity_type in _ENTITY_TYPES else EVENT_PREFIX_ENTITY.get(action.split(".")[0])
-    data = {"userId": user_id, "action": action[:100], "entityType": kind, "entityId": entity_id}
-    meta = _metadata(metadata)
-    if meta is not None:
-        data["metadata"] = Json(meta)
     try:
+        kind = entity_type if entity_type in _ENTITY_TYPES else EVENT_PREFIX_ENTITY.get(action.split(".")[0])
+        data = {"userId": user_id, "action": action[:100], "entityType": kind, "entityId": entity_id}
+        meta = _metadata(metadata)
+        if meta is not None:
+            data["metadata"] = Json(meta)
         await db.activitylog.create(data=data)
-    except Exception as exc:  # noqa: BLE001 — e.g. the user was deleted meanwhile
+    except Exception as exc:  # noqa: BLE001 — e.g. the user was deleted meanwhile, or odd metadata
         log.debug("activity log skipped (%s): %s", action, exc)
