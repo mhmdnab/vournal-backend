@@ -219,13 +219,15 @@ async def link_identity(user_id: str, issuer: str, subject: str) -> None:
 
 
 async def identity_user(provider: Provider, id_token: str, nonce: str):
-    """The account this provider sign-in is already linked to, or None. Never creates
-    or links anything: the web (vournal OS) signs in existing app accounts only."""
+    """(the account this provider sign-in is already linked to or None, the verified
+    identity). Never creates or links anything: the web (vournal OS) signs in
+    existing app accounts only."""
     identity = await verify_identity(provider, id_token, nonce)
     known = await db.externalidentity.find_unique(
         where={"issuer_subject": {"issuer": identity.issuer, "subject": identity.subject}}
     )
-    return None if known is None else await db.user.find_unique(where={"id": known.userId})
+    user = None if known is None else await db.user.find_unique(where={"id": known.userId})
+    return user, identity
 
 
 @router.post("/{provider}", response_model=TokenResponse | AuthChallengeOut)

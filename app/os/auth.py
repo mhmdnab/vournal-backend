@@ -6,8 +6,9 @@ access JWT and rotating refresh token), carried in httpOnly cookies.
 """
 
 import os
+from datetime import datetime, timedelta, timezone
 
-from fastapi import Depends, Request, Response
+from fastapi import Depends, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from app import oauth, security
@@ -20,7 +21,7 @@ from app.os.common.deps import (
     REFRESH_COOKIE_PATH,
     web_user,
 )
-from app.os.common.http import nest_error, nest_router
+from app.os.common.http import NestJSONResponse, nest_error, nest_router
 from app.rate_limit import rate_limited
 from app.schemas import TokenResponse
 
@@ -28,6 +29,10 @@ router = nest_router("/auth")
 
 CREATE_IN_APP = "Create your account in the vournal app."
 CONFIRM_IN_APP = "Confirm your email in the vournal app first."
+LINK_IN_APP = "Sign in with your email and password, or use this sign-in once in the vournal app."
+# NestJS let a just-rotated refresh token through for this long: several dashboard
+# tabs refresh with the same cookie, and only one can win the rotation.
+_ROTATION_GRACE = timedelta(seconds=60)
 
 
 class LoginBody(BaseModel):
@@ -115,8 +120,12 @@ async def login(body: LoginBody, response: Response):
 async def provider_sign_in(provider: oauth.Provider, body: ProviderBody, response: Response):
     if not oauth._audiences(provider):
         raise nest_error(503, "This sign-in option isn't available yet.")
-    user = await oauth.identity_user(provider, body.idToken, body.nonce)
+    user, identity = await oauth.identity_user(provider, body.idToken, body.nonce)
     if user is None:
+        if identity.email and await db.user.find_unique(where={"email": identity.email.lower()}):
+            # The account exists; linking it to this sign-in happens in the app,
+            # which can prove the email first.
+            raise nest_error(403, LINK_IN_APP, code="link_in_app")
         raise nest_error(403, CREATE_IN_APP, code="create_in_app")
     return await _signed_in(user, response)
 
@@ -126,12 +135,51 @@ async def register():
     raise nest_error(403, CREATE_IN_APP, code="create_in_app")
 
 
+def _signed_out(message: str) -> NestJSONResponse:
+    """A 401 that also drops the cookies: the dashboard sends anyone holding one back
+    from /login to /dashboard, so a dead cookie would bounce them between the two."""
+    failed = NestJSONResponse(
+        {"statusCode": 401, "message": message, "error": "Unauthorized"}, status_code=401
+    )
+    clear_session_cookies(failed)
+    return failed
+
+
+async def _rotated_by_another_tab(raw: str) -> bool:
+    """True when this refresh token was just spent by another tab of the same
+    session: its account has a fresh live token of the same generation. The app's
+    own /auth/refresh would treat it as theft and end every session, the phone's too."""
+    stored = await db.refreshtoken.find_unique(where={"tokenHash": security.hash_refresh_token(raw)})
+    if stored is None or not stored.revoked or stored.expiresAt < datetime.now(timezone.utc):
+        return False
+    owner = await db.user.find_unique(where={"id": stored.userId})
+    if owner is None or stored.generation != owner.sessionGeneration:
+        return False
+    fresh = await db.refreshtoken.find_first(
+        where={
+            "userId": stored.userId,
+            "revoked": False,
+            "generation": owner.sessionGeneration,
+            "createdAt": {"gte": datetime.now(timezone.utc) - _ROTATION_GRACE},
+        }
+    )
+    return fresh is not None
+
+
 @router.post("/refresh")
 async def refresh(request: Request, response: Response):
     raw = request.cookies.get(REFRESH_COOKIE)
     if not raw:
-        raise nest_error(401, "Not authenticated")
-    set_session_cookies(response, await rotate_refresh_token(raw))
+        return _signed_out("Not authenticated")
+    if await _rotated_by_another_tab(raw):
+        # The other tab already holds the new cookies; nothing is issued here, so a
+        # stolen token gains nothing from this answer.
+        return {"ok": True}
+    try:
+        tokens = await rotate_refresh_token(raw)
+    except HTTPException as exc:
+        return _signed_out(str(exc.detail))
+    set_session_cookies(response, tokens)
     return {"ok": True}
 
 

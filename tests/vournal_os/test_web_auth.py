@@ -113,11 +113,51 @@ class WebAuth(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(self.client.cookies.get("life_rt"), old_refresh)
         self.assertTrue(first.status_code == 200)
 
+        # Long after the rotation, presenting the old token again is a replay.
+        await self.db.refreshtoken.update_many(
+            where={"userId": user.id, "revoked": False},
+            data={"createdAt": datetime.now(timezone.utc) - timedelta(minutes=5)},
+        )
         replay = self._new_client()
         replay.cookies.set("life_rt", old_refresh, domain="life.test", path="/api/auth")
         async with replay:
             again = await replay.post("/api/auth/refresh", headers=CSRF)
         self.assertEqual(again.status_code, 401)
+
+    async def test_two_tabs_refreshing_keep_the_phone_signed_in(self):
+        # Two dashboard tabs refresh with the same cookie. The second must not look
+        # like a stolen token: that would end every session, the iPhone's included.
+        from app.auth import _issue_tokens, rotate_refresh_token
+
+        user = await self._user()
+        phone = await _issue_tokens(user.id)
+        await self._login(user)
+        shared = self.client.cookies.get("life_rt")
+        first = await self.client.post("/api/auth/refresh", headers=CSRF)
+        self.assertEqual(first.status_code, 200, first.text)
+
+        other_tab = self._new_client()
+        other_tab.cookies.set("life_rt", shared, domain="life.test", path="/api/auth")
+        async with other_tab:
+            second = await other_tab.post("/api/auth/refresh", headers=CSRF)
+        self.assertEqual(second.status_code, 200, second.text)
+        self.assertEqual(second.json(), {"ok": True})
+        self.assertFalse(any(h.startswith("life_rt=") for h in second.headers.get_list("set-cookie")))
+
+        self.assertEqual((await self.client.get("/api/auth/me")).status_code, 200)
+        await rotate_refresh_token(phone.refreshToken)  # raises 401 if the phone was signed out
+
+    async def test_failed_refresh_clears_cookies(self):
+        # Stale cookies would make the dashboard bounce between /login and /dashboard.
+        dead = self._new_client()
+        dead.cookies.set("life_rt", "not-a-token", domain="life.test", path="/api/auth")
+        dead.cookies.set("life_at", "not-a-token", domain="life.test", path="/")
+        async with dead:
+            response = await dead.post("/api/auth/refresh", headers=CSRF)
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["statusCode"], 401)
+        cleared = {h.split("=", 1)[0] for h in response.headers.get_list("set-cookie") if "max-age=0" in h.lower()}
+        self.assertEqual(cleared, {"life_at", "life_rt"})
 
     async def test_logout_clears_cookies(self):
         user = await self._user()
@@ -185,6 +225,25 @@ class WebAuth(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 403, response.text)
         self.assertEqual(response.json()["code"], "create_in_app")
         self.assertEqual(await self.db.user.count(), users)
+        self.assertEqual(await self.db.externalidentity.count(), identities)
+
+    async def test_unlinked_oauth_for_existing_account_points_to_the_app(self):
+        # The account exists; only this sign-in method isn't connected to it yet.
+        from app.oauth import GOOGLE_ISSUERS, VerifiedIdentity
+
+        user = await self._user()
+        identity = VerifiedIdentity(GOOGLE_ISSUERS[0], f"sub-{uuid.uuid4().hex}", user.email, True, True)
+        identities = await self.db.externalidentity.count()
+        with patch("app.oauth.verify_identity", return_value=identity):
+            response = await self.client.post(
+                "/api/auth/oauth/google", json={"idToken": "t", "nonce": "n"}, headers=CSRF
+            )
+        self.assertEqual(response.status_code, 403, response.text)
+        self.assertEqual(response.json()["code"], "link_in_app")
+        self.assertEqual(
+            response.json()["message"],
+            "Sign in with your email and password, or use this sign-in once in the vournal app.",
+        )
         self.assertEqual(await self.db.externalidentity.count(), identities)
 
     async def test_linked_oauth_identity_signs_in(self):
