@@ -68,6 +68,35 @@ def _without(node: Any, keys: tuple[str, ...]) -> Any:
     return node
 
 
+_REFERENCE_DB = "vournal_os_reference"
+
+
+async def copy_reference_market_rates() -> None:
+    """Give the local database the reference's live market rates (both local), so
+    rate answers are computed from the same numbers on both sides."""
+    import subprocess
+    from urllib.parse import urlparse
+
+    local = urlparse(os.environ["DATABASE_URL"])
+    if local.hostname not in ("127.0.0.1", "localhost", "::1"):
+        raise RuntimeError("Refusing to copy market rates into a non-local database.")
+    target = ["psql", "-h", local.hostname, "-p", str(local.port or 5432), local.path.lstrip("/"), "-q"]
+    source = ["psql", "-h", local.hostname, "-p", str(local.port or 5432), _REFERENCE_DB, "-q"]
+    rows = subprocess.run(
+        [*source, "-c", r'\copy "MarketRate" TO STDOUT'], capture_output=True, text=True, check=True
+    ).stdout
+    subprocess.run(
+        [*target, "-c", 'DELETE FROM "MarketRate"', "-c", r'\copy "MarketRate" FROM STDIN'],
+        input=rows,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    from app.os import market_rates
+
+    market_rates.reset_for_tests()
+
+
 async def python_client(user, password: str = PARITY_PASSWORD) -> httpx.AsyncClient:
     """An in-process client on the Python app, signed in as `user` through the
     web's own sign-in route (cookies, like the browser)."""
