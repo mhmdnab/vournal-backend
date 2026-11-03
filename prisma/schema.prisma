@@ -14,6 +14,8 @@ generator client {
   // whichever variant actually runs on the host (it runs `engine --version` and
   // selects the one that succeeds). "native" keeps local dev (macOS) working.
   binaryTargets        = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
+  // vournal OS stores money as Decimal(14,2); the Python client gates it behind this flag.
+  enable_experimental_decimal = true
 }
 
 enum EntrySource {
@@ -97,6 +99,52 @@ model User {
   passwordResetTokens PasswordResetToken[]
   authChallenges AuthChallenge[]
   externalIdentities ExternalIdentity[]
+
+  // vournal OS (web dashboard)
+  settings          UserSettings?
+  categories        Category[]
+  tags              Tag[]
+  exchangeRates     ExchangeRate[]
+  tasks             Task[]
+  events            Event[]
+  projects          Project[]
+  attachments       Attachment[]
+  accounts          Account[]
+  transactions      Transaction[]
+  budgets           Budget[]
+  recurringPayments RecurringPayment[]
+  goals             Goal[]
+  habits            Habit[]
+  habitLogs         HabitLog[]
+  maintenanceItems  MaintenanceItem[]
+  maintenanceLogs   MaintenanceLog[]
+  documents         Document[]
+  shoppingLists     ShoppingList[]
+  shoppingItems     ShoppingItem[]
+  recipes           Recipe[]
+  mealPlanEntries   MealPlanEntry[]
+  notes             Note[]
+  courses           Course[]
+  assessments       Assessment[]
+  studySessions     StudySession[]
+  trips             Trip[]
+  importantDates    ImportantDate[]
+  reminders         Reminder[]
+  notifications     Notification[]
+  pushSubscriptions PushSubscription[]
+  activityLogs      ActivityLog[]
+  dayLogs           DayLog[]
+  weekReviews       WeekReview[]
+  householdMember   HouseholdMember?
+  assistantChats    AssistantConversation[]
+  debts             Debt[]
+  debtPayments      DebtPayment[]
+  healthProfile     HealthProfile?
+  foodItems         FoodItem[]
+  foodLogs          FoodLog[]
+  exerciseLogs      ExerciseLog[]
+  weightLogs        WeightLog[]
+  waterLogs         WaterLog[]
 }
 
 // Prepared for credentialed provider adapters; identity is issuer+subject,
@@ -269,6 +317,23 @@ model Person {
 
   entries EntryPerson[]
 
+  // vournal OS fields: all optional, so the app's people keep working unchanged
+  relationship       String? // "Family", "Friend", "Colleague"...
+  birthday           DateTime? @db.Date
+  birthdayHasYear    Boolean   @default(true) // false → only day/month are meaningful
+  anniversary        DateTime? @db.Date
+  email              String?
+  phone              String?
+  notes              String?
+  avatarColor        String?
+  reminderDaysBefore Int?      @default(3)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @default(now()) @updatedAt
+  importantDates     ImportantDate[]
+  giftIdeas          GiftIdea[]
+  debts              Debt[]
+  notesList          Note[]
+
   @@unique([userId, normalizedName])
 }
 
@@ -320,4 +385,1430 @@ model PendingGrant {
   createdAt  DateTime  @default(now())
 
   @@index([email])
+}
+
+// =============================================================================
+// vournal OS — the web dashboard's data (ported from vournalOS-backend).
+// Every model belongs to the app's User; Person above is shared with the app.
+// Conventions from vournal OS:
+//  * Every user-owned row has `userId` and every query MUST filter by it.
+//  * Money = Decimal(14,2) + `currency` (ISO-4217 string, e.g. "USD", "LBP").
+//  * Recurrence = RFC-5545 RRULE body WITHOUT DTSTART; the row's own anchor
+//    date (startAt / dueAt / nextDate / ...) is DTSTART.
+//  * Date-only values use @db.Date. Instants use DateTime (UTC).
+// =============================================================================
+
+enum ThemePreference {
+  LIGHT
+  DARK
+  SYSTEM
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum LifeArea {
+  PERSONAL
+  WORK
+  STUDY
+  HOME
+  HEALTH
+  FINANCE
+  SOCIAL
+  OTHER
+}
+
+enum CategoryScope {
+  TASK
+  EVENT
+  EXPENSE
+  INCOME
+  NOTE
+  GOAL
+  HABIT
+  PROJECT
+  MAINTENANCE
+  DOCUMENT
+  SHOPPING
+  GENERAL
+}
+
+enum EventType {
+  GENERAL
+  MEETING
+  CLASS
+  EXAM
+  APPOINTMENT
+  SOCIAL
+  TRAVEL
+  WORKOUT
+  OTHER
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum AccountType {
+  CASH
+  BANK
+  SAVINGS
+  CREDIT_CARD
+  DEBIT_CARD
+  DIGITAL_WALLET
+  INVESTMENT
+  OTHER
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+}
+
+enum PaymentMethod {
+  CASH
+  DEBIT_CARD
+  CREDIT_CARD
+  BANK_TRANSFER
+  DIGITAL_WALLET
+  CHECK
+  OTHER
+}
+
+enum BudgetPeriod {
+  MONTHLY
+  YEARLY
+}
+
+enum RecurringKind {
+  BILL
+  SUBSCRIPTION
+  INSURANCE
+  LOAN
+  OTHER
+}
+
+enum RecurringStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+}
+
+/// Who owes whom.
+enum DebtDirection {
+  I_OWE // I borrowed: money I have to pay back
+  OWED_TO_ME // I lent: money someone has to give back to me
+}
+
+enum DebtKind {
+  PERSONAL // between people
+  LOAN // bank / car / student loan
+  CREDIT_CARD
+  OTHER
+}
+
+enum DebtStatus {
+  OPEN
+  SETTLED
+  CANCELLED // forgiven / written off
+}
+
+enum GoalType {
+  FINANCIAL
+  PERSONAL
+  FITNESS
+  EDUCATION
+  CAREER
+  BUSINESS
+  TRAVEL
+  OTHER
+}
+
+enum GoalStatus {
+  ACTIVE
+  COMPLETED
+  PAUSED
+  ABANDONED
+}
+
+enum HabitFrequency {
+  DAILY // every day
+  WEEKLY // `timesPerWeek` times, any days
+  CUSTOM // specific `daysOfWeek`
+}
+
+enum MaintenanceArea {
+  HOME
+  CAR
+  PERSONAL
+  HEALTH
+  OTHER
+}
+
+enum DocumentType {
+  PASSPORT
+  NATIONAL_ID
+  DRIVERS_LICENSE
+  INSURANCE
+  CONTRACT
+  WARRANTY
+  CERTIFICATE
+  MEDICAL
+  VEHICLE
+  FINANCIAL
+  OTHER
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+enum Sex {
+  MALE
+  FEMALE
+}
+
+/// Daily activity outside logged exercise (multiplies the resting calories).
+enum ActivityLevel {
+  SEDENTARY // desk job, little walking
+  LIGHT // on your feet a bit, light exercise 1–3 days
+  MODERATE // exercise 3–5 days
+  ACTIVE // hard exercise 6–7 days or a physical job
+  VERY_ACTIVE // athlete / very physical job
+}
+
+enum HealthGoal {
+  LOSE
+  MAINTAIN
+  GAIN
+}
+
+enum AssessmentType {
+  ASSIGNMENT
+  EXAM
+  QUIZ
+  PROJECT
+  PRESENTATION
+  LAB
+  OTHER
+}
+
+enum AssessmentStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+  GRADED
+}
+
+enum TripStatus {
+  PLANNING
+  BOOKED
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum TripItemType {
+  TRANSPORT
+  ACCOMMODATION
+  RESERVATION
+  PLACE
+  ACTIVITY
+  OTHER
+}
+
+// Polymorphic link target (attachments, reminders, notifications, activity log)
+enum EntityType {
+  TASK
+  EVENT
+  PROJECT
+  TRANSACTION
+  RECURRING_PAYMENT
+  BUDGET
+  GOAL
+  HABIT
+  MAINTENANCE
+  DOCUMENT
+  SHOPPING_LIST
+  SHOPPING_ITEM
+  MEAL
+  RECIPE
+  NOTE
+  COURSE
+  ASSESSMENT
+  TRIP
+  PERSON
+  IMPORTANT_DATE
+  REMINDER
+  DEBT
+}
+
+model UserSettings {
+  id                  String          @id @default(cuid())
+  userId              String          @unique
+  user                User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Shown on the web; the app's User has no name (design: name and avatarColor)
+  name                String?
+  avatarColor         String?
+  defaultCurrency     String          @default("USD")
+  language            String          @default("en")
+  timezone            String          @default("UTC")
+  dateFormat          String          @default("dd/MM/yyyy")
+  timeFormat          String          @default("24h") // "12h" | "24h"
+  weekStartsOn        Int             @default(1) // 0=Sunday, 1=Monday
+  theme               ThemePreference @default(SYSTEM)
+  // Section keys, see docs/CONVENTIONS.md §Sections
+  enabledSections     String[]        @default([])
+  // [{ "id": "todayTasks", "visible": true, "order": 0 }, ...]
+  dashboardWidgets    Json?
+  // { "email": false, "push": true, "inApp": true, "taskReminders": true, "bills": true, "birthdays": true, "documents": true, "habits": true, "dailyDigestTime": "08:00" }
+  notificationPrefs   Json?
+  onboardingCompleted Boolean         @default(false)
+  // AI features are opt-in: the user's text is sent to the AI provider only when this is on
+  aiEnabled           Boolean         @default(false)
+  // spending plan: { "savingsMode": "none" | "percent" | "amount", "savingsValue": 10, "periodMode": "auto" | "month" }
+  spendingPlan        Json?
+  // prayer times: { "cityId": "beirut", "lat": 33.89, "lng": 35.50, "method": "MuslimWorldLeague", "madhab": "shafi" }
+  prayerSettings      Json?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+}
+
+// User-defined categories (with optional sub-categories) per scope.
+model Category {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scope     CategoryScope
+  name      String
+  color     String? // hex, e.g. "#6366f1"
+  icon      String? // lucide icon name, e.g. "utensils"
+  parentId  String?
+  parent    Category?     @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Category[]    @relation("CategoryTree")
+  sortOrder Int           @default(0)
+  isDefault Boolean       @default(false) // seeded on signup
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  tasks             Task[]
+  events            Event[]
+  projects          Project[]
+  transactions      Transaction[]
+  budgets           Budget[]
+  recurringPayments RecurringPayment[]
+  goals             Goal[]
+  habits            Habit[]
+  maintenanceItems  MaintenanceItem[]
+  notes             Note[]
+
+  @@unique([userId, scope, name, parentId])
+  @@index([userId, scope])
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  color     String?
+  createdAt DateTime @default(now())
+
+  tasks Task[]
+  notes Note[]
+
+  @@unique([userId, name])
+}
+
+// Units of `currency` per 1 USD (e.g. LBP 89500, EUR 0.92). User-editable; seeded with defaults.
+model ExchangeRate {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currency   String
+  ratePerUsd Decimal  @db.Decimal(20, 8)
+  // true = the user typed this rate and it wins over the live market rate; false = follow the live rate
+  manual     Boolean  @default(false)
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, currency])
+}
+
+// Live market rates shared by all users (units of `currency` per 1 USD), refreshed a few times a day
+// from a public rates API. A user's manual ExchangeRate overrides it for that user.
+model MarketRate {
+  currency   String   @id
+  ratePerUsd Decimal  @db.Decimal(20, 8)
+  source     String
+  fetchedAt  DateTime
+}
+
+model Task {
+  id                 String     @id @default(cuid())
+  userId             String
+  user               User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title              String
+  description        String?
+  notes              String?
+  status             TaskStatus @default(TODO)
+  priority           Priority   @default(MEDIUM)
+  lifeArea           LifeArea?
+  categoryId         String?
+  category           Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  dueAt              DateTime? // date (+ time when hasDueTime)
+  hasDueTime         Boolean    @default(false)
+  /// time set relative to a prayer, recomputed for each day: { start: { prayer, offset }, end?: { prayer, offset } }
+  timeAnchor         Json?
+  reminderAt         DateTime?
+  estimatedMinutes   Int?
+  rrule              String? // recurring task; on completion the next occurrence is created
+  recurrenceEndAt    DateTime?
+  recurrenceParentId String? // id of the first task in a recurring series
+  position           Float      @default(0) // ordering for drag & drop (within status column)
+  completedAt        DateTime?
+  // "Top 3 priorities today": the date this task is pinned as a top priority
+  focusDate          DateTime?  @db.Date
+  parentId           String?
+  parent             Task?      @relation("Subtasks", fields: [parentId], references: [id], onDelete: Cascade)
+  subtasks           Task[]     @relation("Subtasks")
+  projectId          String?
+  project            Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  goalId             String?
+  goal               Goal?      @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  courseId           String?
+  course             Course?    @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  tripId             String?
+  trip               Trip?      @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  tags               Tag[]
+  events             Event[] // calendar time-blocks scheduled for this task
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, dueAt])
+  @@index([userId, focusDate])
+  @@index([projectId])
+  @@index([parentId])
+}
+
+model Event {
+  id              String     @id @default(cuid())
+  userId          String
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?
+  location        String?
+  type            EventType  @default(GENERAL)
+  priority        Priority   @default(MEDIUM)
+  color           String?
+  startAt         DateTime
+  endAt           DateTime?
+  /// time set relative to a prayer, recomputed for each day: { start: { prayer, offset }, end?: { prayer, offset } }
+  timeAnchor      Json?
+  allDay          Boolean    @default(false)
+  rrule           String?
+  recurrenceEndAt DateTime?
+  exDates         DateTime[] @default([]) // excluded occurrences (by original start instant)
+  reminderMinutes Int? // minutes before start; null = no reminder
+  categoryId      String?
+  category        Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  taskId          String?
+  task            Task?      @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  projectId       String?
+  project         Project?   @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  goalId          String?
+  goal            Goal?      @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  tripId          String?
+  trip            Trip?      @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  courseId        String?
+  course          Course?    @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  // shared with the owner's household: members see it in their calendar (only the owner edits it)
+  householdId     String?
+  household       Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@index([userId, startAt])
+  @@index([householdId, startAt])
+}
+
+model Project {
+  id               String        @id @default(cuid())
+  userId           String
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name             String
+  description      String?
+  notes            String?
+  status           ProjectStatus @default(ACTIVE)
+  lifeArea         LifeArea?
+  color            String?
+  icon             String?
+  startDate        DateTime?     @db.Date
+  deadline         DateTime?     @db.Date
+  budget           Decimal?      @db.Decimal(14, 2)
+  currency         String?
+  // null = auto (completed tasks / total tasks); otherwise manual 0..100
+  progressOverride Int?
+  categoryId       String?
+  category         Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  goalId           String?
+  goal             Goal?         @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  completedAt      DateTime?
+  tasks            Task[]
+  events           Event[]
+  transactions     Transaction[]
+  notesList        Note[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([userId, status])
+}
+
+// Files are stored in Postgres (bytea), served only through an authorized endpoint.
+// ALWAYS `select` without `data` when listing.
+model Attachment {
+  id         String     @id @default(cuid())
+  userId     String
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entityType EntityType
+  entityId   String
+  fileName   String
+  mimeType   String
+  size       Int
+  // R2 object key; files no longer live in Postgres (design: Files)
+  storageKey String
+  createdAt  DateTime   @default(now())
+
+  @@index([userId, entityType, entityId])
+}
+
+model Account {
+  id             String      @id @default(cuid())
+  userId         String
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  type           AccountType @default(BANK)
+  currency       String      @default("USD")
+  initialBalance Decimal     @default(0) @db.Decimal(14, 2)
+  color          String?
+  icon           String?
+  isArchived     Boolean     @default(false)
+  includeInTotal Boolean     @default(true)
+  sortOrder      Int         @default(0)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  transactions      Transaction[]      @relation("AccountTransactions")
+  incomingTransfers Transaction[]      @relation("TransferTarget")
+  recurringPayments RecurringPayment[]
+  goals             Goal[]
+  debts             Debt[]
+
+  @@index([userId])
+}
+
+// Income, expense and transfer in one table.
+// Balance(account) = initialBalance + INCOME - EXPENSE - TRANSFER(out) + TRANSFER(in, toAmount)
+model Transaction {
+  id                 String            @id @default(cuid())
+  userId             String
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type               TransactionType
+  title              String? // short description, e.g. "Groceries at Spinneys"
+  amount             Decimal           @db.Decimal(14, 2) // always positive
+  currency           String
+  date               DateTime // instant; day-level reports use user timezone
+  categoryId         String?
+  category           Category?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  accountId          String?
+  account            Account?          @relation("AccountTransactions", fields: [accountId], references: [id], onDelete: SetNull)
+  // TRANSFER only
+  toAccountId        String?
+  toAccount          Account?          @relation("TransferTarget", fields: [toAccountId], references: [id], onDelete: SetNull)
+  toAmount           Decimal?          @db.Decimal(14, 2)
+  paymentMethod      PaymentMethod?
+  source             String? // INCOME: payer / employer / client
+  notes              String?
+  // recurring income (e.g. salary) — expenses use RecurringPayment instead
+  rrule              String?
+  recurringPaymentId String?
+  recurringPayment   RecurringPayment? @relation(fields: [recurringPaymentId], references: [id], onDelete: SetNull)
+  projectId          String?
+  project            Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  tripId             String?
+  trip               Trip?             @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  goalId             String? // contribution towards a (financial) goal
+  goal               Goal?             @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  maintenanceLogs    MaintenanceLog[]
+  debtPayment        DebtPayment?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([userId, date])
+  @@index([userId, type, date])
+  @@index([accountId])
+  @@index([categoryId])
+}
+
+model Budget {
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String?
+  categoryId     String? // null = overall spending budget
+  category       Category?    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  amount         Decimal      @db.Decimal(14, 2)
+  currency       String
+  period         BudgetPeriod @default(MONTHLY)
+  alertThreshold Int          @default(80) // % used that triggers a warning
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([userId])
+}
+
+// Bills, rent, insurance AND subscriptions (kind = SUBSCRIPTION).
+// "Mark as paid" creates an EXPENSE Transaction (recurringPaymentId set) and advances nextDate by rrule.
+model RecurringPayment {
+  id                 String          @id @default(cuid())
+  userId             String
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind               RecurringKind   @default(BILL)
+  name               String
+  amount             Decimal         @db.Decimal(14, 2)
+  currency           String
+  rrule              String // billing cycle, e.g. "FREQ=MONTHLY" / "FREQ=YEARLY" / "FREQ=MONTHLY;INTERVAL=3"
+  startDate          DateTime        @db.Date
+  nextDate           DateTime        @db.Date // next payment / billing date
+  status             RecurringStatus @default(ACTIVE)
+  categoryId         String?
+  category           Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  accountId          String?
+  account            Account?        @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  paymentMethod      PaymentMethod?
+  reminderDaysBefore Int?            @default(2)
+  autoLogExpense     Boolean         @default(false) // auto-create the expense when due
+  url                String?
+  notes              String?
+  cancelledAt        DateTime?
+  transactions       Transaction[]
+  debt               Debt? // installment plan of a loan
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([userId, status, nextDate])
+}
+
+model Goal {
+  id              String          @id @default(cuid())
+  userId          String
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  description     String?
+  notes           String?
+  type            GoalType        @default(PERSONAL)
+  status          GoalStatus      @default(ACTIVE)
+  targetValue     Decimal?        @db.Decimal(14, 2) // e.g. 5000 ($) or 12 (books)
+  currentValue    Decimal         @default(0) @db.Decimal(14, 2)
+  unit            String? // "books", "km", "kg" — FINANCIAL uses `currency`
+  currency        String?
+  startDate       DateTime?       @db.Date
+  deadline        DateTime?       @db.Date
+  // FINANCIAL: if set, currentValue mirrors this account's balance
+  linkedAccountId String?
+  linkedAccount   Account?        @relation(fields: [linkedAccountId], references: [id], onDelete: SetNull)
+  categoryId      String?
+  category        Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  color           String?
+  icon            String?
+  completedAt     DateTime?
+  milestones      GoalMilestone[]
+  tasks           Task[]
+  projects        Project[]
+  habits          Habit[]
+  events          Event[]
+  transactions    Transaction[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([userId, status])
+}
+
+model GoalMilestone {
+  id          String    @id @default(cuid())
+  goalId      String
+  goal        Goal      @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  title       String
+  targetValue Decimal?  @db.Decimal(14, 2)
+  dueDate     DateTime? @db.Date
+  completedAt DateTime?
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+}
+
+model Habit {
+  id           String         @id @default(cuid())
+  userId       String
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  icon         String?
+  color        String?
+  frequency    HabitFrequency @default(DAILY)
+  daysOfWeek   Int[]          @default([]) // CUSTOM: 0=Sun..6=Sat
+  timesPerWeek Int? // WEEKLY
+  targetPerDay Int            @default(1) // e.g. 8 glasses of water
+  unit         String?
+  reminderTime String? // "HH:mm" in user timezone
+  startDate    DateTime       @default(now()) @db.Date
+  isArchived   Boolean        @default(false)
+  categoryId   String?
+  category     Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  goalId       String?
+  goal         Goal?          @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  sortOrder    Int            @default(0)
+  logs         HabitLog[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([userId, isArchived])
+}
+
+// One row per habit per day. "Done" for the day when count >= habit.targetPerDay.
+model HabitLog {
+  id        String   @id @default(cuid())
+  habitId   String
+  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  count     Int      @default(1)
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@unique([habitId, date])
+  @@index([userId, date])
+}
+
+model MaintenanceItem {
+  id                 String           @id @default(cuid())
+  userId             String
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title              String
+  description        String?
+  area               MaintenanceArea  @default(HOME)
+  rrule              String // e.g. "FREQ=MONTHLY;INTERVAL=6"
+  lastDoneAt         DateTime?        @db.Date
+  nextDueAt          DateTime         @db.Date
+  reminderDaysBefore Int?             @default(3)
+  estimatedCost      Decimal?         @db.Decimal(14, 2)
+  currency           String?
+  categoryId         String?
+  category           Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  isActive           Boolean          @default(true)
+  notes              String?
+  logs               MaintenanceLog[]
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([userId, nextDueAt])
+}
+
+model MaintenanceLog {
+  id            String          @id @default(cuid())
+  itemId        String
+  item          MaintenanceItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  doneAt        DateTime        @db.Date
+  cost          Decimal?        @db.Decimal(14, 2)
+  currency      String?
+  notes         String?
+  transactionId String?
+  transaction   Transaction?    @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  createdAt     DateTime        @default(now())
+}
+
+model Document {
+  id                 String       @id @default(cuid())
+  userId             String
+  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name               String
+  type               DocumentType @default(OTHER)
+  // Sensitive — AES-256-GCM encrypted at rest (EncryptionService)
+  documentNumberEnc  String?
+  notesEnc           String?
+  issuer             String?
+  holderName         String?
+  issueDate          DateTime?    @db.Date
+  expiryDate         DateTime?    @db.Date
+  reminderDaysBefore Int?         @default(30)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@index([userId, expiryDate])
+}
+
+model ShoppingList {
+  id          String         @id @default(cuid())
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  icon        String?
+  color       String?
+  currency    String?
+  isArchived  Boolean        @default(false)
+  sortOrder   Int            @default(0)
+  // shared with the owner's household: every member can see it and add / tick items
+  householdId String?
+  household   Household?     @relation(fields: [householdId], references: [id], onDelete: SetNull)
+  items       ShoppingItem[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([userId])
+}
+
+model ShoppingItem {
+  id             String       @id @default(cuid())
+  listId         String
+  list           ShoppingList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  quantity       Decimal      @default(1) @db.Decimal(10, 2)
+  unit           String?
+  estimatedPrice Decimal?     @db.Decimal(14, 2) // per line (not per unit)
+  actualPrice    Decimal?     @db.Decimal(14, 2)
+  currency       String?
+  store          String?
+  priority       Priority     @default(MEDIUM)
+  isPurchased    Boolean      @default(false)
+  purchasedAt    DateTime?
+  notes          String?
+  sourceRecipeId String? // generated from meal plan
+  sourceRecipe   Recipe?      @relation(fields: [sourceRecipeId], references: [id], onDelete: SetNull)
+  sortOrder      Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([listId])
+  @@index([userId, isPurchased])
+}
+
+model Recipe {
+  id            String             @id @default(cuid())
+  userId        String
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  description   String?
+  instructions  String?
+  servings      Int?
+  prepMinutes   Int?
+  cookMinutes   Int?
+  sourceUrl     String?
+  isFavorite    Boolean            @default(false)
+  ingredients   RecipeIngredient[]
+  meals         MealPlanEntry[]
+  shoppingItems ShoppingItem[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([userId])
+}
+
+model RecipeIngredient {
+  id        String   @id @default(cuid())
+  recipeId  String
+  recipe    Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  name      String
+  quantity  Decimal? @db.Decimal(10, 2)
+  unit      String?
+  sortOrder Int      @default(0)
+}
+
+model MealPlanEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  mealType  MealType
+  title     String // free text, or recipe name
+  recipeId  String?
+  recipe    Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  servings  Int?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, date])
+}
+
+model Note {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title      String
+  content    String    @default("") // markdown
+  color      String?
+  isPinned   Boolean   @default(false)
+  isFavorite Boolean   @default(false)
+  isArchived Boolean   @default(false)
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  tags       Tag[]
+  projectId  String?
+  project    Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  tripId     String?
+  trip       Trip?     @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  courseId   String?
+  course     Course?   @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  personId   String?
+  person     Person?   @relation(fields: [personId], references: [id], onDelete: SetNull)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([userId, isArchived])
+}
+
+model Course {
+  id          String         @id @default(cuid())
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  code        String?
+  instructor  String?
+  term        String? // "Fall 2026"
+  credits     Decimal?       @db.Decimal(4, 1)
+  color       String?
+  targetGrade Decimal?       @db.Decimal(5, 2)
+  location    String?
+  // weekly class schedule is modelled as recurring Events (type CLASS, courseId)
+  notes       String?
+  isArchived  Boolean        @default(false)
+  assessments Assessment[]
+  sessions    StudySession[]
+  tasks       Task[]
+  events      Event[]
+  notesList   Note[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([userId])
+}
+
+// Assignments, exams, quizzes... with grades.
+model Assessment {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId  String
+  course    Course           @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title     String
+  type      AssessmentType   @default(ASSIGNMENT)
+  status    AssessmentStatus @default(NOT_STARTED)
+  dueAt     DateTime?
+  location  String?
+  grade     Decimal?         @db.Decimal(6, 2)
+  maxGrade  Decimal?         @db.Decimal(6, 2)
+  weight    Decimal?         @db.Decimal(5, 2) // % of final grade
+  notes     String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([userId, dueAt])
+}
+
+model StudySession {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId        String?
+  course          Course?  @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  startAt         DateTime
+  durationMinutes Int
+  topic           String?
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  @@index([userId, startAt])
+}
+
+model Trip {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String
+  destination    String
+  startDate      DateTime      @db.Date
+  endDate        DateTime      @db.Date
+  status         TripStatus    @default(PLANNING)
+  budget         Decimal?      @db.Decimal(14, 2)
+  currency       String?
+  transportation String?
+  accommodation  String?
+  notes          String?
+  color          String?
+  // random token of the public read-only link (null = not shared)
+  shareToken     String?       @unique
+  items          TripItem[] // reservations, places to visit, activities, transport, stays
+  packingItems   PackingItem[]
+  tasks          Task[]
+  events         Event[]
+  transactions   Transaction[]
+  notesList      Note[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([userId, startDate])
+}
+
+model TripItem {
+  id               String       @id @default(cuid())
+  tripId           String
+  trip             Trip         @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  type             TripItemType
+  title            String
+  startAt          DateTime?
+  endAt            DateTime?
+  location         String?
+  confirmationCode String?
+  cost             Decimal?     @db.Decimal(14, 2)
+  currency         String?
+  url              String?
+  notes            String?
+  isDone           Boolean      @default(false) // visited / booked
+  sortOrder        Int          @default(0)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+model PackingItem {
+  id        String   @id @default(cuid())
+  tripId    String
+  trip      Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  name      String
+  quantity  Int      @default(1)
+  group     String? // "Clothes", "Electronics"...
+  isPacked  Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model ImportantDate {
+  id                 String   @id @default(cuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  personId           String?
+  person             Person?  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  title              String
+  date               DateTime @db.Date
+  repeatsYearly      Boolean  @default(true)
+  reminderDaysBefore Int?     @default(3)
+  notes              String?
+  createdAt          DateTime @default(now())
+
+  @@index([userId])
+}
+
+model GiftIdea {
+  id          String   @id @default(cuid())
+  personId    String
+  person      Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  title       String
+  price       Decimal? @db.Decimal(14, 2)
+  currency    String?
+  url         String?
+  occasion    String?
+  isPurchased Boolean  @default(false)
+  notes       String?
+  createdAt   DateTime @default(now())
+}
+
+model Reminder {
+  id           String      @id @default(cuid())
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title        String
+  notes        String?
+  remindAt     DateTime // next fire time
+  /// time set relative to a prayer, recomputed for each day: { start: { prayer, offset }, end?: { prayer, offset } }
+  timeAnchor   Json?
+  rrule        String? // recurring reminder; after firing, remindAt advances
+  isDeadline   Boolean     @default(false)
+  isDone       Boolean     @default(false)
+  snoozedUntil DateTime?
+  lastFiredAt  DateTime?
+  // optional link to any entity
+  entityType   EntityType?
+  entityId     String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([userId, remindAt])
+  @@index([remindAt, isDone])
+}
+
+// In-app notification center + source for web push.
+// The scheduler creates these for: reminders, task reminders, event reminders,
+// upcoming bills/subscriptions, document expiry, maintenance due, birthdays/important dates,
+// budget threshold. `dedupeKey` prevents duplicates (e.g. "doc:<id>:expiry:2026-10-30").
+model Notification {
+  id         String      @id @default(cuid())
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title      String
+  body       String?
+  link       String? // frontend path, e.g. "/tasks?id=..."
+  entityType EntityType?
+  entityId   String?
+  dedupeKey  String
+  readAt     DateTime?
+  pushedAt   DateTime?
+  createdAt  DateTime    @default(now())
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, readAt])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+}
+
+// Append-only activity stream. Feeds insights now and future AI analysis later.
+model ActivityLog {
+  id         String      @id @default(cuid())
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action     String // "task.completed", "transaction.created", "habit.checked"...
+  entityType EntityType?
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime    @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// One row per user per calendar day (user timezone): the morning plan and the evening review.
+model DayLog {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date       DateTime  @db.Date
+  plannedAt  DateTime? // morning plan done
+  reviewedAt DateTime? // evening review done
+  intention  String? // "today I want to…"
+  win        String? // best thing about the day
+  mood       Int? // 1 (rough) .. 5 (great)
+  note       String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([userId, date])
+}
+
+// One row per user per week (weekStart = first day of the week in the user's settings).
+model WeekReview {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekStart  DateTime  @db.Date
+  reviewedAt DateTime?
+  priorities String[]  @default([]) // up to 3 things that matter next week
+  wentWell   String?
+  improve    String?
+  score      Int? // life score (0-100) at review time
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([userId, weekStart])
+}
+
+enum HouseholdRole {
+  OWNER
+  MEMBER
+}
+
+model Household {
+  id            String            @id @default(cuid())
+  name          String
+  members       HouseholdMember[]
+  invites       HouseholdInvite[]
+  shoppingLists ShoppingList[]
+  events        Event[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+}
+
+// A user belongs to at most one household.
+model HouseholdMember {
+  id          String        @id @default(cuid())
+  householdId String
+  household   Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  userId      String        @unique
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        HouseholdRole @default(MEMBER)
+  joinedAt    DateTime      @default(now())
+
+  @@index([householdId])
+}
+
+// Single-use invite. Only the SHA-256 hash of the code is stored.
+model HouseholdInvite {
+  id          String    @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  codeHash    String    @unique
+  createdById String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  usedById    String?
+  createdAt   DateTime  @default(now())
+
+  @@index([householdId])
+}
+
+enum AssistantChannel {
+  APP
+  TELEGRAM
+}
+
+model AssistantConversation {
+  id            String             @id @default(cuid())
+  userId        String
+  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String?
+  channel       AssistantChannel   @default(APP)
+  lastMessageAt DateTime           @default(now())
+  messages      AssistantMessage[]
+  actions       AssistantAction[]
+  createdAt     DateTime           @default(now())
+
+  @@index([userId, lastMessageAt])
+}
+
+// One API turn, replayed to the model unchanged (append-only).
+model AssistantMessage {
+  id             String                @id @default(cuid())
+  conversationId String
+  conversation   AssistantConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String // "user" | "assistant"
+  content        Json // API content blocks
+  text           String? // what the chat shows; null for tool rounds
+  hidden         Boolean               @default(false) // tool rounds and notes (confirmed, undone)
+  createdAt      DateTime              @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+// Something the assistant did (or wants to do: a deletion waiting for confirmation).
+model AssistantAction {
+  id             String                @id @default(cuid())
+  conversationId String
+  conversation   AssistantConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  messageId      String? // the assistant reply it belongs to
+  kind           String // create | update | complete | delete
+  entityType     String
+  entityId       String
+  label          String
+  link           String?
+  undo           Json? // how to reverse it, when it can be
+  status         String // done | pending | cancelled | undone
+  createdAt      DateTime              @default(now())
+  resolvedAt     DateTime?
+
+  @@index([conversationId])
+  @@index([userId, status])
+}
+
+/// Money owed in either direction. Remaining = principal − Σ payments (computed, never stored).
+model Debt {
+  id                 String            @id @default(cuid())
+  userId             String
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  direction          DebtDirection
+  kind               DebtKind          @default(PERSONAL)
+  title              String // "Dinner split", "Car loan"
+  personId           String?
+  person             Person?           @relation(fields: [personId], references: [id], onDelete: SetNull)
+  counterparty       String? // free text when it is not a saved person, e.g. "Bank Audi"
+  principal          Decimal           @db.Decimal(14, 2) // original amount, always positive
+  currency           String
+  startDate          DateTime          @db.Date
+  dueDate            DateTime?         @db.Date
+  interestRate       Decimal?          @db.Decimal(6, 3) // yearly %, informational
+  status             DebtStatus        @default(OPEN)
+  settledAt          DateTime?
+  accountId          String? // default account payments go through
+  account            Account?          @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  recurringPaymentId String?           @unique // installments: paying it records a payment here
+  recurringPayment   RecurringPayment? @relation(fields: [recurringPaymentId], references: [id], onDelete: SetNull)
+  reminderDaysBefore Int?              @default(3)
+  notes              String?
+  payments           DebtPayment[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([userId, status])
+  @@index([personId])
+}
+
+/// A repayment (in the debt's currency). Linked to the Money transaction that recorded it, if any:
+/// deleting that transaction deletes the payment, and deleting the payment deletes the transaction.
+model DebtPayment {
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  debtId        String
+  debt          Debt         @relation(fields: [debtId], references: [id], onDelete: Cascade)
+  amount        Decimal      @db.Decimal(14, 2)
+  date          DateTime     @db.Date
+  transactionId String?      @unique
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  note          String?
+  createdAt     DateTime     @default(now())
+
+  @@index([debtId, date])
+  @@index([userId])
+}
+
+/// What the calorie target is worked out from, and what the user chose to track. Current weight = latest WeightLog.
+model HealthProfile {
+  id                    String        @id @default(cuid())
+  userId                String        @unique
+  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sex                   Sex?
+  birthDate             DateTime?     @db.Date
+  heightCm              Decimal?      @db.Decimal(5, 1)
+  activityLevel         ActivityLevel @default(LIGHT)
+  goal                  HealthGoal    @default(MAINTAIN)
+  targetWeightKg        Decimal?      @db.Decimal(5, 1)
+  /// kg per week to lose or gain
+  weeklyRateKg          Decimal       @default(0.5) @db.Decimal(3, 2)
+  /// user-chosen daily calories instead of the computed target
+  calorieTargetOverride Int?
+  trackProtein          Boolean       @default(false)
+  trackCarbs            Boolean       @default(false)
+  trackFat              Boolean       @default(false)
+  trackWater            Boolean       @default(true)
+  trackExercise         Boolean       @default(true)
+  trackWeight           Boolean       @default(true)
+  /// exercise calories raise that day's allowance
+  addExerciseCalories   Boolean       @default(true)
+  waterGoalMl           Int?
+  /// "HH:mm": remind when nothing was logged that day; null = off
+  logReminderTime       String?       @default("20:00")
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+}
+
+/// The user's own foods: created by hand, or remembered from what they logged.
+model FoodItem {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  serving    String? // "1 piece", "100 g"
+  calories   Int // per serving
+  protein    Decimal?  @db.Decimal(6, 1)
+  carbs      Decimal?  @db.Decimal(6, 1)
+  fat        Decimal?  @db.Decimal(6, 1)
+  isFavorite Boolean   @default(false)
+  useCount   Int       @default(0)
+  lastUsedAt DateTime?
+  logs       FoodLog[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([userId, lastUsedAt])
+}
+
+/// One thing eaten. Totals are stored (servings already applied), so a later change to the food does not rewrite history.
+model FoodLog {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date       DateTime  @db.Date
+  meal       MealType  @default(SNACK)
+  name       String?
+  servings   Decimal   @default(1) @db.Decimal(6, 2)
+  serving    String?
+  calories   Int
+  protein    Decimal?  @db.Decimal(6, 1)
+  carbs      Decimal?  @db.Decimal(6, 1)
+  fat        Decimal?  @db.Decimal(6, 1)
+  foodItemId String?
+  foodItem   FoodItem? @relation(fields: [foodItemId], references: [id], onDelete: SetNull)
+  /// built-in food catalog id, when it came from there
+  catalogId  String?
+  source     String    @default("manual") // catalog | food | manual | ai
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, date])
+}
+
+model ExerciseLog {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date        DateTime @db.Date
+  /// catalog activity id ("walking", "running"…) or "other"
+  activity    String
+  name        String?
+  durationMin Int
+  calories    Int
+  createdAt   DateTime @default(now())
+
+  @@index([userId, date])
+}
+
+model WeightLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  weightKg  Decimal  @db.Decimal(5, 2)
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, date])
+}
+
+/// Water drunk on a day (one running total per day).
+model WaterLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  ml        Int
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
 }

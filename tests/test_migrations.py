@@ -138,6 +138,54 @@ class Migrations(unittest.TestCase):
             _psql("""SELECT "recurrenceWeekdays" FROM "Todo" WHERE id = 't1'"""), "{}"
         )
 
+    def test_vournal_os_on_existing_rows(self):
+        # An app account from before vournal OS keeps every row, and its people get
+        # the new fields' defaults rather than a failed migration.
+        _deploy(upto=(9, "e"))
+        _psql(
+            """INSERT INTO "User" (id, email) VALUES ('u1', 'build8@example.test');
+               INSERT INTO "Person" (id, "userId", name, "normalizedName")
+                 VALUES ('p1', 'u1', 'Rania', 'rania');
+               INSERT INTO "Entry" (id, "userId", "rawTranscript") VALUES ('e1', 'u1', 'x');
+               INSERT INTO "Todo" (id, "entryId", "userId", text) VALUES ('t1', 'e1', 'u1', 'Call');"""
+        )
+        _deploy()
+        self.assertEqual(
+            _psql(
+                """SELECT (SELECT email FROM "User" WHERE id = 'u1'),
+                          (SELECT name FROM "Person" WHERE id = 'p1'),
+                          (SELECT "rawTranscript" FROM "Entry" WHERE id = 'e1'),
+                          (SELECT text FROM "Todo" WHERE id = 't1')"""
+            ),
+            "build8@example.test|Rania|x|Call",
+        )
+        self.assertEqual(
+            _psql(
+                """SELECT "birthdayHasYear", "reminderDaysBefore", birthday IS NULL,
+                          relationship IS NULL, "createdAt" IS NOT NULL
+                   FROM "Person" WHERE id = 'p1'"""
+            ),
+            "t|3|t|t|t",
+        )
+
+    def test_vournal_os_cascades_from_user(self):
+        # Deleting an account (DELETE /auth/me) must take its vournal OS rows too.
+        _deploy()
+        _psql(
+            """INSERT INTO "User" (id, email) VALUES ('u1', 'gone@example.test');
+               INSERT INTO "UserSettings" (id, "userId", "updatedAt") VALUES ('s1', 'u1', now());
+               INSERT INTO "Category" (id, "userId", scope, name, "updatedAt")
+                 VALUES ('c1', 'u1', 'TASK', 'Work', now());
+               DELETE FROM "User" WHERE id = 'u1';"""
+        )
+        self.assertEqual(
+            _psql(
+                """SELECT (SELECT count(*) FROM "UserSettings" WHERE id = 's1'),
+                          (SELECT count(*) FROM "Category" WHERE id = 'c1')"""
+            ),
+            "0|0",
+        )
+
     def test_schema_matches_after_all_migrations(self):
         _deploy()
         result = _prisma(
@@ -154,6 +202,25 @@ class Migrations(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# Tables that existed before vournal OS; its migration may only touch Person.
+APP_TABLES = {
+    "User",
+    "ExternalIdentity",
+    "AuthChallenge",
+    "PasswordResetToken",
+    "RefreshToken",
+    "Entry",
+    "Todo",
+    "Topic",
+    "EntryTopic",
+    "Person",
+    "EntryPerson",
+    "Place",
+    "EntryPlace",
+    "PendingGrant",
+}
 
 
 def _folders() -> list[str]:
@@ -176,6 +243,28 @@ class MigrationLayout(unittest.TestCase):
             sql = (MIGRATIONS / name / "migration.sql").read_text().upper()
             for banned in ("DROP TABLE", "DROP COLUMN", "DROP TYPE", "RENAME", "ALTER COLUMN"):
                 self.assertNotIn(banned, sql, name)
+
+    def test_vournal_os_migration_is_additive(self):
+        # vournal OS only adds tables, plus new columns and links on the app's Person.
+        sql = (MIGRATIONS / "9f_vournal_os" / "migration.sql").read_text()
+        upper = sql.upper()
+        for banned in (
+            "DROP TABLE",
+            "DROP COLUMN",
+            "DROP TYPE",
+            "RENAME",
+            "ALTER COLUMN",
+            "SET NOT NULL",
+        ):
+            self.assertNotIn(banned, upper)
+        for statement in re.findall(r'ALTER TABLE\s+"(\w+)"\s+(\w+\s+\w+)', sql, flags=re.I):
+            table, action = statement
+            if table == "Person":
+                self.assertIn(action.upper(), {"ADD COLUMN", "ADD CONSTRAINT"}, statement)
+            else:
+                # Foreign keys on the new tables are added after the tables exist.
+                self.assertEqual(action.upper(), "ADD CONSTRAINT", statement)
+                self.assertNotIn(table, APP_TABLES, statement)
 
     def test_refuses_non_scratch_db(self):
         for url in (
