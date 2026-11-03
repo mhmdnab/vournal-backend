@@ -26,6 +26,7 @@ def include_os_routers() -> APIRouter:
     global _included
     if not _included:
         from app.os import (
+            accounts,
             auth,
             calendar,
             categories,
@@ -36,6 +37,7 @@ def include_os_routers() -> APIRouter:
             settings,
             tags,
             tasks,
+            transactions,
             users,
         )
 
@@ -50,5 +52,7 @@ def include_os_routers() -> APIRouter:
         api_router.include_router(reminders.router)
         api_router.include_router(notifications.router)
         api_router.include_router(calendar.router)
+        api_router.include_router(accounts.router)
+        api_router.include_router(transactions.router)
         _included = True
     return api_router
