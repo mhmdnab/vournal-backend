@@ -49,6 +49,8 @@ from app.quota import (
     reject_if_recording_too_long,
     reserve_entry_quota,
 )
+from app.os import include_os_routers
+from app.os.common.http import install_nest_errors
 from app.rate_limit import limiter
 from app.storage import (
     create_signed_url,
@@ -200,6 +202,11 @@ app.include_router(oauth_router)
 app.include_router(threads_router)
 app.include_router(billing_apple_router)
 app.include_router(billing_paddle_router)
+
+# vournal OS (the web dashboard): everything under /api, answering in NestJS's
+# shape there only. Root routes above keep FastAPI's handlers.
+install_nest_errors(app)
+app.include_router(include_os_routers())
 
 
 @app.get("/health")
