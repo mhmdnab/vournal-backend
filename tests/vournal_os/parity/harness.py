@@ -100,6 +100,19 @@ async def copy_reference_market_rates() -> None:
     market_rates.reset_for_tests()
 
 
+def reference_sql(sql: str) -> str:
+    """Run SQL on the reference's own local database (rows the API can't make, such
+    as notifications, are put in place on both sides this way)."""
+    import subprocess
+    from urllib.parse import urlparse
+
+    local = urlparse(os.environ["DATABASE_URL"])
+    if local.hostname not in ("127.0.0.1", "localhost", "::1"):
+        raise RuntimeError("Refusing to touch a non-local database.")
+    command = ["psql", "-h", local.hostname, "-p", str(local.port or 5432), _REFERENCE_DB, "-v", "ON_ERROR_STOP=1", "-Atq", "-c", sql]
+    return subprocess.run(command, capture_output=True, text=True, check=True).stdout.strip()
+
+
 async def python_client(user, password: str = PARITY_PASSWORD) -> httpx.AsyncClient:
     """An in-process client on the Python app, signed in as `user` through the
     web's own sign-in route (cookies, like the browser)."""
@@ -160,6 +173,7 @@ class ParityCase(unittest.IsolatedAsyncioTestCase):
                 "plan": "plus",
             }
         )
+        self.nest_user_id = (await self.nest.get("/auth/me")).json()["user"]["id"]
         self.py = await python_client(self.user)
         self.addAsyncCleanup(self.py.aclose)
         named = await self.py.patch("/api/users/me", json={"name": "Parity"})
