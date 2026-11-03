@@ -31,6 +31,12 @@ class Normalize(unittest.TestCase):
         now = datetime.now(timezone.utc)
         self.assertEqual(normalize({"createdAt": _iso(now - timedelta(seconds=3))}), {"createdAt": "<now>"})
 
+    def test_timestamps_whole_days_from_now_are_masked_by_their_day_count(self):
+        now = datetime.now(timezone.utc)
+        body = normalize([_iso(now + timedelta(days=1, milliseconds=15)), _iso(now - timedelta(days=7)), _iso(now + timedelta(days=1, hours=3))])
+        self.assertEqual(body[:2], ["<now+1d>", "<now-7d>"])
+        self.assertNotIn("<now", body[2])  # a day and three hours is a real time, not "now"
+
     def test_fixed_dates_are_kept(self):
         self.assertEqual(
             normalize({"dueAt": "2020-01-01T00:00:00.000Z"}), {"dueAt": "2020-01-01T00:00:00.000Z"}

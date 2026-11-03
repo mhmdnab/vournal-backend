@@ -29,12 +29,23 @@ _ISO = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$")
 _NOW_WINDOW = timedelta(minutes=10)
 
 
-def _is_now(value: str) -> bool:
+def _now_label(value: str) -> str | None:
+    """"<now>" for a timestamp from the last few minutes, "<now+Nd>" for one a whole
+    number of days from now (a series anchored at "now", e.g. income received today:
+    the two backends' clocks are milliseconds apart, so its next date is too)."""
     try:
         moment = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
-        return False
-    return abs(datetime.now(timezone.utc) - moment) <= _NOW_WINDOW
+        return None
+    delta = moment - datetime.now(timezone.utc)
+    days = round(delta / timedelta(days=1))
+    if abs(days) > 400 or abs(delta - timedelta(days=days)) > _NOW_WINDOW:
+        return None
+    return "<now>" if days == 0 else f"<now{days:+d}d>"
+
+
+def _is_now(value: str) -> bool:
+    return _now_label(value) == "<now>"
 
 
 def normalize(body: Any) -> Any:
@@ -54,8 +65,8 @@ def normalize(body: Any) -> Any:
         if isinstance(node, str):
             if _CUID.match(node):
                 return ids.setdefault(node, f"<id:{len(ids) + 1}>")
-            if _ISO.match(node) and _is_now(node):
-                return "<now>"
+            if _ISO.match(node) and (label := _now_label(node)):
+                return label
             # ids inside longer text, e.g. a link "/tasks?id=<id>"
             return _CUID_INSIDE.sub(lambda m: ids.setdefault(m[0], f"<id:{len(ids) + 1}>"), node)
         return node
