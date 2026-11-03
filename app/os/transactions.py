@@ -604,4 +604,8 @@ async def remove(id: str, user=Depends(plus_user)):
     await log_activity(
         user.id, "transaction.deleted", entity_id=id, type=existing.type, amount=to_number(existing.amount), title=existing.title
     )
+    # NestJS's "transaction.deleted" listener: its debt payment went with it (cascade)
+    from app.os.debts import on_transaction_deleted
+
+    await on_transaction_deleted(user.id)
     return {"ok": True}

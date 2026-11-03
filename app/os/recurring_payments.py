@@ -208,6 +208,10 @@ async def _pay_internal(user_id: str, p, *, when: datetime, amount=None, account
         user_id, "transaction.created", entity_id=created.id, type="EXPENSE", amount=value, currency=p.currency,
         categoryId=p.categoryId, title=p.name, recurringPaymentId=p.id,
     )
+    # NestJS's "recurring.paid" listener: a loan's installment is a payment on its debt
+    from app.os.debts import on_recurring_paid
+
+    await on_recurring_paid(user_id, p.id, value, p.currency, created.id)
     return {f: getattr(created, f) for f in _TX_FIELDS}
 
 
@@ -497,6 +501,11 @@ async def summary(request: Request, user=Depends(plus_user)):
 
 @router.post("", status_code=201)
 async def create(body: CreateBody, user=Depends(plus_user)):
+    return await _get(user, (await create_payment(user, body)).id)
+
+
+async def create_payment(user, body: CreateBody):
+    """Creates a recurring payment (also used for a debt's installment plan)."""
     ctx = await _context(user)
     await _assert_category(user.id, body.categoryId)
     account = await _find_account(user.id, body.accountId)
@@ -528,7 +537,7 @@ async def create(body: CreateBody, user=Depends(plus_user)):
     await log_activity(user.id, "recurring.created", entity_id=row.id, name=row.name, kind=row.kind, amount=body.amount)
     if row.autoLogExpense:
         await auto_log_due(user.id)
-    return await _get(user, row.id)
+    return row
 
 
 @router.get("/{id}")
