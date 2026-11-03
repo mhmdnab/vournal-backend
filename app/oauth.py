@@ -218,6 +218,16 @@ async def link_identity(user_id: str, issuer: str, subject: str) -> None:
         pass  # a double tap got here first
 
 
+async def identity_user(provider: Provider, id_token: str, nonce: str):
+    """The account this provider sign-in is already linked to, or None. Never creates
+    or links anything: the web (vournal OS) signs in existing app accounts only."""
+    identity = await verify_identity(provider, id_token, nonce)
+    known = await db.externalidentity.find_unique(
+        where={"issuer_subject": {"issuer": identity.issuer, "subject": identity.subject}}
+    )
+    return None if known is None else await db.user.find_unique(where={"id": known.userId})
+
+
 @router.post("/{provider}", response_model=TokenResponse | AuthChallengeOut)
 @limiter.limit("20/15 minutes")
 async def sign_in(provider: Provider, request: Request, body: ProviderSignIn):

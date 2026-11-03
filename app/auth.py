@@ -68,15 +68,32 @@ async def get_current_user(authorization: Optional[str] = Header(default=None)):
         raise HTTPException(401, "Not authenticated", headers=_UNAUTHENTICATED)
 
     token = authorization[len("bearer ") :].strip()
+    user = await user_for_access_token(token)
+    if user is None:
+        raise HTTPException(401, "Invalid or expired token", headers=_UNAUTHENTICATED)
+    return user
+
+
+async def user_for_access_token(token: str):
+    """The user an access token belongs to, or None when it's malformed, expired, or
+    from before the account's sessions were ended. Shared with the web (vournal OS)."""
     decoded = security.decode_access_token(token)
     if not decoded:
-        raise HTTPException(401, "Invalid or expired token", headers=_UNAUTHENTICATED)
-
+        return None
     user_id, generation = decoded
     user = await db.user.find_unique(where={"id": user_id})
     if user is None or user.sessionGeneration != generation:
-        raise HTTPException(401, "Invalid or expired token", headers=_UNAUTHENTICATED)
+        return None
     return user
+
+
+async def end_all_sessions(user_id: str) -> None:
+    """Sign the account out everywhere: every access token stops working at once
+    (generation) and every refresh token is spent."""
+    await db.user.update(where={"id": user_id}, data={"sessionGeneration": {"increment": 1}})
+    await db.refreshtoken.update_many(
+        where={"userId": user_id, "revoked": False}, data={"revoked": True}
+    )
 
 
 async def _issue_tokens(user_id: str, generation: int | None = None) -> TokenResponse:
@@ -401,7 +418,12 @@ async def login(request: Request, body: LoginRequest):
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh(body: RefreshRequest):
-    token_hash = security.hash_refresh_token(body.refreshToken)
+    return await rotate_refresh_token(body.refreshToken)
+
+
+async def rotate_refresh_token(raw: str) -> TokenResponse:
+    """Spend a refresh token for a fresh pair, or raise 401. Shared with the web."""
+    token_hash = security.hash_refresh_token(raw)
     stored = await db.refreshtoken.find_unique(where={"tokenHash": token_hash})
 
     now = datetime.now(timezone.utc)
@@ -433,11 +455,15 @@ async def refresh(body: RefreshRequest):
 async def logout(body: LogoutRequest):
     """Revoke the presented refresh token. Idempotent and always 200 — it must
     not reveal whether the token existed."""
-    token_hash = security.hash_refresh_token(body.refreshToken)
+    await revoke_refresh_token(body.refreshToken)
+    return {"ok": True}
+
+
+async def revoke_refresh_token(raw: str) -> None:
+    token_hash = security.hash_refresh_token(raw)
     stored = await db.refreshtoken.find_unique(where={"tokenHash": token_hash})
     if stored is not None and not stored.revoked:
         await db.refreshtoken.update(where={"id": stored.id}, data={"revoked": True})
-    return {"ok": True}
 
 
 def _user_out(user) -> UserOut:
@@ -493,7 +519,12 @@ async def delete_me(body: DeleteAccountRequest, current=Depends(get_current_user
         body.password, current.passwordHash
     ):
         raise HTTPException(403, "Password is incorrect.")
+    await delete_account(current)
 
+
+async def delete_account(current) -> None:
+    """Delete an account and everything it owns, once the caller has confirmed it.
+    Shared with the web's DELETE /api/users/me."""
     # Apple requires revoking its token when the account goes.
     from app.oauth import APPLE_ISSUER, log as oauth_log, revoke_apple
 

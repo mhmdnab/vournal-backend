@@ -89,10 +89,11 @@ class ParityCase(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         from app import security
         from app.db import db
+        from app.rate_limit import limiter
 
         self.db = db
-        if not db.is_connected():
-            await db.connect()
+        limiter.reset()
+        await db.connect()  # each test has its own event loop
         self.email = f"parity-{uuid.uuid4().hex}@example.test"
 
         self.nest = httpx.AsyncClient(base_url=os.environ["NEST_REFERENCE_URL"], headers=CSRF)
@@ -126,6 +127,7 @@ class ParityCase(unittest.IsolatedAsyncioTestCase):
         await self.nest.aclose()
         await self.py.aclose()
         await self.db.user.delete_many(where={"email": self.email})
+        await self.db.disconnect()
 
     async def both(self, method: str, path: str, json: Any = None) -> tuple[httpx.Response, httpx.Response]:
         """The same request to NestJS (`path` under its /api base) and to Python."""

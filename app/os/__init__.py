@@ -5,11 +5,14 @@ the dashboard (vournalOS-frontend) only changes its BACKEND_URL. The app's own
 routes stay at the root, untouched.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.os.common.deps import csrf_check
 from app.os.common.http import NestJSONResponse
 
-api_router = APIRouter(prefix="/api", default_response_class=NestJSONResponse)
+api_router = APIRouter(
+    prefix="/api", default_response_class=NestJSONResponse, dependencies=[Depends(csrf_check)]
+)
 
 
 @api_router.get("/health")
@@ -24,5 +27,8 @@ def include_os_routers() -> APIRouter:
     """Attach every section's router (once) and return /api for app.include_router."""
     global _included
     if not _included:
+        from app.os import auth
+
+        api_router.include_router(auth.router)
         _included = True
     return api_router
