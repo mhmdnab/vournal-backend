@@ -4,7 +4,7 @@ import math
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
-from app.os.common import dates
+from app.os.common import dates, jsparse
 from app.os.common.currency import round_money
 
 safe_tz = dates.valid_zone
@@ -21,6 +21,11 @@ def _at(day: date, clock: time, tz: str) -> datetime:
     return dates._at(day, clock, safe_tz(tz))
 
 
+def _rolled(day: str) -> date:
+    """"YYYY-MM-DD" as TZDate(y, m - 1, d) reads it: 30 February is 2 March."""
+    return jsparse.roll_date(*(int(p) for p in day.split("-")))
+
+
 def parse_instant(value, tz: str) -> datetime | None:
     """For an instant column (Transaction.date): "YYYY-MM-DD" → 12:00 local, so it
     stays on its calendar day in every report; a full ISO value → that instant."""
@@ -29,7 +34,7 @@ def parse_instant(value, tz: str) -> datetime | None:
     if isinstance(value, datetime):
         return dates._utc(value)
     if dates.DATE_ONLY_RE.match(value):
-        return _at(date.fromisoformat(value), time(12), tz)
+        return _at(_rolled(value), time(12), tz)
     return dates.parse_instant(value)
 
 
@@ -38,7 +43,7 @@ def parse_boundary(value, tz: str, edge: str) -> datetime | None:
     if not value:
         return None
     if dates.DATE_ONLY_RE.match(value):
-        return _at(date.fromisoformat(value), time(0) if edge == "start" else time(23, 59, 59, 999000), tz)
+        return _at(_rolled(value), time(0) if edge == "start" else time(23, 59, 59, 999000), tz)
     return dates.parse_instant(value)
 
 

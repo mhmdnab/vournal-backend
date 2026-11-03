@@ -1,5 +1,6 @@
 """/api/reminders (port of vournalOS RemindersService)."""
 
+import math
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
@@ -20,6 +21,7 @@ from app.os.calendar_utils import (
     safe_tz,
 )
 from app.os.common import dates, rrule, validators
+from app.os.common.jsparse import js_number
 from app.os.common.activity import log_activity
 from app.os.common.deps import plus_user
 from app.os.common.http import invalid_data, nest_error, nest_router
@@ -178,11 +180,9 @@ class SnoozeBody(BaseModel):
     def _minutes(cls, v):
         if v is None:
             return v
-        try:
-            number = float(v)  # @Type(() => Number): "10" counts
-        except (TypeError, ValueError):
-            raise ValueError("minutes must be an integer number")
-        if isinstance(v, bool) or number != int(number) or not 1 <= number <= 43200:
+        # @Type(() => Number): "10" counts
+        number = js_number(v) if isinstance(v, str) else v if isinstance(v, (int, float)) and not isinstance(v, bool) else math.nan
+        if not math.isfinite(number) or number != int(number) or not 1 <= number <= 43200:
             raise ValueError("minutes must be an integer between 1 and 43200")
         return int(number)
 

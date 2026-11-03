@@ -177,7 +177,7 @@ def _period_query(request: Request, errors: list) -> tuple[str | None, str | Non
     import re
 
     period = request.query_params.get("period")
-    if period is not None and not re.fullmatch(r"\d{4}(-(0[1-9]|1[0-2]))?", period):
+    if period is not None and not re.fullmatch(r"\d{4}(-(0[1-9]|1[0-2]))?", period, re.ASCII):
         errors.append("period must be YYYY-MM or YYYY")
     kind = request.query_params.get("periodType")
     if kind is not None and kind not in ("MONTHLY", "YEARLY"):

@@ -1,10 +1,13 @@
 """Field rules shared by vournal OS request bodies (vournalOS common/validators)."""
 
+import math
 import re
 
-HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
-ICON_NAME = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
-HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+from app.os.common.jsparse import decimal_places
+
+HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}\Z")
+ICON_NAME = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*\Z")
+HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d\Z", re.ASCII)
 
 
 def trimmed(value, field: str, low: int, high: int):
@@ -33,13 +36,11 @@ def icon(value, field: str = "icon"):
     return value
 
 
-def _decimal_places(value) -> int:
-    """Decimals as JavaScript's Number#toString writes the value (12.0 → "12";
-    exponent forms like 1e-7 have no "." part, so count as 0, as in class-validator)."""
-    text = repr(value) if isinstance(value, float) else str(value)
-    if text.endswith(".0") or "e" in text.lower() or "." not in text:
-        return 0
-    return len(text.split(".")[1])
+def _decimal_places(value) -> float:
+    """Decimals as class-validator counts them from Number#toString ("1.5e-7" → 4).
+    Infinite where class-validator threw (1e-7), so every limit refuses it."""
+    places = decimal_places(value)
+    return math.inf if places is None else places
 
 
 def money(value, field: str, minimum: float | None = None):

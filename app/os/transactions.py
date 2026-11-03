@@ -6,6 +6,7 @@ repeating income/expense is a rolling series: the newest occurrence carries the
 rule, and materialize_due() creates each occurrence once its date has come.
 """
 
+import math
 import re
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -17,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator
 from app.db import db
 from app.os import finance_utils as fu
 from app.os.common import dates, rrule, validators
+from app.os.common.jsparse import js_number
 from app.os.common.activity import log_activity
 from app.os.common.currency import Converter, get_converter, round_money, to_number
 from app.os.common.defaults import SUPPORTED_CURRENCIES
@@ -229,7 +231,7 @@ class ImportRow(BaseModel):
     @field_validator("date")
     @classmethod
     def _date(cls, v):
-        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", v):
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", v, re.ASCII):
             raise ValueError("date must match /^\\d{4}-\\d{2}-\\d{2}$/ regular expression")
         return v
 
@@ -345,9 +347,8 @@ async def build_where(user_id: str, request: Request, tz: str) -> dict:
         raw = q.get(name)
         if raw is None:
             continue
-        try:
-            amounts[name] = float(raw)
-        except ValueError:
+        amounts[name] = js_number(raw)  # @Type(() => Number)
+        if not math.isfinite(amounts[name]):
             errors.append(f"{name} must be a number conforming to the specified constraints")
             continue
         if amounts[name] < 0:

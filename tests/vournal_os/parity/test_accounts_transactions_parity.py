@@ -125,9 +125,16 @@ class MoneyParity(ParityCase):
         for body in ({}, {"type": "EXPENSE"}, {"type": "EXPENSE", "amount": 0}, {"type": "EXPENSE", "amount": 1.005},
                      {"type": "EXPENSE", "amount": 1, "currency": "BTC"}, {"type": "EXPENSE", "amount": 1, "date": "nope"},
                      {"type": "EXPENSE", "amount": 1, "rrule": "FREQ=MINUTELY"}, {"type": "EXPENSE", "amount": 1, "extra": True},
-                     {"type": "EXPENSE", "amount": 1, "accountId": "cnosuchaccountidatallxxxx"}):
+                     {"type": "EXPENSE", "amount": 1, "accountId": "cnosuchaccountidatallxxxx"},
+                     # JavaScript's reading: 30 February rolls over, month 13 and foreign digits are refused
+                     {"type": "EXPENSE", "amount": 1, "date": "2026-02-30T10:00:00Z"}, {"type": "EXPENSE", "amount": 1, "date": "2026-02-30"},
+                     {"type": "EXPENSE", "amount": 1, "date": "2026-13-01"}, {"type": "EXPENSE", "amount": 1, "date": "٢٠٢٦-01-01"},
+                     {"type": "EXPENSE", "amount": 0.000001}):
             with self.subTest(body=body):
                 self.assertParity(*await self.both("POST", "/transactions", body))
+        for query in ("?page=inf", "?minAmount=1_000", "?page=0x2", "?from=2026-02-30&to=2026-03-05"):
+            with self.subTest(query=query):
+                self.assertParity(*await self.both("GET", f"/transactions{query}"))
 
 
 if __name__ == "__main__":

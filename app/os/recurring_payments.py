@@ -7,6 +7,7 @@ set to log themselves are paid when due, lazily here on reads and writes; the
 hourly job that does it for everyone comes with the scheduler.
 """
 
+import math
 import re
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -18,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, Strict
 from app.db import db
 from app.os import finance_utils as fu
 from app.os.common import dates, rrule, validators
+from app.os.common.jsparse import js_number
 from app.os.common.activity import log_activity
 from app.os.common.currency import get_converter, round_money, to_number
 from app.os.common.defaults import SUPPORTED_CURRENCIES
@@ -47,7 +49,7 @@ UNCATEGORIZED = {"en": "Uncategorized", "ar": "بدون فئة"}
 LOGGED_AUTOMATICALLY = {"en": "Logged automatically", "ar": "سُجّل تلقائيًا"}
 # validator.js isURL with require_protocol: false (http, https or ftp; a host with a TLD)
 _URL = re.compile(
-    r"^(?:(?:https?|ftp)://)?(?:[^\s:@/]+(?::[^\s:@/]*)?@)?(?:localhost|(?:[a-z0-9¡-￿](?:[a-z0-9¡-￿-]*[a-z0-9¡-￿])?\.)+[a-z¡-￿]{2,})(?::\d{1,5})?(?:[/?#]\S*)?$",
+    r"^(?:(?:https?|ftp)://)?(?:[^\s:@/]+(?::[^\s:@/]*)?@)?(?:localhost|(?:[a-z0-9¡-￿](?:[a-z0-9¡-￿-]*[a-z0-9¡-￿])?\.)+[a-z¡-￿]{2,})(?::[0-9]{1,5})?(?:[/?#]\S*)?\Z",
     re.I,
 )
 
@@ -395,11 +397,8 @@ async def summary(request: Request, user=Depends(plus_user)):
     raw_days = request.query_params.get("days")
     days = 30
     if raw_days is not None:
-        try:
-            number = float(raw_days)
-        except ValueError:
-            number = None
-        if number is None or number != int(number) or not 1 <= number <= 365:
+        number = js_number(raw_days)  # @Type(() => Number)
+        if not math.isfinite(number) or number != int(number) or not 1 <= number <= 365:
             errors.append("days must be an integer between 1 and 365")
         else:
             days = int(number)

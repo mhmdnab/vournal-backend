@@ -7,6 +7,7 @@ minutes for the whole server. Never raises: without data, callers fall back to
 the built-in defaults.
 """
 
+import math
 import asyncio
 import logging
 import time
@@ -17,6 +18,7 @@ from decimal import Decimal
 import httpx
 
 from app.db import db
+from app.os.common.jsparse import js_number
 from app.os.common.defaults import DEFAULT_RATES_PER_USD, SUPPORTED_CURRENCIES
 
 log = logging.getLogger("vournal.os")
@@ -72,10 +74,13 @@ def reset_for_tests() -> None:
 def _number(value) -> float | None:
     if isinstance(value, bool):
         return None
-    try:
-        number = float(value)
-    except (TypeError, ValueError, OverflowError):
-        return None
+    if isinstance(value, str):
+        number = js_number(value)  # Number(raw)
+    else:
+        try:
+            number = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
     return number if number == number and number not in (float("inf"), float("-inf")) else None
 
 

@@ -13,6 +13,8 @@ import re
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
+from app.os.common import jsparse
+
 _DAY = timedelta(days=1)
 
 
@@ -146,7 +148,7 @@ def parse_date_only(value) -> datetime | None:
         return _date_only(_utc(value).date())
     if not isinstance(value, str):
         return None
-    match = re.match(r"^(\d{4})-(\d{2})-(\d{2})", value)
+    match = re.match(r"^(\d{4})-(\d{2})-(\d{2})", value, re.ASCII)
     if not match:
         return None
     year, month, day = int(match[1]), int(match[2]), int(match[3])
@@ -198,38 +200,27 @@ def next_anniversary(value: datetime, tz: str) -> datetime:
 
 # ----- request values ------------------------------------------------------------
 
-DATE_ONLY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-_ISO_RE = re.compile(
-    r"^\d{4}-\d{2}-\d{2}"
-    r"(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}(?::?\d{2})?)?)?$",
-    re.I,
-)
+DATE_ONLY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}\Z", re.ASCII)
 
 
 def is_iso_date_string(value) -> bool:
-    """class-validator's IsDateString for the forms the dashboard sends."""
-    return isinstance(value, str) and bool(_ISO_RE.match(value))
+    """class-validator's IsDateString (validator.js isISO8601)."""
+    return jsparse.is_iso8601(value)
 
 
 def parse_instant(value: str) -> datetime | None:
-    """An ISO date/date-time → aware UTC, or None. A time without an offset counts as
-    UTC (the server's own zone in production, as JavaScript's Date read it there)."""
+    """A valid ISO date/date-time → aware UTC as `new Date(value)` reads it, or None.
+    A time without an offset counts as UTC (the server's own zone in production);
+    30 February rolls over to 2 March."""
     if not is_iso_date_string(value):
         return None
-    text = value.strip().replace(" ", "T")
-    if text[-1:] in ("z", "Z"):
-        text = text[:-1] + "+00:00"
-    try:
-        moment = datetime.fromisoformat(text)
-    except ValueError:
-        return None
-    return _utc(moment)
+    return jsparse.js_date(value)
 
 
 def local_midnight(date_only: str, tz: str) -> datetime:
     """"YYYY-MM-DD" → the instant that local day starts in `tz`."""
     year, month, day = (int(part) for part in date_only.split("-"))
-    return _at(date(year, month, day), _MIDNIGHT, tz)
+    return _at(jsparse.roll_date(year, month, day), _MIDNIGHT, tz)
 
 
 def valid_zone(tz: str | None) -> str:

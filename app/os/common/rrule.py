@@ -67,7 +67,7 @@ def _number(value: str):
     """rrule.js parseNumber: one value → a number (or the raw text), several → a list."""
 
     def one(v):
-        return int(v) if re.fullmatch(r"[+-]?\d+", v) else v
+        return int(v) if re.fullmatch(r"[+-]?\d+", v, re.ASCII) else v
 
     return [one(v) for v in value.split(",")] if "," in value else one(value)
 
@@ -80,7 +80,7 @@ def _weekdays(value: str) -> list[Weekday]:
                 raise ValueError(f"Invalid weekday string: {day}")
             out.append(Weekday(_DAYS.index(day)))
             continue
-        match = re.fullmatch(r"([+-]?\d{1,2})([A-Z]{2})", day)
+        match = re.fullmatch(r"([+-]?\d{1,2})([A-Z]{2})", day, re.ASCII)
         if not match or match[2] not in _DAYS:
             raise ValueError(f"Invalid weekday string: {day}")
         out.append(Weekday(_DAYS.index(match[2]), int(match[1])))
@@ -88,7 +88,7 @@ def _weekdays(value: str) -> list[Weekday]:
 
 
 def _until(value: str) -> datetime:
-    match = re.fullmatch(r"(\d{4})(\d{2})(\d{2})(T(\d{2})(\d{2})(\d{2})Z?)?", value)
+    match = re.fullmatch(r"(\d{4})(\d{2})(\d{2})(T(\d{2})(\d{2})(\d{2})Z?)?", value, re.ASCII)
     if not match:
         raise ValueError(f"Invalid UNTIL value: {value}")
     return datetime(

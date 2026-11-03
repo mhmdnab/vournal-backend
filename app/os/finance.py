@@ -21,6 +21,7 @@ from app.os.common.currency import get_converter, to_number
 from app.os.common.defaults import SUPPORTED_CURRENCIES
 from app.os.common.deps import plus_user
 from app.os.common.http import nest_error, nest_router
+from app.os.common.jsparse import js_number
 from app.os.common.i18n import to_lang
 from app.os.finance_forecast import add_days, average_daily_spend, build_forecast
 from app.os.profile import ensure_os_profile
@@ -471,24 +472,13 @@ async def get_summary(request: Request, user=Depends(plus_user)):
     return await summary(user, {k: q.get(k) for k in ("from", "to", "period")})
 
 
-def _js_number(raw: str) -> float:
-    """Number(raw) for a query value: blank → 0, unparseable → NaN."""
-    raw = raw.strip()
-    if raw == "":
-        return 0
-    try:
-        return float(raw) if raw.lower() not in ("nan", "inf", "-inf", "infinity", "-infinity", "+inf") else math.nan
-    except ValueError:
-        return math.nan
-
-
 @router.get("/forecast")
 async def get_forecast(request: Request, user=Depends(plus_user)):
     """Projected balance for the next N days (7–365, default 60)."""
     raw = request.query_params.get("days")
     days = 60
     if raw is not None:
-        n = _js_number(raw)
+        n = js_number(raw)  # @Type(() => Number)
         errors = []
         if not (math.isfinite(n) and n == int(n)):
             errors.append("days must be an integer number")

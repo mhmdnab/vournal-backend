@@ -19,7 +19,7 @@ from app.os.profile import ensure_os_profile
 
 router = nest_router("/users")
 
-_HEX = re.compile(r"^#[0-9a-fA-F]{6}$")
+_HEX = re.compile(r"^#[0-9a-fA-F]{6}\Z")
 
 
 class UpdateMeBody(BaseModel):

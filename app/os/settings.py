@@ -37,7 +37,7 @@ from app.os.profile import ensure_os_profile
 
 router = nest_router("/settings")
 
-_HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+_HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d\Z", re.ASCII)
 
 
 def normalize_sections(values) -> list[str]:

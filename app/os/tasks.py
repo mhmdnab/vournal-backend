@@ -6,6 +6,7 @@ task creates the next occurrence once; reopening and completing again finds it
 instead of making another.
 """
 
+import math
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Literal
@@ -16,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictFloat, Stri
 
 from app.db import db
 from app.os.common import dates, rrule, validators
+from app.os.common.jsparse import js_number
 from app.os.common.activity import log_activity
 from app.os.common.deps import plus_user
 from app.os.common.http import invalid_data, nest_error, nest_router
@@ -376,11 +378,8 @@ def _query_int(request: Request, name: str, errors: list, maximum: int | None = 
     value = request.query_params.get(name)
     if value is None:
         return None
-    try:
-        number = float(value)
-    except ValueError:
-        number = None
-    if number is None or number != int(number) or number < 1 or (maximum and number > maximum):
+    number = js_number(value)  # @Type(() => Number)
+    if not math.isfinite(number) or number != int(number) or number < 1 or (maximum and number > maximum):
         errors.append(f"{name} must be an integer between 1 and {maximum or 'infinity'}")
         return None
     return int(number)
