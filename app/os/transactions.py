@@ -430,12 +430,11 @@ async def list_transactions(request: Request, user=Depends(plus_user)):
     rows = await db.transaction.find_many(where=where, include=INCLUDE, order=order, skip=skip, take=size)
     total = await db.transaction.count(where=where)
     fx = await get_converter(user.id)
-    sums: dict[tuple[str, str], Decimal] = {}
-    for row in await db.transaction.find_many(where=where):
-        sums[(row.type, row.currency)] = sums.get((row.type, row.currency), Decimal(0)) + row.amount
     income = expenses = transfers = 0
-    for (kind, currency), amount in sums.items():
-        value = fx.to_default(amount, currency)
+    # summed in the database (NestJS's groupBy), not over every matching row
+    for g in await db.transaction.group_by(by=["type", "currency"], where=where, sum={"amount": True}):
+        kind = g["type"]
+        value = fx.to_default(fu.group_decimal(g["_sum"]["amount"]), g["currency"])
         if kind == "INCOME":
             income += value
         elif kind == "EXPENSE":

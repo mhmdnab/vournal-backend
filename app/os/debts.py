@@ -23,7 +23,7 @@ from app.os.common.activity import log_activity
 from app.os.common.currency import get_converter, round_money, to_number
 from app.os.common.defaults import SUPPORTED_CURRENCIES
 from app.os.common.deps import plus_user
-from app.os.common.http import nest_error, nest_router
+from app.os.common.http import invalid_data, nest_error, nest_router
 from app.os.common.ownership import assert_owned
 from app.os.profile import ensure_os_profile
 from app.os.transactions import as_decimal
@@ -509,9 +509,11 @@ async def create(body: CreateBody, user=Depends(plus_user)):
         if body.installments.categoryId:
             await assert_owned("category", body.installments.categoryId, user.id)
         # made without auto-log first, so the first installment can't be paid before the link exists
+        # model_construct: NestJS called the service directly, without the recurring-payment
+        # form's rules (name ≤ 100, reminder ≤ 60); the debt's own rules already ran
         plan = await recurring_payments.create_payment(
             user,
-            recurring_payments.CreateBody(
+            recurring_payments.CreateBody.model_construct(
                 kind="LOAN",
                 name=body.title,
                 amount=body.installments.amount,
@@ -579,6 +581,8 @@ async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
     kind = body.kind or existing.kind
     if not person_id and not counterparty and kind not in ("CREDIT_CARD", "LOAN"):
         raise nest_error(400, "Say who the debt is with (a person or a name)")
+    if any(f in sent and getattr(body, f) is None for f in ("direction", "kind", "title", "currency", "principal")):
+        raise invalid_data()  # Prisma refused null on a required column
     data: dict = {"personId": person_id, "counterparty": counterparty, "dueDate": due}
     for field in ("direction", "kind", "title", "currency", "reminderDaysBefore", "notes"):
         if field in sent:

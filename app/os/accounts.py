@@ -5,6 +5,7 @@ when given, which is already in the target account's currency), every amount
 converted from its transaction's currency to the account's.
 """
 
+from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
@@ -12,6 +13,7 @@ from fastapi import Depends, Request
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, field_validator
 
 from app.db import db
+from app.os import finance_utils as fu
 from app.os.common import validators
 from app.os.common.activity import log_activity
 from app.os.common.currency import Converter, get_converter, round_money, to_number
@@ -52,39 +54,39 @@ async def with_balances(user_id: str, rows, fx: Converter) -> list[dict]:
         return []
     ids = [r.id for r in rows]
     by_id = {r.id: r for r in rows}
-    outgoing = await db.transaction.find_many(where={"userId": user_id, "accountId": {"in": ids}})
-    incoming = await db.transaction.find_many(where={"userId": user_id, "toAccountId": {"in": ids}})
-
-    out_sums: dict[tuple, Decimal] = {}
-    for t in outgoing:
-        key = (t.accountId, t.type, t.currency)
-        out_sums[key] = out_sums.get(key, Decimal(0)) + t.amount
-    in_with_to: dict[str, Decimal] = {}
-    in_without_to: dict[tuple, Decimal] = {}
-    for t in incoming:
-        if t.type != "TRANSFER":
-            continue
-        if t.toAmount is not None:
-            in_with_to[t.toAccountId] = in_with_to.get(t.toAccountId, Decimal(0)) + t.toAmount
-        else:
-            key = (t.toAccountId, t.currency)
-            in_without_to[key] = in_without_to.get(key, Decimal(0)) + t.amount
+    # summed in the database, as NestJS's groupBy did: never every row on the shared server
+    group = db.transaction.group_by
+    mine = {"userId": user_id}
+    out_sums = await group(by=["accountId", "type", "currency"], where={**mine, "accountId": {"in": ids}}, sum={"amount": True})
+    in_with_to = await group(
+        by=["toAccountId"], where={**mine, "type": "TRANSFER", "toAccountId": {"in": ids}, "toAmount": {"not": None}}, sum={"toAmount": True}
+    )
+    in_without_to = await group(
+        by=["toAccountId", "currency"], where={**mine, "type": "TRANSFER", "toAccountId": {"in": ids}, "toAmount": None}, sum={"amount": True}
+    )
+    stats = [
+        *await group(by=["accountId"], where={**mine, "accountId": {"in": ids}}, count={"_all": True}, max={"date": True}),
+        *await group(by=["toAccountId"], where={**mine, "toAccountId": {"in": ids}}, count={"_all": True}, max={"date": True}),
+    ]
 
     delta: dict[str, float] = {}
-    for (account_id, kind, currency), amount in out_sums.items():
-        value = fx.convert(amount, currency, by_id[account_id].currency)
-        delta[account_id] = delta.get(account_id, 0) + (value if kind == "INCOME" else -value)
-    for account_id, amount in in_with_to.items():
-        delta[account_id] = delta.get(account_id, 0) + to_number(amount)
-    for (account_id, currency), amount in in_without_to.items():
-        delta[account_id] = delta.get(account_id, 0) + fx.convert(amount, currency, by_id[account_id].currency)
+    for g in out_sums:
+        value = fx.convert(fu.group_decimal(g["_sum"]["amount"]), g["currency"], by_id[g["accountId"]].currency)
+        delta[g["accountId"]] = delta.get(g["accountId"], 0) + (value if g["type"] == "INCOME" else -value)
+    for g in in_with_to:
+        delta[g["toAccountId"]] = delta.get(g["toAccountId"], 0) + to_number(fu.group_decimal(g["_sum"]["toAmount"]))
+    for g in in_without_to:
+        account_id = g["toAccountId"]
+        delta[account_id] = delta.get(account_id, 0) + fx.convert(fu.group_decimal(g["_sum"]["amount"]), g["currency"], by_id[account_id].currency)
 
     count: dict[str, int] = {}
-    last: dict[str, object] = {}
-    for t, account_id in [*((t, t.accountId) for t in outgoing), *((t, t.toAccountId) for t in incoming)]:
-        count[account_id] = count.get(account_id, 0) + 1
-        if account_id not in last or t.date > last[account_id]:
-            last[account_id] = t.date
+    last: dict[str, datetime] = {}
+    for g in stats:
+        account_id = g.get("accountId") or g.get("toAccountId")
+        count[account_id] = count.get(account_id, 0) + g["_count"]["_all"]
+        latest = fu.group_instant(g["_max"]["date"])
+        if latest and (account_id not in last or latest > last[account_id]):
+            last[account_id] = latest
 
     out = []
     for r in rows:

@@ -2,6 +2,7 @@
 
 import math
 from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 
 from app.os.common import dates
 from app.os.common.currency import round_money
@@ -51,6 +52,20 @@ def day_key(moment, tz: str) -> str:
 def date_only_to_noon(value: datetime, tz: str) -> datetime:
     """Noon (local) of a date-only value: a bill's due date becoming a transaction date."""
     return _at(dates._utc(value).date(), time(12), tz)
+
+
+def group_decimal(value) -> Decimal:
+    """A group_by _sum as an exact Decimal (the engine may hand it back as text or a number)."""
+    if value is None:
+        return Decimal(0)
+    return value if isinstance(value, Decimal) else Decimal(str(value))
+
+
+def group_instant(value) -> datetime | None:
+    """A group_by _max date as an aware instant."""
+    if value is None or isinstance(value, datetime):
+        return value if value is None else dates._utc(value)
+    return dates.parse_instant(value)
 
 
 round2 = round_money

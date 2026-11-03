@@ -1,6 +1,7 @@
 """Debts never touch another user's rows, and follow their linked transactions."""
 
 import unittest
+from decimal import Decimal
 
 from vournal_os.support import OsTestCase
 
@@ -47,6 +48,30 @@ class Debts(OsTestCase):
         self.assertEqual(paid.status_code, 200, paid.text)
         after = (await client.get(f"/api/debts/{debt['id']}")).json()
         self.assertEqual((after["paid"], after["remaining"], after["paymentCount"]), (100, 200, 1))
+
+    async def test_installments_take_the_debts_own_limits(self):
+        """NestJS built the plan without the recurring-payment form's rules (name ≤ 100,
+        reminder ≤ 60): a long debt title or a far reminder still makes the plan."""
+        client = await self.signed_in()
+        title = "Car loan from the bank, " * 6  # 144 characters
+        response = await client.post(
+            "/api/debts",
+            json={"direction": "I_OWE", "kind": "LOAN", "title": title, "principal": 1000, "reminderDaysBefore": 90,
+                  "installments": {"amount": 100, "firstDate": "2026-12-01"}},
+        )
+        self.assertEqual(response.status_code, 201, response.text)
+        plan = await self.db.recurringpayment.find_unique(where={"id": response.json()["recurringPaymentId"]})
+        self.assertEqual((plan.name, plan.reminderDaysBefore), (title.strip(), 90))
+
+    async def test_null_on_a_required_field_is_nest_invalid_data(self):
+        client = await self.signed_in()
+        debt = (await client.post("/api/debts", json={"direction": "I_OWE", "title": "Omar", "counterparty": "Omar", "principal": 20})).json()
+        for field in ("principal", "title", "direction", "kind", "currency"):
+            response = await client.patch(f"/api/debts/{debt['id']}", json={field: None})
+            self.assertEqual(response.status_code, 400, f"{field}: {response.text}")
+            self.assertEqual(response.json(), {"statusCode": 400, "message": "Invalid data", "error": "BAD_REQUEST"})
+        row = await self.db.debt.find_unique(where={"id": debt["id"]})
+        self.assertEqual((row.title, row.principal), ("Omar", Decimal("20")))
 
 
 if __name__ == "__main__":
