@@ -76,5 +76,28 @@ class Golden(unittest.TestCase):
                     self.fail(f"unknown op {op}")
 
 
+class ImpossibleRules(unittest.TestCase):
+    """A rule that can never happen answers like NestJS (valid; no occurrences)
+    without searching to the year 9999: that would stall the shared server."""
+
+    RULES = ("FREQ=DAILY;BYMONTH=2;BYMONTHDAY=30", "FREQ=HOURLY;BYMONTH=2;BYMONTHDAY=30", "FREQ=YEARLY;BYMONTH=13")
+
+    def test_impossible_rules_answer_fast(self):
+        import time
+
+        from app.os.common import rrule
+
+        anchor = datetime(2026, 11, 3, 10, tzinfo=timezone.utc)
+        for rule in self.RULES:
+            with self.subTest(rule=rule):
+                started = time.monotonic()
+                self.assertIsNone(rrule.validate_rrule(rule))
+                self.assertIsNone(rrule.next_occurrence(rule, anchor, anchor, tz="Asia/Beirut"))
+                self.assertEqual(
+                    rrule.between(rule, anchor, anchor, datetime(2027, 11, 3, tzinfo=timezone.utc), tz="Asia/Beirut"), []
+                )
+                self.assertLess(time.monotonic() - started, 0.5)
+
+
 if __name__ == "__main__":
     unittest.main()

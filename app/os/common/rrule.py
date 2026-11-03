@@ -145,7 +145,8 @@ def validate_rrule(value) -> str | None:
         if interval is not None and (not isinstance(interval, int) or interval < 1 or interval > 1000):
             return "INTERVAL must be between 1 and 1000"
         start = datetime(2020, 1, 1)
-        _build_rule(opts, start, None).after(start, inc=True)
+        if not _never_happens(opts, start):
+            _build_rule(opts, start, None).after(start, inc=True)
         return None
     except Exception as exc:  # noqa: BLE001 — any failure means the rule can't be used
         return f"is not a valid recurrence rule ({exc})"
@@ -235,6 +236,31 @@ def _build_rule(opts: dict, dtstart: datetime, until: datetime | None) -> du.rru
         return du.rrule(opts["freq"], **kwargs)
 
 
+_DATE_FILTERS = ("bymonth", "bymonthday", "byyearday", "byweekno", "byweekday")
+
+
+def _never_happens(opts: dict, start: datetime) -> bool:
+    """True for a rule whose day filters exclude every date (BYMONTH=2;BYMONTHDAY=30).
+
+    dateutil searches such a rule to the year 9999 (seconds of CPU, stalling every
+    request on the shared server; NestJS's answer was the same: none). A yearly rule
+    with the same day filters, minus nth-weekday and BYSETPOS (which only narrow),
+    covers every day the real rule could produce, and dateutil answers it in
+    milliseconds. No date at all from it means none from the real rule.
+    """
+    if opts["freq"] == YEARLY or not any(opts.get(k) for k in _DATE_FILTERS):
+        return False
+    probe = {"freq": YEARLY, **{k: opts[k] for k in _DATE_FILTERS if opts.get(k)}}
+    if "byweekday" in probe:
+        probe["byweekday"] = [Weekday(w.weekday) for w in probe["byweekday"]]
+    try:
+        return _build_rule(probe, start.replace(month=1, day=1, hour=0, minute=0, second=0), None).after(
+            start.replace(month=1, day=1, hour=0, minute=0, second=0), inc=True
+        ) is None
+    except Exception:  # noqa: BLE001 — let the real rule report its own error
+        return False
+
+
 @dataclass
 class _Context:
     rule: du.rrule
@@ -255,6 +281,8 @@ def _context(rule: str, anchor: datetime, tz, date_only: bool, until: datetime |
     shift = timedelta(microseconds=start.microsecond - start.microsecond % 1000)
     start = start.replace(microsecond=0)
     _month_end_fallback(opts, start)
+    if _never_happens(opts, start):
+        return None
     end = opts.pop("until", None)
     if until is not None:
         cap = _to_floating(until, zone)

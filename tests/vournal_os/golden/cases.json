@@ -1141,5 +1141,51 @@
   "rule": "FREQ=WEEKLY;BYDAY=+2MO",
   "lang": "ar",
   "id": "describe-168"
+ },
+ {
+  "op": "validate",
+  "rule": "FREQ=DAILY;BYMONTH=2;BYMONTHDAY=30",
+  "id": "validate-169"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=DAILY;BYMONTH=2;BYMONTHDAY=30",
+  "anchor": "2026-11-03T10:00:00.000Z",
+  "after": "2026-11-03T10:00:00.000Z",
+  "opts": {
+   "tz": "Asia/Beirut"
+  },
+  "id": "next-170"
+ },
+ {
+  "op": "between",
+  "rule": "FREQ=HOURLY;BYMONTH=4;BYMONTHDAY=31",
+  "anchor": "2026-11-03T10:00:00.000Z",
+  "start": "2026-11-03T00:00:00.000Z",
+  "end": "2027-11-03T00:00:00.000Z",
+  "opts": {
+   "tz": "Asia/Beirut"
+  },
+  "id": "between-171"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=MONTHLY;BYDAY=MO;BYMONTHDAY=13",
+  "anchor": "2026-11-03T10:00:00.000Z",
+  "after": "2026-11-03T10:00:00.000Z",
+  "opts": {
+   "tz": "Asia/Beirut"
+  },
+  "id": "next-172"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=DAILY;BYDAY=1MO;BYMONTH=6",
+  "anchor": "2026-11-03T10:00:00.000Z",
+  "after": "2026-11-03T10:00:00.000Z",
+  "opts": {
+   "tz": "UTC"
+  },
+  "id": "next-173"
  }
 ]
