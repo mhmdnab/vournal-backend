@@ -1,0 +1,1145 @@
+[
+ {
+  "op": "validate",
+  "rule": "FREQ=DAILY",
+  "id": "validate-0"
+ },
+ {
+  "op": "validate",
+  "rule": "RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR",
+  "id": "validate-1"
+ },
+ {
+  "op": "validate",
+  "rule": "freq=monthly;bymonthday=-1",
+  "id": "validate-2"
+ },
+ {
+  "op": "validate",
+  "rule": "FREQ=MINUTELY",
+  "id": "validate-3"
+ },
+ {
+  "op": "validate",
+  "rule": "FREQ=DAILY;INTERVAL=0",
+  "id": "validate-4"
+ },
+ {
+  "op": "validate",
+  "rule": "FREQ=DAILY;INTERVAL=1001",
+  "id": "validate-5"
+ },
+ {
+  "op": "validate",
+  "rule": "DTSTART:20200101T000000Z\nRRULE:FREQ=DAILY",
+  "id": "validate-6"
+ },
+ {
+  "op": "validate",
+  "rule": "BYDAY=MO",
+  "id": "validate-7"
+ },
+ {
+  "op": "validate",
+  "rule": "",
+  "id": "validate-8"
+ },
+ {
+  "op": "validate",
+  "rule": "   ",
+  "id": "validate-9"
+ },
+ {
+  "op": "validate",
+  "rule": "FREQ=NOPE",
+  "id": "validate-10"
+ },
+ {
+  "op": "validate",
+  "rule": "FREQ=YEARLY;BYMONTH=13",
+  "id": "validate-11"
+ },
+ {
+  "op": "validate",
+  "rule": "FREQ=WEEKLY;BYDAY=XX",
+  "id": "validate-12"
+ },
+ {
+  "op": "validate",
+  "rule": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "id": "validate-13"
+ },
+ {
+  "op": "validate",
+  "rule": "FREQ=HOURLY;INTERVAL=6",
+  "id": "validate-14"
+ },
+ {
+  "op": "validate",
+  "rule": "FREQ=WEEKLY;UNTIL=20261231T000000Z",
+  "id": "validate-15"
+ },
+ {
+  "op": "validate",
+  "rule": "FREQ=MONTHLY;COUNT=3",
+  "id": "validate-16"
+ },
+ {
+  "op": "validate",
+  "rule": 5,
+  "id": "validate-17"
+ },
+ {
+  "op": "validate",
+  "rule": null,
+  "id": "validate-18"
+ },
+ {
+  "op": "normalize",
+  "rule": "RRULE:freq=weekly;byday=mo",
+  "id": "normalize-19"
+ },
+ {
+  "op": "normalize",
+  "rule": "DTSTART:20200101T000000Z\nRRULE:FREQ=DAILY",
+  "id": "normalize-20"
+ },
+ {
+  "op": "normalize",
+  "rule": " FREQ=DAILY ; INTERVAL=2 ;",
+  "id": "normalize-21"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=WEEKLY;BYDAY=MO",
+  "anchor": "2026-10-19T06:00:00.000Z",
+  "after": "2026-10-19T06:00:00.000Z",
+  "opts": {
+   "tz": "Asia/Beirut"
+  },
+  "id": "next-22"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=WEEKLY;BYDAY=MO",
+  "anchor": "2026-10-19T06:00:00.000Z",
+  "after": "2026-10-26T00:00:00.000Z",
+  "opts": {
+   "tz": "Asia/Beirut"
+  },
+  "id": "next-23"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=DAILY",
+  "anchor": "2026-10-24T06:00:00.000Z",
+  "after": "2026-10-24T06:00:00.000Z",
+  "opts": {
+   "tz": "Asia/Beirut"
+  },
+  "id": "next-24"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=DAILY",
+  "anchor": "2026-03-28T13:30:00.000Z",
+  "after": "2026-03-28T13:30:00.000Z",
+  "opts": {
+   "tz": "America/New_York"
+  },
+  "id": "next-25"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=MONTHLY",
+  "anchor": "2026-01-31T00:00:00.000Z",
+  "after": "2026-01-31T00:00:00.000Z",
+  "opts": {
+   "dateOnly": true
+  },
+  "id": "next-26"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=MONTHLY",
+  "anchor": "2026-01-31T00:00:00.000Z",
+  "after": "2026-02-28T00:00:00.000Z",
+  "opts": {
+   "dateOnly": true
+  },
+  "id": "next-27"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=MONTHLY;BYMONTHDAY=30",
+  "anchor": "2026-01-30T00:00:00.000Z",
+  "after": "2026-01-30T00:00:00.000Z",
+  "opts": {
+   "dateOnly": true
+  },
+  "id": "next-28"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=YEARLY",
+  "anchor": "2024-02-29T00:00:00.000Z",
+  "after": "2024-02-29T00:00:00.000Z",
+  "opts": {
+   "dateOnly": true
+  },
+  "id": "next-29"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=YEARLY",
+  "anchor": "2024-02-29T00:00:00.000Z",
+  "after": "2027-03-01T00:00:00.000Z",
+  "opts": {
+   "dateOnly": true
+  },
+  "id": "next-30"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=MONTHLY;BYMONTHDAY=-1",
+  "anchor": "2026-01-31T00:00:00.000Z",
+  "after": "2026-01-31T00:00:00.000Z",
+  "opts": {
+   "dateOnly": true
+  },
+  "id": "next-31"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=WEEKLY;COUNT=2",
+  "anchor": "2026-11-02T08:00:00.000Z",
+  "after": "2026-11-09T08:00:00.000Z",
+  "opts": {
+   "tz": "Asia/Beirut"
+  },
+  "id": "next-32"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=DAILY",
+  "anchor": "2026-11-02T08:00:00.000Z",
+  "after": "2026-11-05T08:00:00.000Z",
+  "opts": {
+   "tz": "Asia/Beirut",
+   "until": "2026-11-05T08:00:00.000Z"
+  },
+  "id": "next-33"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=DAILY",
+  "anchor": "2026-11-02T08:00:00.000Z",
+  "after": "2026-11-04T08:00:00.000Z",
+  "opts": {
+   "tz": "Asia/Beirut",
+   "until": "2026-11-05T08:00:00.000Z"
+  },
+  "id": "next-34"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=DAILY",
+  "anchor": "2026-11-02T08:00:00.000Z",
+  "after": "2026-11-04T08:00:00.000Z",
+  "opts": {
+   "tz": "Asia/Beirut",
+   "inclusive": true
+  },
+  "id": "next-35"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=WEEKLY;INTERVAL=2;BYDAY=TU,TH",
+  "anchor": "2026-11-03T15:00:00.000Z",
+  "after": "2026-11-05T15:00:00.000Z",
+  "opts": {
+   "tz": "UTC"
+  },
+  "id": "next-36"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=MONTHLY;BYDAY=1MO",
+  "anchor": "2026-11-02T07:00:00.000Z",
+  "after": "2026-11-02T07:00:00.000Z",
+  "opts": {
+   "tz": "Asia/Beirut"
+  },
+  "id": "next-37"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=MONTHLY;BYDAY=-1FR",
+  "anchor": "2026-11-27T07:00:00.000Z",
+  "after": "2026-11-27T07:00:00.000Z",
+  "opts": {
+   "tz": "Asia/Beirut"
+  },
+  "id": "next-38"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=HOURLY;INTERVAL=6",
+  "anchor": "2026-11-03T00:00:00.000Z",
+  "after": "2026-11-03T05:00:00.000Z",
+  "opts": {
+   "tz": "Asia/Beirut"
+  },
+  "id": "next-39"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=DAILY;UNTIL=20261105T000000Z",
+  "anchor": "2026-11-02T00:00:00.000Z",
+  "after": "2026-11-04T00:00:00.000Z",
+  "opts": {
+   "dateOnly": true
+  },
+  "id": "next-40"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=YEARLY;BYMONTH=3;BYMONTHDAY=15",
+  "anchor": "2026-03-15T00:00:00.000Z",
+  "after": "2026-03-15T00:00:00.000Z",
+  "opts": {
+   "dateOnly": true
+  },
+  "id": "next-41"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=WEEKLY;BYDAY=SA,SU",
+  "anchor": "2026-11-07T21:30:00.000Z",
+  "after": "2026-11-07T21:30:00.000Z",
+  "opts": {
+   "tz": "Asia/Beirut"
+  },
+  "id": "next-42"
+ },
+ {
+  "op": "next",
+  "rule": "FREQ=DAILY",
+  "anchor": "2026-11-02T22:30:00.000Z",
+  "after": "2026-11-02T22:30:00.000Z",
+  "opts": {
+   "tz": "Not/AZone"
+  },
+  "id": "next-43"
+ },
+ {
+  "op": "next",
+  "rule": "garbage",
+  "anchor": "2026-11-02T22:30:00.000Z",
+  "after": "2026-11-02T22:30:00.000Z",
+  "opts": {},
+  "id": "next-44"
+ },
+ {
+  "op": "between",
+  "rule": "FREQ=WEEKLY;BYDAY=MO",
+  "anchor": "2026-10-05T06:00:00.000Z",
+  "start": "2026-10-01T00:00:00.000Z",
+  "end": "2026-11-30T23:59:59.999Z",
+  "opts": {
+   "tz": "Asia/Beirut"
+  },
+  "id": "between-45"
+ },
+ {
+  "op": "between",
+  "rule": "FREQ=DAILY",
+  "anchor": "2026-10-20T06:00:00.000Z",
+  "start": "2026-10-20T00:00:00.000Z",
+  "end": "2026-10-31T23:59:59.999Z",
+  "opts": {
+   "tz": "Asia/Beirut"
+  },
+  "exDates": [
+   "2026-10-22T06:00:00.000Z",
+   "2026-10-26T07:00:00.000Z",
+   "2026-10-27T06:00:00.000Z"
+  ],
+  "id": "between-46"
+ },
+ {
+  "op": "between",
+  "rule": "FREQ=MONTHLY",
+  "anchor": "2026-01-31T00:00:00.000Z",
+  "start": "2026-01-01T00:00:00.000Z",
+  "end": "2026-12-31T00:00:00.000Z",
+  "opts": {
+   "dateOnly": true
+  },
+  "id": "between-47"
+ },
+ {
+  "op": "between",
+  "rule": "FREQ=MONTHLY;BYMONTHDAY=29",
+  "anchor": "2026-01-29T00:00:00.000Z",
+  "start": "2026-01-01T00:00:00.000Z",
+  "end": "2027-03-31T00:00:00.000Z",
+  "opts": {
+   "dateOnly": true
+  },
+  "id": "between-48"
+ },
+ {
+  "op": "between",
+  "rule": "FREQ=DAILY",
+  "anchor": "2026-11-01T00:00:00.000Z",
+  "start": "2026-11-01T00:00:00.000Z",
+  "end": "2026-11-10T00:00:00.000Z",
+  "opts": {
+   "dateOnly": true
+  },
+  "exDates": [
+   "2026-11-03T00:00:00.000Z",
+   "2026-11-05T13:00:00.000Z"
+  ],
+  "id": "between-49"
+ },
+ {
+  "op": "between",
+  "rule": "FREQ=WEEKLY;BYDAY=MO,WE,FR;COUNT=7",
+  "anchor": "2026-11-02T16:00:00.000Z",
+  "start": "2026-10-01T00:00:00.000Z",
+  "end": "2027-01-01T00:00:00.000Z",
+  "opts": {
+   "tz": "America/New_York"
+  },
+  "id": "between-50"
+ },
+ {
+  "op": "between",
+  "rule": "FREQ=DAILY",
+  "anchor": "2026-03-06T14:00:00.000Z",
+  "start": "2026-03-01T00:00:00.000Z",
+  "end": "2026-03-12T00:00:00.000Z",
+  "opts": {
+   "tz": "America/New_York"
+  },
+  "id": "between-51"
+ },
+ {
+  "op": "between",
+  "rule": "FREQ=DAILY",
+  "anchor": "2020-01-01T00:00:00.000Z",
+  "start": "2020-01-01T00:00:00.000Z",
+  "end": "2030-01-01T00:00:00.000Z",
+  "opts": {
+   "dateOnly": true
+  },
+  "id": "between-52"
+ },
+ {
+  "op": "between",
+  "rule": "FREQ=YEARLY",
+  "anchor": "2024-02-29T10:00:00.000Z",
+  "start": "2024-01-01T00:00:00.000Z",
+  "end": "2029-01-01T00:00:00.000Z",
+  "opts": {
+   "tz": "UTC"
+  },
+  "id": "between-53"
+ },
+ {
+  "op": "between",
+  "rule": "FREQ=WEEKLY",
+  "anchor": "2026-11-03T10:00:00.000Z",
+  "start": "2026-11-20T00:00:00.000Z",
+  "end": "2026-11-10T00:00:00.000Z",
+  "opts": {
+   "tz": "Asia/Beirut"
+  },
+  "id": "between-54"
+ },
+ {
+  "op": "between",
+  "rule": "FREQ=DAILY;INTERVAL=3",
+  "anchor": "2026-11-01T09:00:00.000Z",
+  "start": "2026-11-01T00:00:00.000Z",
+  "end": "2026-11-20T00:00:00.000Z",
+  "opts": {
+   "tz": "Asia/Beirut",
+   "until": "2026-11-13T09:00:00.000Z"
+  },
+  "id": "between-55"
+ },
+ {
+  "op": "between",
+  "rule": "FREQ=MONTHLY;BYDAY=2TU",
+  "anchor": "2026-01-13T17:00:00.000Z",
+  "start": "2026-01-01T00:00:00.000Z",
+  "end": "2026-07-01T00:00:00.000Z",
+  "opts": {
+   "tz": "Asia/Beirut"
+  },
+  "id": "between-56"
+ },
+ {
+  "op": "between",
+  "rule": "FREQ=YEARLY;BYMONTH=1,7;BYMONTHDAY=1",
+  "anchor": "2026-01-01T00:00:00.000Z",
+  "start": "2026-01-01T00:00:00.000Z",
+  "end": "2028-01-01T00:00:00.000Z",
+  "opts": {
+   "dateOnly": true
+  },
+  "id": "between-57"
+ },
+ {
+  "op": "monthlyFactor",
+  "rule": "FREQ=DAILY",
+  "id": "monthlyFactor-58"
+ },
+ {
+  "op": "monthlyFactor",
+  "rule": "FREQ=DAILY;INTERVAL=2",
+  "id": "monthlyFactor-59"
+ },
+ {
+  "op": "monthlyFactor",
+  "rule": "FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR",
+  "id": "monthlyFactor-60"
+ },
+ {
+  "op": "monthlyFactor",
+  "rule": "FREQ=WEEKLY",
+  "id": "monthlyFactor-61"
+ },
+ {
+  "op": "monthlyFactor",
+  "rule": "FREQ=WEEKLY;BYDAY=MO,WE",
+  "id": "monthlyFactor-62"
+ },
+ {
+  "op": "monthlyFactor",
+  "rule": "FREQ=WEEKLY;INTERVAL=2",
+  "id": "monthlyFactor-63"
+ },
+ {
+  "op": "monthlyFactor",
+  "rule": "FREQ=MONTHLY",
+  "id": "monthlyFactor-64"
+ },
+ {
+  "op": "monthlyFactor",
+  "rule": "FREQ=MONTHLY;BYMONTHDAY=1,15",
+  "id": "monthlyFactor-65"
+ },
+ {
+  "op": "monthlyFactor",
+  "rule": "FREQ=MONTHLY;BYDAY=MO",
+  "id": "monthlyFactor-66"
+ },
+ {
+  "op": "monthlyFactor",
+  "rule": "FREQ=MONTHLY;BYDAY=1MO,3MO",
+  "id": "monthlyFactor-67"
+ },
+ {
+  "op": "monthlyFactor",
+  "rule": "FREQ=MONTHLY;BYDAY=MO,FR;BYSETPOS=-1",
+  "id": "monthlyFactor-68"
+ },
+ {
+  "op": "monthlyFactor",
+  "rule": "FREQ=YEARLY",
+  "id": "monthlyFactor-69"
+ },
+ {
+  "op": "monthlyFactor",
+  "rule": "FREQ=YEARLY;BYMONTH=1,7",
+  "id": "monthlyFactor-70"
+ },
+ {
+  "op": "monthlyFactor",
+  "rule": "FREQ=YEARLY;INTERVAL=2",
+  "id": "monthlyFactor-71"
+ },
+ {
+  "op": "monthlyFactor",
+  "rule": "FREQ=HOURLY",
+  "id": "monthlyFactor-72"
+ },
+ {
+  "op": "monthlyFactor",
+  "rule": "FREQ=WEEKLY;BYMONTH=6,7,8",
+  "id": "monthlyFactor-73"
+ },
+ {
+  "op": "monthlyFactor",
+  "rule": "garbage",
+  "id": "monthlyFactor-74"
+ },
+ {
+  "op": "describe",
+  "rule": null,
+  "lang": "en",
+  "id": "describe-75"
+ },
+ {
+  "op": "describe",
+  "rule": "",
+  "lang": "en",
+  "id": "describe-76"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY",
+  "lang": "en",
+  "id": "describe-77"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;INTERVAL=2",
+  "lang": "en",
+  "id": "describe-78"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;INTERVAL=3",
+  "lang": "en",
+  "id": "describe-79"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;INTERVAL=11",
+  "lang": "en",
+  "id": "describe-80"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY",
+  "lang": "en",
+  "id": "describe-81"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY;BYDAY=MO",
+  "lang": "en",
+  "id": "describe-82"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY;BYDAY=MO,WE,FR",
+  "lang": "en",
+  "id": "describe-83"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY;INTERVAL=2;BYDAY=TU,TH",
+  "lang": "en",
+  "id": "describe-84"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
+  "lang": "en",
+  "id": "describe-85"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY",
+  "lang": "en",
+  "id": "describe-86"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;BYMONTHDAY=15",
+  "lang": "en",
+  "id": "describe-87"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;BYMONTHDAY=-1",
+  "lang": "en",
+  "id": "describe-88"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;BYMONTHDAY=1,15",
+  "lang": "en",
+  "id": "describe-89"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;INTERVAL=3",
+  "lang": "en",
+  "id": "describe-90"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=YEARLY",
+  "lang": "en",
+  "id": "describe-91"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=YEARLY;INTERVAL=2",
+  "lang": "en",
+  "id": "describe-92"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=HOURLY;INTERVAL=6",
+  "lang": "en",
+  "id": "describe-93"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;COUNT=5",
+  "lang": "en",
+  "id": "describe-94"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;COUNT=1",
+  "lang": "en",
+  "id": "describe-95"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY;COUNT=12",
+  "lang": "en",
+  "id": "describe-96"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;UNTIL=20261231T000000Z",
+  "lang": "en",
+  "id": "describe-97"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;BYDAY=1MO",
+  "lang": "en",
+  "id": "describe-98"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;BYDAY=-1FR",
+  "lang": "en",
+  "id": "describe-99"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=YEARLY;BYMONTH=3;BYMONTHDAY=15",
+  "lang": "en",
+  "id": "describe-100"
+ },
+ {
+  "op": "describe",
+  "rule": "garbage",
+  "lang": "en",
+  "id": "describe-101"
+ },
+ {
+  "op": "describe",
+  "rule": null,
+  "lang": "ar",
+  "id": "describe-102"
+ },
+ {
+  "op": "describe",
+  "rule": "",
+  "lang": "ar",
+  "id": "describe-103"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY",
+  "lang": "ar",
+  "id": "describe-104"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;INTERVAL=2",
+  "lang": "ar",
+  "id": "describe-105"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;INTERVAL=3",
+  "lang": "ar",
+  "id": "describe-106"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;INTERVAL=11",
+  "lang": "ar",
+  "id": "describe-107"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY",
+  "lang": "ar",
+  "id": "describe-108"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY;BYDAY=MO",
+  "lang": "ar",
+  "id": "describe-109"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY;BYDAY=MO,WE,FR",
+  "lang": "ar",
+  "id": "describe-110"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY;INTERVAL=2;BYDAY=TU,TH",
+  "lang": "ar",
+  "id": "describe-111"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
+  "lang": "ar",
+  "id": "describe-112"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY",
+  "lang": "ar",
+  "id": "describe-113"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;BYMONTHDAY=15",
+  "lang": "ar",
+  "id": "describe-114"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;BYMONTHDAY=-1",
+  "lang": "ar",
+  "id": "describe-115"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;BYMONTHDAY=1,15",
+  "lang": "ar",
+  "id": "describe-116"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;INTERVAL=3",
+  "lang": "ar",
+  "id": "describe-117"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=YEARLY",
+  "lang": "ar",
+  "id": "describe-118"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=YEARLY;INTERVAL=2",
+  "lang": "ar",
+  "id": "describe-119"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=HOURLY;INTERVAL=6",
+  "lang": "ar",
+  "id": "describe-120"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;COUNT=5",
+  "lang": "ar",
+  "id": "describe-121"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;COUNT=1",
+  "lang": "ar",
+  "id": "describe-122"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY;COUNT=12",
+  "lang": "ar",
+  "id": "describe-123"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;UNTIL=20261231T000000Z",
+  "lang": "ar",
+  "id": "describe-124"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;BYDAY=1MO",
+  "lang": "ar",
+  "id": "describe-125"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;BYDAY=-1FR",
+  "lang": "ar",
+  "id": "describe-126"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=YEARLY;BYMONTH=3;BYMONTHDAY=15",
+  "lang": "ar",
+  "id": "describe-127"
+ },
+ {
+  "op": "describe",
+  "rule": "garbage",
+  "lang": "ar",
+  "id": "describe-128"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;UNTIL=20260105T000000Z",
+  "lang": "en",
+  "id": "describe-129"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY;BYDAY=SU;UNTIL=20270309T120000Z",
+  "lang": "en",
+  "id": "describe-130"
+ },
+ {
+  "op": "describe",
+  "rule": "BYDAY=MO;FREQ=WEEKLY",
+  "lang": "en",
+  "id": "describe-131"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;COUNT=3;UNTIL=20261231T000000Z",
+  "lang": "en",
+  "id": "describe-132"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR,SA,SU",
+  "lang": "en",
+  "id": "describe-133"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TU,WE,TH,FR",
+  "lang": "en",
+  "id": "describe-134"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR",
+  "lang": "en",
+  "id": "describe-135"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;BYMONTHDAY=-1,-3,1",
+  "lang": "en",
+  "id": "describe-136"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR",
+  "lang": "en",
+  "id": "describe-137"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=YEARLY;BYMONTH=1,7",
+  "lang": "en",
+  "id": "describe-138"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;BYHOUR=9,17",
+  "lang": "en",
+  "id": "describe-139"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;BYMONTH=6;INTERVAL=2",
+  "lang": "en",
+  "id": "describe-140"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;COUNT=101",
+  "lang": "en",
+  "id": "describe-141"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;INTERVAL=101",
+  "lang": "en",
+  "id": "describe-142"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY;BYDAY=MO;BYSETPOS=1",
+  "lang": "en",
+  "id": "describe-143"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;BYDAY=MO;BYMONTHDAY=13",
+  "lang": "en",
+  "id": "describe-144"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=YEARLY;BYWEEKNO=1,20",
+  "lang": "en",
+  "id": "describe-145"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=YEARLY;BYYEARDAY=1,100",
+  "lang": "en",
+  "id": "describe-146"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;BYMONTHDAY=21,22,23,31",
+  "lang": "en",
+  "id": "describe-147"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY;BYDAY=+2MO",
+  "lang": "en",
+  "id": "describe-148"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;UNTIL=20260105T000000Z",
+  "lang": "ar",
+  "id": "describe-149"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY;BYDAY=SU;UNTIL=20270309T120000Z",
+  "lang": "ar",
+  "id": "describe-150"
+ },
+ {
+  "op": "describe",
+  "rule": "BYDAY=MO;FREQ=WEEKLY",
+  "lang": "ar",
+  "id": "describe-151"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;COUNT=3;UNTIL=20261231T000000Z",
+  "lang": "ar",
+  "id": "describe-152"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR,SA,SU",
+  "lang": "ar",
+  "id": "describe-153"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,TU,WE,TH,FR",
+  "lang": "ar",
+  "id": "describe-154"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;BYDAY=MO,TU,WE,TH,FR",
+  "lang": "ar",
+  "id": "describe-155"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;BYMONTHDAY=-1,-3,1",
+  "lang": "ar",
+  "id": "describe-156"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR",
+  "lang": "ar",
+  "id": "describe-157"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=YEARLY;BYMONTH=1,7",
+  "lang": "ar",
+  "id": "describe-158"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;BYHOUR=9,17",
+  "lang": "ar",
+  "id": "describe-159"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;BYMONTH=6;INTERVAL=2",
+  "lang": "ar",
+  "id": "describe-160"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;COUNT=101",
+  "lang": "ar",
+  "id": "describe-161"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=DAILY;INTERVAL=101",
+  "lang": "ar",
+  "id": "describe-162"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY;BYDAY=MO;BYSETPOS=1",
+  "lang": "ar",
+  "id": "describe-163"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;BYDAY=MO;BYMONTHDAY=13",
+  "lang": "ar",
+  "id": "describe-164"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=YEARLY;BYWEEKNO=1,20",
+  "lang": "ar",
+  "id": "describe-165"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=YEARLY;BYYEARDAY=1,100",
+  "lang": "ar",
+  "id": "describe-166"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=MONTHLY;BYMONTHDAY=21,22,23,31",
+  "lang": "ar",
+  "id": "describe-167"
+ },
+ {
+  "op": "describe",
+  "rule": "FREQ=WEEKLY;BYDAY=+2MO",
+  "lang": "ar",
+  "id": "describe-168"
+ }
+]

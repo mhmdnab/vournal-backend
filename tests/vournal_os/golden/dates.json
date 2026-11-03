@@ -1,0 +1,4853 @@
+[
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-0",
+  "result": "2026-11-02T22:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-1",
+  "result": "2026-11-03T05:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-2",
+  "result": "2026-11-03T00:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-3",
+  "result": "2026-11-03T18:30:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-4",
+  "result": "2026-11-03T00:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-5",
+  "result": "2026-10-24T22:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-6",
+  "result": "2026-10-24T04:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-7",
+  "result": "2026-10-24T00:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-8",
+  "result": "2026-10-24T18:30:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-9",
+  "result": "2026-10-24T00:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-10",
+  "result": "2026-10-24T22:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-11",
+  "result": "2026-10-24T04:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-12",
+  "result": "2026-10-25T00:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-13",
+  "result": "2026-10-24T18:30:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-14",
+  "result": "2026-10-25T00:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-15",
+  "result": "2026-03-28T22:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-16",
+  "result": "2026-03-28T04:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "UTC"
+  ],
+  "id": "date-17",
+  "result": "2026-03-28T00:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-18",
+  "result": "2026-03-28T18:30:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-19",
+  "result": "2026-03-28T00:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-20",
+  "result": "2026-03-07T22:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-21",
+  "result": "2026-03-08T05:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "UTC"
+  ],
+  "id": "date-22",
+  "result": "2026-03-08T00:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-23",
+  "result": "2026-03-07T18:30:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-24",
+  "result": "2026-03-08T00:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-25",
+  "result": "2026-10-31T22:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-26",
+  "result": "2026-11-01T04:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-27",
+  "result": "2026-11-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-28",
+  "result": "2026-10-31T18:30:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-29",
+  "result": "2026-11-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-30",
+  "result": "2026-12-31T22:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-31",
+  "result": "2026-12-31T05:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "UTC"
+  ],
+  "id": "date-32",
+  "result": "2026-12-31T00:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-33",
+  "result": "2026-12-31T18:30:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-34",
+  "result": "2026-12-31T00:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-35",
+  "result": "2028-02-28T22:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-36",
+  "result": "2028-02-29T05:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "UTC"
+  ],
+  "id": "date-37",
+  "result": "2028-02-29T00:00:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-38",
+  "result": "2028-02-28T18:30:00.000Z"
+ },
+ {
+  "method": "startOfDay",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-39",
+  "result": "2028-02-29T00:00:00.000Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-40",
+  "result": "2026-11-03T21:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-41",
+  "result": "2026-11-04T04:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-42",
+  "result": "2026-11-03T23:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-43",
+  "result": "2026-11-04T18:29:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-44",
+  "result": "2026-11-03T23:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-45",
+  "result": "2026-10-25T21:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-46",
+  "result": "2026-10-25T03:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-47",
+  "result": "2026-10-24T23:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-48",
+  "result": "2026-10-25T18:29:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-49",
+  "result": "2026-10-24T23:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-50",
+  "result": "2026-10-25T21:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-51",
+  "result": "2026-10-25T03:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-52",
+  "result": "2026-10-25T23:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-53",
+  "result": "2026-10-25T18:29:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-54",
+  "result": "2026-10-25T23:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-55",
+  "result": "2026-03-29T20:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-56",
+  "result": "2026-03-29T03:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "UTC"
+  ],
+  "id": "date-57",
+  "result": "2026-03-28T23:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-58",
+  "result": "2026-03-29T18:29:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-59",
+  "result": "2026-03-28T23:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-60",
+  "result": "2026-03-08T21:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-61",
+  "result": "2026-03-09T03:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "UTC"
+  ],
+  "id": "date-62",
+  "result": "2026-03-08T23:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-63",
+  "result": "2026-03-08T18:29:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-64",
+  "result": "2026-03-08T23:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-65",
+  "result": "2026-11-01T21:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-66",
+  "result": "2026-11-02T04:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-67",
+  "result": "2026-11-01T23:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-68",
+  "result": "2026-11-01T18:29:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-69",
+  "result": "2026-11-01T23:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-70",
+  "result": "2027-01-01T21:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-71",
+  "result": "2027-01-01T04:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "UTC"
+  ],
+  "id": "date-72",
+  "result": "2026-12-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-73",
+  "result": "2027-01-01T18:29:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-74",
+  "result": "2026-12-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-75",
+  "result": "2028-02-29T21:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-76",
+  "result": "2028-03-01T04:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "UTC"
+  ],
+  "id": "date-77",
+  "result": "2028-02-29T23:59:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-78",
+  "result": "2028-02-29T18:29:59.999Z"
+ },
+ {
+  "method": "endOfDay",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-79",
+  "result": "2028-02-29T23:59:59.999Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-80",
+  "result": "2026-10-31T22:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-81",
+  "result": "2026-11-01T04:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-82",
+  "result": "2026-11-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-83",
+  "result": "2026-10-31T18:30:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-84",
+  "result": "2026-11-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-85",
+  "result": "2026-09-30T21:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-86",
+  "result": "2026-10-01T04:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-87",
+  "result": "2026-10-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-88",
+  "result": "2026-09-30T18:30:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-89",
+  "result": "2026-10-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-90",
+  "result": "2026-09-30T21:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-91",
+  "result": "2026-10-01T04:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-92",
+  "result": "2026-10-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-93",
+  "result": "2026-09-30T18:30:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-94",
+  "result": "2026-10-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-95",
+  "result": "2026-02-28T22:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-96",
+  "result": "2026-03-01T05:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "UTC"
+  ],
+  "id": "date-97",
+  "result": "2026-03-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-98",
+  "result": "2026-02-28T18:30:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-99",
+  "result": "2026-03-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-100",
+  "result": "2026-02-28T22:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-101",
+  "result": "2026-03-01T05:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "UTC"
+  ],
+  "id": "date-102",
+  "result": "2026-03-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-103",
+  "result": "2026-02-28T18:30:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-104",
+  "result": "2026-03-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-105",
+  "result": "2026-10-31T22:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-106",
+  "result": "2026-11-01T04:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-107",
+  "result": "2026-11-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-108",
+  "result": "2026-10-31T18:30:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-109",
+  "result": "2026-11-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-110",
+  "result": "2026-12-31T22:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-111",
+  "result": "2026-12-01T05:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "UTC"
+  ],
+  "id": "date-112",
+  "result": "2026-12-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-113",
+  "result": "2026-12-31T18:30:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-114",
+  "result": "2026-12-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-115",
+  "result": "2028-01-31T22:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-116",
+  "result": "2028-02-01T05:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "UTC"
+  ],
+  "id": "date-117",
+  "result": "2028-02-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-118",
+  "result": "2028-01-31T18:30:00.000Z"
+ },
+ {
+  "method": "startOfMonth",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-119",
+  "result": "2028-02-01T00:00:00.000Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-120",
+  "result": "2026-11-30T21:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-121",
+  "result": "2026-12-01T04:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-122",
+  "result": "2026-11-30T23:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-123",
+  "result": "2026-11-30T18:29:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-124",
+  "result": "2026-11-30T23:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-125",
+  "result": "2026-10-31T21:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-126",
+  "result": "2026-11-01T03:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-127",
+  "result": "2026-10-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-128",
+  "result": "2026-10-31T18:29:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-129",
+  "result": "2026-10-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-130",
+  "result": "2026-10-31T21:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-131",
+  "result": "2026-11-01T03:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-132",
+  "result": "2026-10-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-133",
+  "result": "2026-10-31T18:29:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-134",
+  "result": "2026-10-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-135",
+  "result": "2026-03-31T20:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-136",
+  "result": "2026-04-01T03:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "UTC"
+  ],
+  "id": "date-137",
+  "result": "2026-03-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-138",
+  "result": "2026-03-31T18:29:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-139",
+  "result": "2026-03-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-140",
+  "result": "2026-03-31T20:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-141",
+  "result": "2026-04-01T03:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "UTC"
+  ],
+  "id": "date-142",
+  "result": "2026-03-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-143",
+  "result": "2026-03-31T18:29:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-144",
+  "result": "2026-03-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-145",
+  "result": "2026-11-30T21:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-146",
+  "result": "2026-12-01T04:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-147",
+  "result": "2026-11-30T23:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-148",
+  "result": "2026-11-30T18:29:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-149",
+  "result": "2026-11-30T23:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-150",
+  "result": "2027-01-31T21:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-151",
+  "result": "2027-01-01T04:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "UTC"
+  ],
+  "id": "date-152",
+  "result": "2026-12-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-153",
+  "result": "2027-01-31T18:29:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-154",
+  "result": "2026-12-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-155",
+  "result": "2028-02-29T21:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-156",
+  "result": "2028-03-01T04:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "UTC"
+  ],
+  "id": "date-157",
+  "result": "2028-02-29T23:59:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-158",
+  "result": "2028-02-29T18:29:59.999Z"
+ },
+ {
+  "method": "endOfMonth",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-159",
+  "result": "2028-02-29T23:59:59.999Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-160",
+  "result": "2025-12-31T22:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-161",
+  "result": "2026-01-01T05:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-162",
+  "result": "2026-01-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-163",
+  "result": "2025-12-31T18:30:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-164",
+  "result": "2026-01-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-165",
+  "result": "2025-12-31T22:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-166",
+  "result": "2026-01-01T05:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-167",
+  "result": "2026-01-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-168",
+  "result": "2025-12-31T18:30:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-169",
+  "result": "2026-01-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-170",
+  "result": "2025-12-31T22:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-171",
+  "result": "2026-01-01T05:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-172",
+  "result": "2026-01-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-173",
+  "result": "2025-12-31T18:30:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-174",
+  "result": "2026-01-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-175",
+  "result": "2025-12-31T22:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-176",
+  "result": "2026-01-01T05:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "UTC"
+  ],
+  "id": "date-177",
+  "result": "2026-01-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-178",
+  "result": "2025-12-31T18:30:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-179",
+  "result": "2026-01-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-180",
+  "result": "2025-12-31T22:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-181",
+  "result": "2026-01-01T05:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "UTC"
+  ],
+  "id": "date-182",
+  "result": "2026-01-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-183",
+  "result": "2025-12-31T18:30:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-184",
+  "result": "2026-01-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-185",
+  "result": "2025-12-31T22:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-186",
+  "result": "2026-01-01T05:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-187",
+  "result": "2026-01-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-188",
+  "result": "2025-12-31T18:30:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-189",
+  "result": "2026-01-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-190",
+  "result": "2026-12-31T22:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-191",
+  "result": "2026-01-01T05:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "UTC"
+  ],
+  "id": "date-192",
+  "result": "2026-01-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-193",
+  "result": "2026-12-31T18:30:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-194",
+  "result": "2026-01-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-195",
+  "result": "2027-12-31T22:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-196",
+  "result": "2028-01-01T05:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "UTC"
+  ],
+  "id": "date-197",
+  "result": "2028-01-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-198",
+  "result": "2027-12-31T18:30:00.000Z"
+ },
+ {
+  "method": "startOfYear",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-199",
+  "result": "2028-01-01T00:00:00.000Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-200",
+  "result": "2026-12-31T21:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-201",
+  "result": "2027-01-01T04:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-202",
+  "result": "2026-12-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-203",
+  "result": "2026-12-31T18:29:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-204",
+  "result": "2026-12-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-205",
+  "result": "2026-12-31T21:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-206",
+  "result": "2027-01-01T04:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-207",
+  "result": "2026-12-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-208",
+  "result": "2026-12-31T18:29:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-209",
+  "result": "2026-12-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-210",
+  "result": "2026-12-31T21:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-211",
+  "result": "2027-01-01T04:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-212",
+  "result": "2026-12-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-213",
+  "result": "2026-12-31T18:29:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-214",
+  "result": "2026-12-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-215",
+  "result": "2026-12-31T21:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-216",
+  "result": "2027-01-01T04:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "UTC"
+  ],
+  "id": "date-217",
+  "result": "2026-12-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-218",
+  "result": "2026-12-31T18:29:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-219",
+  "result": "2026-12-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-220",
+  "result": "2026-12-31T21:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-221",
+  "result": "2027-01-01T04:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "UTC"
+  ],
+  "id": "date-222",
+  "result": "2026-12-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-223",
+  "result": "2026-12-31T18:29:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-224",
+  "result": "2026-12-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-225",
+  "result": "2026-12-31T21:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-226",
+  "result": "2027-01-01T04:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-227",
+  "result": "2026-12-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-228",
+  "result": "2026-12-31T18:29:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-229",
+  "result": "2026-12-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-230",
+  "result": "2027-12-31T21:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-231",
+  "result": "2027-01-01T04:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "UTC"
+  ],
+  "id": "date-232",
+  "result": "2026-12-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-233",
+  "result": "2027-12-31T18:29:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-234",
+  "result": "2026-12-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-235",
+  "result": "2028-12-31T21:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-236",
+  "result": "2029-01-01T04:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "UTC"
+  ],
+  "id": "date-237",
+  "result": "2028-12-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-238",
+  "result": "2028-12-31T18:29:59.999Z"
+ },
+ {
+  "method": "endOfYear",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-239",
+  "result": "2028-12-31T23:59:59.999Z"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-240",
+  "result": "2026-11-03"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-241",
+  "result": "2026-11-03"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-242",
+  "result": "2026-11-03"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-243",
+  "result": "2026-11-04"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-244",
+  "result": "2026-11-03"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-245",
+  "result": "2026-10-25"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-246",
+  "result": "2026-10-24"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-247",
+  "result": "2026-10-24"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-248",
+  "result": "2026-10-25"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-249",
+  "result": "2026-10-24"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-250",
+  "result": "2026-10-25"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-251",
+  "result": "2026-10-24"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-252",
+  "result": "2026-10-25"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-253",
+  "result": "2026-10-25"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-254",
+  "result": "2026-10-25"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-255",
+  "result": "2026-03-29"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-256",
+  "result": "2026-03-28"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "UTC"
+  ],
+  "id": "date-257",
+  "result": "2026-03-28"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-258",
+  "result": "2026-03-29"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-259",
+  "result": "2026-03-28"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-260",
+  "result": "2026-03-08"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-261",
+  "result": "2026-03-08"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "UTC"
+  ],
+  "id": "date-262",
+  "result": "2026-03-08"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-263",
+  "result": "2026-03-08"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-264",
+  "result": "2026-03-08"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-265",
+  "result": "2026-11-01"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-266",
+  "result": "2026-11-01"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-267",
+  "result": "2026-11-01"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-268",
+  "result": "2026-11-01"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-269",
+  "result": "2026-11-01"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-270",
+  "result": "2027-01-01"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-271",
+  "result": "2026-12-31"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "UTC"
+  ],
+  "id": "date-272",
+  "result": "2026-12-31"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-273",
+  "result": "2027-01-01"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-274",
+  "result": "2026-12-31"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-275",
+  "result": "2028-02-29"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-276",
+  "result": "2028-02-29"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "UTC"
+  ],
+  "id": "date-277",
+  "result": "2028-02-29"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-278",
+  "result": "2028-02-29"
+ },
+ {
+  "method": "localDateString",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-279",
+  "result": "2028-02-29"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-280",
+  "result": "2026-11-03T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-281",
+  "result": "2026-11-03T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-282",
+  "result": "2026-11-03T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-283",
+  "result": "2026-11-04T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-284",
+  "result": "2026-11-03T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-285",
+  "result": "2026-10-25T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-286",
+  "result": "2026-10-24T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-287",
+  "result": "2026-10-24T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-288",
+  "result": "2026-10-25T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-289",
+  "result": "2026-10-24T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-290",
+  "result": "2026-10-25T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-291",
+  "result": "2026-10-24T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-292",
+  "result": "2026-10-25T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-293",
+  "result": "2026-10-25T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-294",
+  "result": "2026-10-25T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-295",
+  "result": "2026-03-29T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-296",
+  "result": "2026-03-28T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "UTC"
+  ],
+  "id": "date-297",
+  "result": "2026-03-28T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-298",
+  "result": "2026-03-29T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-299",
+  "result": "2026-03-28T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-300",
+  "result": "2026-03-08T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-301",
+  "result": "2026-03-08T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "UTC"
+  ],
+  "id": "date-302",
+  "result": "2026-03-08T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-303",
+  "result": "2026-03-08T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-304",
+  "result": "2026-03-08T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-305",
+  "result": "2026-11-01T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-306",
+  "result": "2026-11-01T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-307",
+  "result": "2026-11-01T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-308",
+  "result": "2026-11-01T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-11-01T04:30:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-309",
+  "result": "2026-11-01T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-310",
+  "result": "2027-01-01T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-311",
+  "result": "2026-12-31T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "UTC"
+  ],
+  "id": "date-312",
+  "result": "2026-12-31T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-313",
+  "result": "2027-01-01T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2026-12-31T22:15:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-314",
+  "result": "2026-12-31T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-315",
+  "result": "2028-02-29T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-316",
+  "result": "2028-02-29T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "UTC"
+  ],
+  "id": "date-317",
+  "result": "2028-02-29T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Asia/Kolkata"
+  ],
+  "id": "date-318",
+  "result": "2028-02-29T00:00:00.000Z"
+ },
+ {
+  "method": "toDateOnly",
+  "args": [
+   "2028-02-29T12:00:00.000Z",
+   "Not/AZone"
+  ],
+  "id": "date-319",
+  "result": "2028-02-29T00:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Beirut",
+   0
+  ],
+  "id": "date-320",
+  "result": "2026-10-31T22:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Beirut",
+   1
+  ],
+  "id": "date-321",
+  "result": "2026-11-01T22:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-322",
+  "result": "2026-10-30T22:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "America/New_York",
+   0
+  ],
+  "id": "date-323",
+  "result": "2026-11-01T04:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "America/New_York",
+   1
+  ],
+  "id": "date-324",
+  "result": "2026-11-02T05:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-325",
+  "result": "2026-10-31T04:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "UTC",
+   0
+  ],
+  "id": "date-326",
+  "result": "2026-11-01T00:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "UTC",
+   1
+  ],
+  "id": "date-327",
+  "result": "2026-11-02T00:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "UTC",
+   6
+  ],
+  "id": "date-328",
+  "result": "2026-10-31T00:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Beirut",
+   0
+  ],
+  "id": "date-329",
+  "result": "2026-10-24T22:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Beirut",
+   1
+  ],
+  "id": "date-330",
+  "result": "2026-10-18T21:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-331",
+  "result": "2026-10-23T21:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "America/New_York",
+   0
+  ],
+  "id": "date-332",
+  "result": "2026-10-18T04:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "America/New_York",
+   1
+  ],
+  "id": "date-333",
+  "result": "2026-10-19T04:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-334",
+  "result": "2026-10-24T04:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "UTC",
+   0
+  ],
+  "id": "date-335",
+  "result": "2026-10-18T00:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "UTC",
+   1
+  ],
+  "id": "date-336",
+  "result": "2026-10-19T00:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "UTC",
+   6
+  ],
+  "id": "date-337",
+  "result": "2026-10-24T00:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Beirut",
+   0
+  ],
+  "id": "date-338",
+  "result": "2026-10-24T22:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Beirut",
+   1
+  ],
+  "id": "date-339",
+  "result": "2026-10-18T21:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-340",
+  "result": "2026-10-23T21:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "America/New_York",
+   0
+  ],
+  "id": "date-341",
+  "result": "2026-10-18T04:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "America/New_York",
+   1
+  ],
+  "id": "date-342",
+  "result": "2026-10-19T04:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-343",
+  "result": "2026-10-24T04:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "UTC",
+   0
+  ],
+  "id": "date-344",
+  "result": "2026-10-25T00:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "UTC",
+   1
+  ],
+  "id": "date-345",
+  "result": "2026-10-19T00:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "UTC",
+   6
+  ],
+  "id": "date-346",
+  "result": "2026-10-24T00:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Beirut",
+   0
+  ],
+  "id": "date-347",
+  "result": "2026-03-28T22:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Beirut",
+   1
+  ],
+  "id": "date-348",
+  "result": "2026-03-22T22:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-349",
+  "result": "2026-03-27T22:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "America/New_York",
+   0
+  ],
+  "id": "date-350",
+  "result": "2026-03-22T04:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "America/New_York",
+   1
+  ],
+  "id": "date-351",
+  "result": "2026-03-23T04:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-352",
+  "result": "2026-03-28T04:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "UTC",
+   0
+  ],
+  "id": "date-353",
+  "result": "2026-03-22T00:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "UTC",
+   1
+  ],
+  "id": "date-354",
+  "result": "2026-03-23T00:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "UTC",
+   6
+  ],
+  "id": "date-355",
+  "result": "2026-03-28T00:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Beirut",
+   0
+  ],
+  "id": "date-356",
+  "result": "2026-03-07T22:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Beirut",
+   1
+  ],
+  "id": "date-357",
+  "result": "2026-03-01T22:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-358",
+  "result": "2026-03-06T22:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "America/New_York",
+   0
+  ],
+  "id": "date-359",
+  "result": "2026-03-08T05:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "America/New_York",
+   1
+  ],
+  "id": "date-360",
+  "result": "2026-03-02T05:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-361",
+  "result": "2026-03-07T05:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "UTC",
+   0
+  ],
+  "id": "date-362",
+  "result": "2026-03-08T00:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "UTC",
+   1
+  ],
+  "id": "date-363",
+  "result": "2026-03-02T00:00:00.000Z"
+ },
+ {
+  "method": "startOfWeek",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "UTC",
+   6
+  ],
+  "id": "date-364",
+  "result": "2026-03-07T00:00:00.000Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Beirut",
+   0
+  ],
+  "id": "date-365",
+  "result": "2026-11-07T21:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Beirut",
+   1
+  ],
+  "id": "date-366",
+  "result": "2026-11-08T21:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-367",
+  "result": "2026-11-06T21:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "America/New_York",
+   0
+  ],
+  "id": "date-368",
+  "result": "2026-11-08T04:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "America/New_York",
+   1
+  ],
+  "id": "date-369",
+  "result": "2026-11-09T04:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-370",
+  "result": "2026-11-07T04:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "UTC",
+   0
+  ],
+  "id": "date-371",
+  "result": "2026-11-07T23:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "UTC",
+   1
+  ],
+  "id": "date-372",
+  "result": "2026-11-08T23:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   "UTC",
+   6
+  ],
+  "id": "date-373",
+  "result": "2026-11-06T23:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Beirut",
+   0
+  ],
+  "id": "date-374",
+  "result": "2026-10-31T21:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Beirut",
+   1
+  ],
+  "id": "date-375",
+  "result": "2026-10-25T21:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-376",
+  "result": "2026-10-30T21:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "America/New_York",
+   0
+  ],
+  "id": "date-377",
+  "result": "2026-10-25T03:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "America/New_York",
+   1
+  ],
+  "id": "date-378",
+  "result": "2026-10-26T03:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-379",
+  "result": "2026-10-31T03:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "UTC",
+   0
+  ],
+  "id": "date-380",
+  "result": "2026-10-24T23:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "UTC",
+   1
+  ],
+  "id": "date-381",
+  "result": "2026-10-25T23:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   "UTC",
+   6
+  ],
+  "id": "date-382",
+  "result": "2026-10-30T23:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Beirut",
+   0
+  ],
+  "id": "date-383",
+  "result": "2026-10-31T21:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Beirut",
+   1
+  ],
+  "id": "date-384",
+  "result": "2026-10-25T21:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-385",
+  "result": "2026-10-30T21:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "America/New_York",
+   0
+  ],
+  "id": "date-386",
+  "result": "2026-10-25T03:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "America/New_York",
+   1
+  ],
+  "id": "date-387",
+  "result": "2026-10-26T03:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-388",
+  "result": "2026-10-31T03:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "UTC",
+   0
+  ],
+  "id": "date-389",
+  "result": "2026-10-31T23:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "UTC",
+   1
+  ],
+  "id": "date-390",
+  "result": "2026-10-25T23:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   "UTC",
+   6
+  ],
+  "id": "date-391",
+  "result": "2026-10-30T23:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Beirut",
+   0
+  ],
+  "id": "date-392",
+  "result": "2026-04-04T20:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Beirut",
+   1
+  ],
+  "id": "date-393",
+  "result": "2026-03-29T20:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-394",
+  "result": "2026-04-03T20:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "America/New_York",
+   0
+  ],
+  "id": "date-395",
+  "result": "2026-03-29T03:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "America/New_York",
+   1
+  ],
+  "id": "date-396",
+  "result": "2026-03-30T03:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-397",
+  "result": "2026-04-04T03:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "UTC",
+   0
+  ],
+  "id": "date-398",
+  "result": "2026-03-28T23:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "UTC",
+   1
+  ],
+  "id": "date-399",
+  "result": "2026-03-29T23:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   "UTC",
+   6
+  ],
+  "id": "date-400",
+  "result": "2026-04-03T23:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Beirut",
+   0
+  ],
+  "id": "date-401",
+  "result": "2026-03-14T21:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Beirut",
+   1
+  ],
+  "id": "date-402",
+  "result": "2026-03-08T21:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-403",
+  "result": "2026-03-13T21:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "America/New_York",
+   0
+  ],
+  "id": "date-404",
+  "result": "2026-03-15T03:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "America/New_York",
+   1
+  ],
+  "id": "date-405",
+  "result": "2026-03-09T03:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-406",
+  "result": "2026-03-14T03:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "UTC",
+   0
+  ],
+  "id": "date-407",
+  "result": "2026-03-14T23:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "UTC",
+   1
+  ],
+  "id": "date-408",
+  "result": "2026-03-08T23:59:59.999Z"
+ },
+ {
+  "method": "endOfWeek",
+  "args": [
+   "2026-03-08T06:59:00.000Z",
+   "UTC",
+   6
+  ],
+  "id": "date-409",
+  "result": "2026-03-13T23:59:59.999Z"
+ },
+ {
+  "method": "range",
+  "args": [
+   "day",
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-410",
+  "result": {
+   "from": "2026-11-02T22:00:00.000Z",
+   "to": "2026-11-03T21:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "day",
+   "2026-11-03T21:30:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-411",
+  "result": {
+   "from": "2026-11-03T05:00:00.000Z",
+   "to": "2026-11-04T04:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "day",
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-412",
+  "result": {
+   "from": "2026-10-24T22:00:00.000Z",
+   "to": "2026-10-25T21:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "day",
+   "2026-10-24T22:30:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-413",
+  "result": {
+   "from": "2026-10-24T04:00:00.000Z",
+   "to": "2026-10-25T03:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "day",
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-414",
+  "result": {
+   "from": "2026-10-24T22:00:00.000Z",
+   "to": "2026-10-25T21:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "day",
+   "2026-10-25T00:30:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-415",
+  "result": {
+   "from": "2026-10-24T04:00:00.000Z",
+   "to": "2026-10-25T03:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "day",
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-416",
+  "result": {
+   "from": "2026-03-28T22:00:00.000Z",
+   "to": "2026-03-29T20:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "day",
+   "2026-03-28T23:00:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-417",
+  "result": {
+   "from": "2026-03-28T04:00:00.000Z",
+   "to": "2026-03-29T03:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "week",
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-418",
+  "result": {
+   "from": "2026-10-30T22:00:00.000Z",
+   "to": "2026-11-06T21:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "week",
+   "2026-11-03T21:30:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-419",
+  "result": {
+   "from": "2026-10-31T04:00:00.000Z",
+   "to": "2026-11-07T04:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "week",
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-420",
+  "result": {
+   "from": "2026-10-23T21:00:00.000Z",
+   "to": "2026-10-30T21:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "week",
+   "2026-10-24T22:30:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-421",
+  "result": {
+   "from": "2026-10-24T04:00:00.000Z",
+   "to": "2026-10-31T03:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "week",
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-422",
+  "result": {
+   "from": "2026-10-23T21:00:00.000Z",
+   "to": "2026-10-30T21:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "week",
+   "2026-10-25T00:30:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-423",
+  "result": {
+   "from": "2026-10-24T04:00:00.000Z",
+   "to": "2026-10-31T03:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "week",
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-424",
+  "result": {
+   "from": "2026-03-27T22:00:00.000Z",
+   "to": "2026-04-03T20:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "week",
+   "2026-03-28T23:00:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-425",
+  "result": {
+   "from": "2026-03-28T04:00:00.000Z",
+   "to": "2026-04-04T03:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "month",
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-426",
+  "result": {
+   "from": "2026-10-31T22:00:00.000Z",
+   "to": "2026-11-30T21:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "month",
+   "2026-11-03T21:30:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-427",
+  "result": {
+   "from": "2026-11-01T04:00:00.000Z",
+   "to": "2026-12-01T04:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "month",
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-428",
+  "result": {
+   "from": "2026-09-30T21:00:00.000Z",
+   "to": "2026-10-31T21:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "month",
+   "2026-10-24T22:30:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-429",
+  "result": {
+   "from": "2026-10-01T04:00:00.000Z",
+   "to": "2026-11-01T03:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "month",
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-430",
+  "result": {
+   "from": "2026-09-30T21:00:00.000Z",
+   "to": "2026-10-31T21:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "month",
+   "2026-10-25T00:30:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-431",
+  "result": {
+   "from": "2026-10-01T04:00:00.000Z",
+   "to": "2026-11-01T03:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "month",
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-432",
+  "result": {
+   "from": "2026-02-28T22:00:00.000Z",
+   "to": "2026-03-31T20:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "month",
+   "2026-03-28T23:00:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-433",
+  "result": {
+   "from": "2026-03-01T05:00:00.000Z",
+   "to": "2026-04-01T03:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "year",
+   "2026-11-03T21:30:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-434",
+  "result": {
+   "from": "2025-12-31T22:00:00.000Z",
+   "to": "2026-12-31T21:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "year",
+   "2026-11-03T21:30:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-435",
+  "result": {
+   "from": "2026-01-01T05:00:00.000Z",
+   "to": "2027-01-01T04:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "year",
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-436",
+  "result": {
+   "from": "2025-12-31T22:00:00.000Z",
+   "to": "2026-12-31T21:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "year",
+   "2026-10-24T22:30:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-437",
+  "result": {
+   "from": "2026-01-01T05:00:00.000Z",
+   "to": "2027-01-01T04:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "year",
+   "2026-10-25T00:30:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-438",
+  "result": {
+   "from": "2025-12-31T22:00:00.000Z",
+   "to": "2026-12-31T21:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "year",
+   "2026-10-25T00:30:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-439",
+  "result": {
+   "from": "2026-01-01T05:00:00.000Z",
+   "to": "2027-01-01T04:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "year",
+   "2026-03-28T23:00:00.000Z",
+   "Asia/Beirut",
+   6
+  ],
+  "id": "date-440",
+  "result": {
+   "from": "2025-12-31T22:00:00.000Z",
+   "to": "2026-12-31T21:59:59.999Z"
+  }
+ },
+ {
+  "method": "range",
+  "args": [
+   "year",
+   "2026-03-28T23:00:00.000Z",
+   "America/New_York",
+   6
+  ],
+  "id": "date-441",
+  "result": {
+   "from": "2026-01-01T05:00:00.000Z",
+   "to": "2027-01-01T04:59:59.999Z"
+  }
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   1,
+   "Asia/Beirut"
+  ],
+  "id": "date-442",
+  "result": "2026-11-04T21:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   -1,
+   "Asia/Beirut"
+  ],
+  "id": "date-443",
+  "result": "2026-11-02T21:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   7,
+   "Asia/Beirut"
+  ],
+  "id": "date-444",
+  "result": "2026-11-10T21:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   30,
+   "Asia/Beirut"
+  ],
+  "id": "date-445",
+  "result": "2026-12-03T21:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   1,
+   "America/New_York"
+  ],
+  "id": "date-446",
+  "result": "2026-11-04T21:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   -1,
+   "America/New_York"
+  ],
+  "id": "date-447",
+  "result": "2026-11-02T21:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   7,
+   "America/New_York"
+  ],
+  "id": "date-448",
+  "result": "2026-11-10T21:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   30,
+   "America/New_York"
+  ],
+  "id": "date-449",
+  "result": "2026-12-03T21:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   1,
+   "UTC"
+  ],
+  "id": "date-450",
+  "result": "2026-11-04T21:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   -1,
+   "UTC"
+  ],
+  "id": "date-451",
+  "result": "2026-11-02T21:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   7,
+   "UTC"
+  ],
+  "id": "date-452",
+  "result": "2026-11-10T21:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-11-03T21:30:00.000Z",
+   30,
+   "UTC"
+  ],
+  "id": "date-453",
+  "result": "2026-12-03T21:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   1,
+   "Asia/Beirut"
+  ],
+  "id": "date-454",
+  "result": "2026-10-25T22:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   -1,
+   "Asia/Beirut"
+  ],
+  "id": "date-455",
+  "result": "2026-10-23T21:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   7,
+   "Asia/Beirut"
+  ],
+  "id": "date-456",
+  "result": "2026-10-31T22:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   30,
+   "Asia/Beirut"
+  ],
+  "id": "date-457",
+  "result": "2026-11-23T22:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   1,
+   "America/New_York"
+  ],
+  "id": "date-458",
+  "result": "2026-10-25T22:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   -1,
+   "America/New_York"
+  ],
+  "id": "date-459",
+  "result": "2026-10-23T22:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   7,
+   "America/New_York"
+  ],
+  "id": "date-460",
+  "result": "2026-10-31T22:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   30,
+   "America/New_York"
+  ],
+  "id": "date-461",
+  "result": "2026-11-23T23:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   1,
+   "UTC"
+  ],
+  "id": "date-462",
+  "result": "2026-10-25T22:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   -1,
+   "UTC"
+  ],
+  "id": "date-463",
+  "result": "2026-10-23T22:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   7,
+   "UTC"
+  ],
+  "id": "date-464",
+  "result": "2026-10-31T22:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-24T22:30:00.000Z",
+   30,
+   "UTC"
+  ],
+  "id": "date-465",
+  "result": "2026-11-23T22:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   1,
+   "Asia/Beirut"
+  ],
+  "id": "date-466",
+  "result": "2026-10-26T00:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   -1,
+   "Asia/Beirut"
+  ],
+  "id": "date-467",
+  "result": "2026-10-23T23:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   7,
+   "Asia/Beirut"
+  ],
+  "id": "date-468",
+  "result": "2026-11-01T00:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   30,
+   "Asia/Beirut"
+  ],
+  "id": "date-469",
+  "result": "2026-11-24T00:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   1,
+   "America/New_York"
+  ],
+  "id": "date-470",
+  "result": "2026-10-26T00:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   -1,
+   "America/New_York"
+  ],
+  "id": "date-471",
+  "result": "2026-10-24T00:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   7,
+   "America/New_York"
+  ],
+  "id": "date-472",
+  "result": "2026-11-01T00:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   30,
+   "America/New_York"
+  ],
+  "id": "date-473",
+  "result": "2026-11-24T01:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   1,
+   "UTC"
+  ],
+  "id": "date-474",
+  "result": "2026-10-26T00:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   -1,
+   "UTC"
+  ],
+  "id": "date-475",
+  "result": "2026-10-24T00:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   7,
+   "UTC"
+  ],
+  "id": "date-476",
+  "result": "2026-11-01T00:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-10-25T00:30:00.000Z",
+   30,
+   "UTC"
+  ],
+  "id": "date-477",
+  "result": "2026-11-24T00:30:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   1,
+   "Asia/Beirut"
+  ],
+  "id": "date-478",
+  "result": "2026-03-29T23:00:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   -1,
+   "Asia/Beirut"
+  ],
+  "id": "date-479",
+  "result": "2026-03-28T00:00:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   7,
+   "Asia/Beirut"
+  ],
+  "id": "date-480",
+  "result": "2026-04-04T23:00:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   30,
+   "Asia/Beirut"
+  ],
+  "id": "date-481",
+  "result": "2026-04-27T23:00:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   1,
+   "America/New_York"
+  ],
+  "id": "date-482",
+  "result": "2026-03-29T23:00:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   -1,
+   "America/New_York"
+  ],
+  "id": "date-483",
+  "result": "2026-03-27T23:00:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   7,
+   "America/New_York"
+  ],
+  "id": "date-484",
+  "result": "2026-04-04T23:00:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   30,
+   "America/New_York"
+  ],
+  "id": "date-485",
+  "result": "2026-04-27T23:00:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   1,
+   "UTC"
+  ],
+  "id": "date-486",
+  "result": "2026-03-29T23:00:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   -1,
+   "UTC"
+  ],
+  "id": "date-487",
+  "result": "2026-03-27T23:00:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   7,
+   "UTC"
+  ],
+  "id": "date-488",
+  "result": "2026-04-04T23:00:00.000Z"
+ },
+ {
+  "method": "addDays",
+  "args": [
+   "2026-03-28T23:00:00.000Z",
+   30,
+   "UTC"
+  ],
+  "id": "date-489",
+  "result": "2026-04-27T23:00:00.000Z"
+ },
+ {
+  "method": "parseDateOnly",
+  "args": [
+   "2026-11-03"
+  ],
+  "id": "date-490",
+  "result": "2026-11-03T00:00:00.000Z"
+ },
+ {
+  "method": "parseDateOnly",
+  "args": [
+   "2026-11-03T10:00:00.000Z"
+  ],
+  "id": "date-491",
+  "result": "2026-11-03T00:00:00.000Z"
+ },
+ {
+  "method": "parseDateOnly",
+  "args": [
+   "2026-02-30"
+  ],
+  "id": "date-492",
+  "result": "2026-03-02T00:00:00.000Z"
+ },
+ {
+  "method": "parseDateOnly",
+  "args": [
+   "nope"
+  ],
+  "id": "date-493",
+  "result": null
+ },
+ {
+  "method": "parseDateOnly",
+  "args": [
+   ""
+  ],
+  "id": "date-494",
+  "result": null
+ },
+ {
+  "method": "parseDateOnly",
+  "args": [
+   null
+  ],
+  "id": "date-495",
+  "result": null
+ },
+ {
+  "method": "parseDateOnly",
+  "args": [
+   "2026-1-3"
+  ],
+  "id": "date-496",
+  "result": null
+ },
+ {
+  "method": "diffDays",
+  "args": [
+   "2026-11-01T00:00:00.000Z",
+   "2026-11-30T00:00:00.000Z"
+  ],
+  "id": "date-497",
+  "result": 29
+ },
+ {
+  "method": "diffDays",
+  "args": [
+   "2026-03-01T00:00:00.000Z",
+   "2026-02-01T00:00:00.000Z"
+  ],
+  "id": "date-498",
+  "result": -28
+ },
+ {
+  "method": "diffDays",
+  "args": [
+   "2024-01-01T00:00:00.000Z",
+   "2025-01-01T00:00:00.000Z"
+  ],
+  "id": "date-499",
+  "result": 366
+ },
+ {
+  "method": "diffCalendarDays",
+  "args": [
+   "2026-10-25T21:30:00.000Z",
+   "2026-10-24T22:30:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-500",
+  "result": 0
+ },
+ {
+  "method": "diffCalendarDays",
+  "args": [
+   "2026-10-25T21:30:00.000Z",
+   "2026-10-24T22:30:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-501",
+  "result": 1
+ },
+ {
+  "method": "diffCalendarDays",
+  "args": [
+   "2026-10-25T21:30:00.000Z",
+   "2026-10-24T22:30:00.000Z",
+   "UTC"
+  ],
+  "id": "date-502",
+  "result": 1
+ },
+ {
+  "method": "diffCalendarDays",
+  "args": [
+   "2026-11-03T21:59:00.000Z",
+   "2026-11-03T22:01:00.000Z",
+   "Asia/Beirut"
+  ],
+  "id": "date-503",
+  "result": -1
+ },
+ {
+  "method": "diffCalendarDays",
+  "args": [
+   "2026-11-03T21:59:00.000Z",
+   "2026-11-03T22:01:00.000Z",
+   "America/New_York"
+  ],
+  "id": "date-504",
+  "result": 0
+ },
+ {
+  "method": "diffCalendarDays",
+  "args": [
+   "2026-11-03T21:59:00.000Z",
+   "2026-11-03T22:01:00.000Z",
+   "UTC"
+  ],
+  "id": "date-505",
+  "result": 0
+ }
+]
