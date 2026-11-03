@@ -25,11 +25,12 @@ def include_os_routers() -> APIRouter:
     """Attach every section's router (once) and return /api for app.include_router."""
     global _included
     if not _included:
-        from app.os import auth, categories, settings, users
+        from app.os import auth, categories, settings, tags, users
 
         api_router.include_router(auth.router)
         api_router.include_router(categories.router)
         api_router.include_router(settings.router)
         api_router.include_router(users.router)
+        api_router.include_router(tags.router)
         _included = True
     return api_router
