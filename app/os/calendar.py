@@ -26,6 +26,7 @@ from app.os.calendar_utils import (
     safe_tz,
 )
 from app.os.common import dates, rrule
+from app.os.common.collation import locale_key
 from app.os.common.deps import plus_user
 from app.os.common.http import nest_error, nest_router
 from app.os.common.i18n import to_lang
@@ -580,14 +581,14 @@ async def _reminders(ctx: Ctx) -> list[dict]:
 
 
 def _compare(a: dict, b: dict) -> int:
-    """All-day first within a day, then by start, then title (String.localeCompare
-    for titles: case-insensitive first)."""
+    """All-day first within a day, then by start, then title (String.localeCompare;
+    equal titles keep their order)."""
     ka, kb = a["start"][:10], b["start"][:10]
     if a["allDay"] != b["allDay"] and ka == kb:
         return -1 if a["allDay"] else 1
     if a["start"] != b["start"]:
         return -1 if a["start"] < b["start"] else 1
-    ta, tb = (a["title"].casefold(), a["title"]), (b["title"].casefold(), b["title"])
+    ta, tb = locale_key(a["title"]), locale_key(b["title"])
     return (ta > tb) - (ta < tb)
 
 

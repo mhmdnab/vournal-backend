@@ -7,6 +7,8 @@ tests/vournal_os/golden/jsparse.json (printed by Node):
 - js_number: `Number(text)` for a query string or text input.
 - js_to_string / decimal_places: Number#toString, and class-validator's
   maxDecimalPlaces count built on it.
+- js_sum: `values.reduce((s, v) => s + v, 0)`. Python 3.12's sum() compensates float
+  rounding, so its last bit can differ from JavaScript's.
 """
 
 import math
@@ -128,3 +130,11 @@ def decimal_places(value) -> int | None:
         return 0
     _, dot, frac = js_to_string(value).partition(".")
     return len(frac) if dot else None
+
+
+def js_sum(values) -> float:
+    """Left-to-right float addition, as Array#reduce added."""
+    total = 0
+    for value in values:
+        total += value
+    return total

@@ -21,7 +21,7 @@ from app.os.common.currency import get_converter, to_number
 from app.os.common.defaults import SUPPORTED_CURRENCIES
 from app.os.common.deps import plus_user
 from app.os.common.http import nest_error, nest_router
-from app.os.common.jsparse import js_number
+from app.os.common.jsparse import js_number, js_sum
 from app.os.common.query import unknown_params
 from app.os.common.i18n import to_lang
 from app.os.finance_forecast import add_days, average_daily_spend, build_forecast
@@ -92,7 +92,7 @@ async def forecast(user, days: int) -> dict:
     debts = await db.debt.find_many(where={"userId": user.id, "status": "OPEN", "direction": "I_OWE"}, include={"payments": True})
 
     def debt_left(d) -> float:
-        return max(0, to_number(d.principal) - sum(to_number(p.amount) for p in d.payments or []))
+        return max(0, to_number(d.principal) - js_sum(to_number(p.amount) for p in d.payments or []))
 
     plan_left = {d.recurringPaymentId: fx.to_default(debt_left(d), d.currency) for d in debts if d.recurringPaymentId}
 
@@ -137,7 +137,7 @@ async def forecast(user, days: int) -> dict:
     # everyday spending: average of non-recurring expenses over the days we actually have data for
     history_start = dates._utc(first.date) if first and dates._utc(first.date) > history_from else history_from
     history_days = int(max(0, min(FORECAST_HISTORY_DAYS, _js_round((today_start - history_start) / DAY))))
-    history_total = sum(fx.to_default(t.amount, t.currency) for t in history)
+    history_total = js_sum(fx.to_default(t.amount, t.currency) for t in history)
     daily_variable = average_daily_spend(history_total, history_days)
     return {
         "currency": fx.default_currency,

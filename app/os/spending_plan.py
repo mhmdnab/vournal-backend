@@ -14,6 +14,7 @@ from app.db import db
 from app.os import finance_utils as fu
 from app.os.calendar_utils import local_date_time
 from app.os.common import dates, rrule
+from app.os.common.jsparse import js_sum
 from app.os.common.currency import get_converter, round_money, to_number
 from app.os.common.http import nest_error
 from app.os.common.serialize import _iso
@@ -78,7 +79,7 @@ async def _sum_expenses(user_id: str, start: datetime, end: datetime, fx) -> flo
     rows = await db.transaction.find_many(
         where={"userId": user_id, "type": "EXPENSE", "recurringPaymentId": None, "rrule": None, **_NOT_DEBT, "date": {"gte": start, "lte": end}}
     )
-    return round_money(sum(fx.to_default(t.amount, t.currency) for t in rows))
+    return round_money(js_sum(fx.to_default(t.amount, t.currency) for t in rows))
 
 
 def _kind_of(kind: str, is_plan: bool) -> str:
@@ -88,7 +89,7 @@ def _kind_of(kind: str, is_plan: bool) -> str:
 
 
 def _left(debt) -> float:
-    return max(0, to_number(debt.principal) - sum(to_number(p.amount) for p in debt.payments or []))
+    return max(0, to_number(debt.principal) - js_sum(to_number(p.amount) for p in debt.payments or []))
 
 
 async def plan(user) -> dict:
@@ -224,8 +225,8 @@ async def plan(user) -> dict:
 
     plan_debts = []
     for d in long_debts:
-        paid = sum(to_number(x.amount) for x in d.payments or [])
-        in_period = sum(to_number(x.amount) for x in d.payments or [] if start_date_only <= dates._utc(x.date) <= today_date_only)
+        paid = js_sum(to_number(x.amount) for x in d.payments or [])
+        in_period = js_sum(to_number(x.amount) for x in d.payments or [] if start_date_only <= dates._utc(x.date) <= today_date_only)
         plan_debts.append({
             "id": d.id,
             "title": d.title,
@@ -254,7 +255,11 @@ async def plan(user) -> dict:
         **result,
         "income": sorted(income, key=by_date),
         "commitments": sorted(commitments, key=by_date),
-        "sources": [{**s, "monthlyAmount": round_money(s["monthlyAmount"])} for s in sources],
+        # NestJS rebuilt each source as {...rest, monthlyAmount, lastDate}
+        "sources": [
+            {**{k: v for k, v in s.items() if k not in ("monthlyAmount", "lastDate")}, "monthlyAmount": round_money(s["monthlyAmount"]), "lastDate": s["lastDate"]}
+            for s in sources
+        ],
         "settings": prefs,
     }
 

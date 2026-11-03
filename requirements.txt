@@ -3,6 +3,7 @@ uvicorn[standard]>=0.30,<1.0
 prisma>=0.13,<1.0
 anthropic>=0.40,<1.0
 python-dateutil>=2.9,<3  # vournal OS repeat rules (app/os/common/rrule.py)
+pyuca==1.2  # vournal OS title order as JavaScript's localeCompare (app/os/common/collation.py)
 python-dotenv>=1.0,<2.0
 
 # Speech-to-text (Step 2)

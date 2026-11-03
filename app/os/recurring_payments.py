@@ -19,7 +19,8 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, Strict
 from app.db import db
 from app.os import finance_utils as fu
 from app.os.common import dates, rrule, validators
-from app.os.common.jsparse import js_number
+from app.os.common.collation import locale_key
+from app.os.common.jsparse import js_number, js_sum
 from app.os.common.activity import log_activity
 from app.os.common.currency import get_converter, round_money, to_number
 from app.os.common.defaults import SUPPORTED_CURRENCIES
@@ -447,7 +448,7 @@ async def summary(request: Request, user=Depends(plus_user)):
                     "accountId": p["accountId"],
                 }
             )
-    upcoming.sort(key=lambda u: (u["date"], u["name"].casefold(), u["name"]))
+    upcoming.sort(key=lambda u: (u["date"], locale_key(u["name"])))
 
     by_category: dict = {}
     by_kind: dict = {}
@@ -480,8 +481,8 @@ async def summary(request: Request, user=Depends(plus_user)):
     paid_sums: dict[str, Decimal] = {}
     for t in await db.transaction.find_many(where=paid_where):
         paid_sums[t.currency] = paid_sums.get(t.currency, Decimal(0)) + t.amount
-    paid_this_month = sum(fx.to_default(amount, currency) for currency, amount in paid_sums.items())
-    monthly_total = sum(p["monthlyCostInDefault"] for p in active)
+    paid_this_month = js_sum(fx.to_default(amount, currency) for currency, amount in paid_sums.items())
+    monthly_total = js_sum(p["monthlyCostInDefault"] for p in active)
     rounded = lambda groups: sorted(  # noqa: E731
         ({**g, "monthlyTotal": round_money(g["monthlyTotal"])} for g in groups), key=lambda g: -g["monthlyTotal"]
     )
@@ -495,7 +496,7 @@ async def summary(request: Request, user=Depends(plus_user)):
         "overdueCount": sum(1 for i in active if i["isOverdue"]),
         "dueSoonCount": sum(1 for i in active if i["isDueSoon"]),
         "upcomingDays": days,
-        "upcomingTotal": round_money(sum(u["amountInDefault"] for u in upcoming)),
+        "upcomingTotal": round_money(js_sum(u["amountInDefault"] for u in upcoming)),
         "upcoming": upcoming[:100],
         "paidThisMonth": round_money(paid_this_month),
         "dueRestOfMonth": round_money(due_rest_of_month),

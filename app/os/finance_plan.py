@@ -14,6 +14,7 @@ import calendar
 import math
 from datetime import date
 
+from app.os.common.jsparse import js_sum
 from app.os.finance_forecast import add_days
 
 _EPSILON = 2.220446049250313e-16  # Number.EPSILON
@@ -39,7 +40,7 @@ def resolve_period(today: str, payday: dict | None, mode: str) -> dict:
 
 
 def _sum(lines) -> float:
-    return _round2(sum(x["amount"] for x in lines))
+    return _round2(js_sum(x["amount"] for x in lines))
 
 
 def _pct(n: float) -> float:

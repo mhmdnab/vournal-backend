@@ -5,6 +5,7 @@ import json
 import math
 import pathlib
 import unittest
+from datetime import datetime, timedelta, timezone
 
 from vournal_os.support import OsTestCase
 
@@ -57,6 +58,19 @@ class Golden(unittest.TestCase):
                 self.assertEqual(accepted, case["decimals2"] is True)
 
 
+    def test_titles_sort_like_locale_compare(self):
+        from app.os.common.collation import locale_key
+
+        golden = GOLDEN["titles"]
+        self.assertEqual(sorted(reversed(golden), key=locale_key), golden)
+
+    def test_js_sum_adds_like_reduce(self):
+        from app.os.common.jsparse import js_sum
+
+        self.assertEqual(js_sum([0.1] * 10), 0.9999999999999999)  # [0.1 × 10].reduce: Python 3.12's sum() says 1.0
+        self.assertEqual(js_sum([]), 0)
+
+
 class Requests(OsTestCase):
     async def test_impossible_and_foreign_dates(self):
         client = await self.signed_in()
@@ -81,6 +95,20 @@ class Requests(OsTestCase):
             with self.subTest(path=path):
                 self.assertEqual((await client.get(path)).status_code, 400)
         self.assertEqual((await client.get("/api/transactions?page=0x2")).json()["page"], 2)
+
+    async def test_same_day_names_sort_like_locale_compare(self):
+        client = await self.signed_in()
+        day = (datetime.now(timezone.utc) + timedelta(days=20)).date().isoformat()
+        for name in ("Netflix", "netflix", "Zebra", "Äpfel"):
+            made = await client.post("/api/recurring-payments", json={"name": name, "amount": 5, "startDate": day})
+            self.assertEqual(made.status_code, 201, made.text)
+        summary = (await client.get("/api/recurring-payments/summary?days=30")).json()
+        on_day = [u["name"] for u in summary["upcoming"] if u["date"].startswith(day)]
+        self.assertEqual(on_day, ["Äpfel", "netflix", "Netflix", "Zebra"])
+        for title in ("Zebra", "Äpfel", "Netflix", "netflix"):
+            await client.post("/api/tasks", json={"title": title, "dueAt": "2026-11-20"})
+        feed = (await client.get("/api/calendar/feed?from=2026-11-20&to=2026-11-20&types=task")).json()["items"]
+        self.assertEqual([i["title"] for i in feed], ["Äpfel", "netflix", "Netflix", "Zebra"])
 
 
 if __name__ == "__main__":

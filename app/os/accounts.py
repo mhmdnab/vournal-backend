@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, Strict
 from app.db import db
 from app.os import finance_utils as fu
 from app.os.common import validators
+from app.os.common.jsparse import js_sum
 from app.os.common.activity import log_activity
 from app.os.common.currency import Converter, get_converter, round_money, to_number
 from app.os.common.defaults import SUPPORTED_CURRENCIES
@@ -105,7 +106,7 @@ async def with_balances(user_id: str, rows, fx: Converter) -> list[dict]:
 async def net_worth(user_id: str, fx: Converter) -> float:
     """Net worth in the default currency (used by /api/finance/summary)."""
     rows = await db.account.find_many(where={"userId": user_id, "isArchived": False, "includeInTotal": True})
-    return round_money(sum(a["balanceInDefault"] for a in await with_balances(user_id, rows, fx)))
+    return round_money(js_sum(a["balanceInDefault"] for a in await with_balances(user_id, rows, fx)))
 
 
 class _Fields(BaseModel):
@@ -217,15 +218,15 @@ async def summary(user=Depends(plus_user)):
                     "type": kind,
                     "label": labels[kind],
                     "count": len(group),
-                    "total": round_money(sum(a["balanceInDefault"] for a in group if a["includeInTotal"])),
+                    "total": round_money(js_sum(a["balanceInDefault"] for a in group if a["includeInTotal"])),
                     "accountIds": [a["id"] for a in group],
                 }
             )
     return {
         "currency": fx.default_currency,
-        "total": round_money(sum(a["balanceInDefault"] for a in counted)),
-        "assets": round_money(sum(a["balanceInDefault"] for a in counted if a["balanceInDefault"] > 0)),
-        "liabilities": round_money(sum(a["balanceInDefault"] for a in counted if a["balanceInDefault"] < 0)),
+        "total": round_money(js_sum(a["balanceInDefault"] for a in counted)),
+        "assets": round_money(js_sum(a["balanceInDefault"] for a in counted if a["balanceInDefault"] > 0)),
+        "liabilities": round_money(js_sum(a["balanceInDefault"] for a in counted if a["balanceInDefault"] < 0)),
         "accountCount": len(active),
         "archivedCount": len(every) - len(active),
         "accounts": active,

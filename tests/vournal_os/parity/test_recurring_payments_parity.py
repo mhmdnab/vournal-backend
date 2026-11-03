@@ -2,6 +2,7 @@
 lazy auto-logging and the summary, in a Beirut-time account."""
 
 import unittest
+from datetime import datetime, timedelta, timezone
 
 from vournal_os.parity.harness import ParityCase, copy_reference_market_rates
 
@@ -47,6 +48,13 @@ class RecurringParity(ParityCase):
         self.assertParity(*await self.both("GET", "/transactions"))
         self.assertParity(*await self.both("GET", "/recurring-payments/summary"))
         self.assertParity(*await self.on_both("DELETE", rent))
+
+    async def test_same_day_names_in_locale_order(self):
+        """Same-day upcoming payments sort by String#localeCompare: Äpfel, netflix, Netflix, Zebra."""
+        day = (datetime.now(timezone.utc) + timedelta(days=20)).date().isoformat()
+        for name in ("Netflix", "netflix", "Zebra", "Äpfel", "[x]", "10x", "2x"):
+            await self.make({"name": name, "amount": 5, "startDate": day})
+        self.assertParity(*await self.both("GET", "/recurring-payments/summary?days=30"))
 
     async def test_lazy_auto_log(self):
         await self.make({"name": "Phone", "amount": 20, "autoLogExpense": True, "startDate": "2026-08-31", "nextDate": "2026-08-31"})

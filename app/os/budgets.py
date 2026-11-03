@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, Strict
 from app.db import db
 from app.os import finance_utils as fu
 from app.os.common import validators
+from app.os.common.jsparse import js_sum
 from app.os.common.query import _query_bool, unknown_params
 from app.os.common.activity import log_activity
 from app.os.common.currency import get_converter, round_money, to_number
@@ -230,8 +231,8 @@ async def list_budgets(request: Request, user=Depends(plus_user)):
     totals = []
     for kind_name in ("MONTHLY", "YEARLY"):
         group = [i for i in items if i["period"] == kind_name and i["isActive"]]
-        budgeted = sum(i["amountInDefault"] for i in group)
-        spent = sum(i["spentInDefault"] for i in group)
+        budgeted = js_sum(i["amountInDefault"] for i in group)
+        spent = js_sum(i["spentInDefault"] for i in group)
         totals.append(
             {
                 "period": kind_name,

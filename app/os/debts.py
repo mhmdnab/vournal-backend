@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, Strict
 from app.db import db
 from app.os.calendar_utils import local_date_time
 from app.os.common import dates, rrule, validators
+from app.os.common.jsparse import js_sum
 from app.os.common.query import unknown_params
 from app.os.common.activity import log_activity
 from app.os.common.currency import get_converter, round_money, to_number
@@ -48,7 +49,7 @@ def _round2(n: float) -> float:
 
 
 def debt_progress(principal: float, payments: list[float]) -> dict:
-    paid = _round2(sum(payments))
+    paid = _round2(js_sum(payments))
     remaining = max(0, _round2(principal - paid))
     percent = min(100, math.floor((paid / principal) * 100 + 0.5)) if principal > 0 else 100
     return {"paid": paid, "remaining": remaining, "percentPaid": percent}
@@ -125,7 +126,7 @@ def _view(r, ctx) -> dict:
 async def _summary(user_id: str, ctx) -> dict:
     rows = await db.debt.find_many(where={"userId": user_id, "status": "OPEN"}, include=_INCLUDE, take=1000)
     views = [_view(r, ctx) for r in rows]
-    total = lambda d: round_money(sum(v["remainingInDefault"] for v in views if v["direction"] == d))  # noqa: E731
+    total = lambda d: round_money(js_sum(v["remainingInDefault"] for v in views if v["direction"] == d))  # noqa: E731
     i_owe, owed = total("I_OWE"), total("OWED_TO_ME")
     soon = sorted(
         (v for v in views if v["daysUntilDue"] is not None and v["daysUntilDue"] <= 7 and v["remaining"] > 0),
