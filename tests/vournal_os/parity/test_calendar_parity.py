@@ -54,6 +54,27 @@ class CalendarParity(ParityCase):
         self.assertParity(*await self.both("PATCH", "/settings", {"enabledSections": ["calendar", "finance"]}))
         self.assertParity(*await self.both("GET", "/calendar/feed?from=2026-11-01&to=2026-11-30"))
 
+    async def test_feed_with_bills_subscriptions_and_debts(self):
+        """The money sources phase 3 could not check: recurring payments and dated debts."""
+        for path, body in (
+            ("/recurring-payments", {"name": "Rent", "amount": 700, "startDate": "2026-10-31", "nextDate": "2026-10-31"}),
+            ("/recurring-payments", {"name": "Netflix", "amount": 12.99, "currency": "EUR", "kind": "SUBSCRIPTION", "rrule": "FREQ=MONTHLY;BYMONTHDAY=15", "startDate": "2026-11-15"}),
+            ("/recurring-payments", {"name": "Gym", "amount": 25, "rrule": "FREQ=WEEKLY;BYDAY=MO", "startDate": "2026-11-02", "autoLogExpense": False}),
+            ("/debts", {"direction": "I_OWE", "title": "Omar", "counterparty": "Omar", "principal": 150, "dueDate": "2026-11-20"}),
+            ("/debts", {"direction": "OWED_TO_ME", "title": "Dinner", "counterparty": "Rania", "principal": 45.5, "dueDate": "2026-11-01"}),
+            ("/debts", {"direction": "I_OWE", "kind": "LOAN", "title": "Car", "principal": 1000, "dueDate": "2027-01-10"}),
+        ):
+            self.assertParity(*await self.both("POST", path, body))
+        for query in ("?from=2026-11-01&to=2026-11-30", "?from=2026-10-25&to=2026-12-20&types=bill,subscription,debt",
+                      "?from=2026-11-01&to=2026-11-30&types=subscription"):
+            with self.subTest(query=query):
+                nest, py = await self.both("GET", f"/calendar/feed{query}")
+                self.assertParity(nest, py)
+        # the last month-wide feed really carries the money sources
+        nest, _ = await self.both("GET", "/calendar/feed?from=2026-11-01&to=2026-11-30")
+        self.assertEqual({i["sourceType"] for i in nest.json()["items"]} & {"bill", "subscription", "debt"}, {"bill", "subscription", "debt"})
+        self.assertParity(*await self.both("GET", "/calendar/summary?from=2026-10-01&to=2027-01-31"))
+
     async def test_validation_shapes(self):
         for query in ("", "?from=2026-11-01", "?from=x&to=y", "?from=2026-11-01&to=2026-11-30&types=party",
                       "?from=2026-11-01&to=2026-11-30&includeCompleted=perhaps", "?from=2026-01-01&to=2027-03-01",

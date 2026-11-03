@@ -32,7 +32,10 @@ def _number(value: Decimal) -> int | float:
 
 
 def to_json(value: Any) -> Any:
-    if value is None or isinstance(value, (bool, int, float, str)):
+    if isinstance(value, float):
+        # JS has one number type: JSON.stringify(12.0) is "12" (and -0 is "0"); from 1e21 it uses exponents
+        return int(value) if value.is_integer() and abs(value) < 1e21 else value
+    if value is None or isinstance(value, (bool, int, str)):
         return value
     if isinstance(value, Enum):
         return value.value

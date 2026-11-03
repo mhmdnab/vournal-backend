@@ -1,6 +1,7 @@
 """/api answers like the NestJS backend the dashboard was built for; every other
 route keeps answering like FastAPI did for the app."""
 
+import math
 import unittest
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -102,6 +103,17 @@ class ApiHttp(unittest.IsolatedAsyncioTestCase):
             },
         )
         self.assertIsInstance(to_json(Decimal("12.00")), int)
+
+    def test_whole_floats_print_like_javascript_numbers(self):
+        """JS has one number type: JSON.stringify(12.0) is "12", and -0 prints as 0."""
+        import json
+
+        from app.os.common.serialize import to_json
+
+        self.assertEqual(json.dumps(to_json({"a": 12.0, "b": 12.5, "c": -0.0, "d": [700.0], "e": True})), '{"a": 12, "b": 12.5, "c": 0, "d": [700], "e": true}')
+        self.assertIsInstance(to_json(1e20), int)
+        self.assertIsInstance(to_json(1e21), float)  # JS switches to exponent form here
+        self.assertTrue(math.isnan(to_json(math.nan)))
 
     async def test_api_health(self):
         from app.main import app
