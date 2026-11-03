@@ -6,6 +6,7 @@ Validation failures are 400 with `message` as a list, like class-validator.
 Every other path keeps FastAPI's own handlers, so the app's routes don't change.
 """
 
+import functools
 import json
 from http import HTTPStatus
 from typing import Any
@@ -17,6 +18,8 @@ from fastapi.exception_handlers import (
 )
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute
+from starlette.responses import Response
 from prisma.errors import ForeignKeyViolationError, RecordNotFoundError, UniqueViolationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -26,6 +29,31 @@ from app.os.common.serialize import to_json
 class NestJSONResponse(JSONResponse):
     def render(self, content: Any) -> bytes:
         return json.dumps(to_json(content), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
+class NestRoute(APIRoute):
+    """An /api route whose return value goes through to_json() before FastAPI's own
+    encoder, which would otherwise turn datetimes into "+00:00" and Decimals into
+    floats before NestJSONResponse ever saw them. Every /api router uses it."""
+
+    def __init__(self, path: str, endpoint, **kwargs):
+        if not getattr(endpoint, "__nest_json__", False):
+            original = endpoint
+
+            @functools.wraps(original)
+            async def endpoint(*args, **kw):
+                result = await original(*args, **kw)
+                return result if isinstance(result, Response) else to_json(result)
+
+            endpoint.__nest_json__ = True
+        super().__init__(path, endpoint, **kwargs)
+
+
+def nest_router(prefix: str = "", **kwargs):
+    """An APIRouter for a vournal OS section."""
+    from fastapi import APIRouter
+
+    return APIRouter(prefix=prefix, route_class=NestRoute, default_response_class=NestJSONResponse, **kwargs)
 
 
 def nest_error(status: int, message: str | list[str], **extra: Any) -> HTTPException:

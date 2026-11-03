@@ -7,7 +7,7 @@ access JWT and rotating refresh token), carried in httpOnly cookies.
 
 import os
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import Depends, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from app import oauth, security
@@ -20,11 +20,11 @@ from app.os.common.deps import (
     REFRESH_COOKIE_PATH,
     web_user,
 )
-from app.os.common.http import nest_error
+from app.os.common.http import nest_error, nest_router
 from app.rate_limit import rate_limited
 from app.schemas import TokenResponse
 
-router = APIRouter(prefix="/auth")
+router = nest_router("/auth")
 
 CREATE_IN_APP = "Create your account in the vournal app."
 CONFIRM_IN_APP = "Confirm your email in the vournal app first."
@@ -86,7 +86,9 @@ def web_user_out(user, settings) -> dict:
 
 
 async def _settings_for(user):
-    return await db.usersettings.find_unique(where={"userId": user.id})
+    from app.os.profile import ensure_os_profile
+
+    return await ensure_os_profile(user)
 
 
 async def _signed_in(user, response: Response) -> dict:
@@ -103,7 +105,7 @@ async def login(body: LoginBody, response: Response):
     # One answer for an unknown email, a wrong password and an account with no
     # password (Apple/Google only): never reveal which.
     if user is None or not security.verify_password(body.password, user.passwordHash):
-        raise nest_error(401, "Invalid email or password.")
+        raise nest_error(401, "Invalid email or password")
     if user.emailConfirmRequired and user.emailVerifiedAt is None:
         raise nest_error(403, CONFIRM_IN_APP, code="confirm_in_app")
     return await _signed_in(user, response)
@@ -151,5 +153,7 @@ async def logout_all(response: Response, user=Depends(web_user)):
 
 @router.get("/me")
 async def me(user=Depends(web_user)):
+    from app.os.settings import settings_view
+
     settings = await _settings_for(user)
-    return {"user": web_user_out(user, settings), "settings": None}
+    return {"user": web_user_out(user, settings), "settings": settings_view(settings)}

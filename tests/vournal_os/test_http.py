@@ -64,6 +64,24 @@ class ApiHttp(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(unauthenticated.status_code, 401)
         self.assertEqual(unauthenticated.json(), {"detail": "Not authenticated"})
 
+    async def test_route_answers_use_nest_json(self):
+        # FastAPI encodes a route's return value itself; /api routes must still
+        # answer in NestJS's format, not FastAPI's ("+00:00", floats for Decimal).
+        from app.os.common.http import NestJSONResponse, NestRoute, install_nest_errors
+
+        router = APIRouter(prefix="/api/_test", default_response_class=NestJSONResponse, route_class=NestRoute)
+
+        @router.get("/when")
+        async def when():
+            return {"t": datetime(2026, 11, 3, 10, 0, 0, 57000, tzinfo=timezone.utc), "n": Decimal("12.00")}
+
+        app = FastAPI()
+        install_nest_errors(app)
+        app.include_router(router)
+        async with _client(app) as client:
+            response = await client.get("/api/_test/when")
+        self.assertEqual(response.json(), {"t": "2026-11-03T10:00:00.057Z", "n": 12})
+
     def test_json_matches_nest(self):
         from app.os.common.serialize import to_json
 

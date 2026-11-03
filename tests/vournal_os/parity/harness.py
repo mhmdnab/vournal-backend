@@ -11,6 +11,7 @@ Run only through the guarded runner, with the reference started first:
 
 import os
 import re
+import secrets
 import unittest
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -94,9 +95,17 @@ class ParityCase(unittest.IsolatedAsyncioTestCase):
         self.db = db
         limiter.reset()
         await db.connect()  # each test has its own event loop
+        # Cleanups, not asyncTearDown: they still run when setup fails halfway.
+        self.addAsyncCleanup(db.disconnect)
         self.email = f"parity-{uuid.uuid4().hex}@example.test"
 
-        self.nest = httpx.AsyncClient(base_url=os.environ["NEST_REFERENCE_URL"], headers=CSRF)
+        # NestJS throttles sign-ups per address (5 a minute) and trusts one proxy
+        # hop, so each test gets its own made-up local address on the reference.
+        address = f"10.{secrets.randbelow(256)}.{secrets.randbelow(256)}.{secrets.randbelow(254) + 1}"
+        self.nest = httpx.AsyncClient(
+            base_url=os.environ["NEST_REFERENCE_URL"], headers={**CSRF, "X-Forwarded-For": address}
+        )
+        self.addAsyncCleanup(self.nest.aclose)
         registered = await self.nest.post(
             "/auth/register",
             json={
@@ -111,6 +120,7 @@ class ParityCase(unittest.IsolatedAsyncioTestCase):
         if registered.status_code not in (200, 201):
             raise AssertionError(f"NestJS register failed: {registered.status_code} {registered.text}")
 
+        self.addAsyncCleanup(db.user.delete_many, where={"email": self.email})
         self.user = await db.user.create(
             data={
                 "email": self.email,
@@ -119,15 +129,10 @@ class ParityCase(unittest.IsolatedAsyncioTestCase):
             }
         )
         self.py = await python_client(self.user)
+        self.addAsyncCleanup(self.py.aclose)
         named = await self.py.patch("/api/users/me", json={"name": "Parity"})
         if named.status_code != 200:
             raise AssertionError(f"Python name update failed: {named.status_code} {named.text}")
-
-    async def asyncTearDown(self):
-        await self.nest.aclose()
-        await self.py.aclose()
-        await self.db.user.delete_many(where={"email": self.email})
-        await self.db.disconnect()
 
     async def both(self, method: str, path: str, json: Any = None) -> tuple[httpx.Response, httpx.Response]:
         """The same request to NestJS (`path` under its /api base) and to Python."""

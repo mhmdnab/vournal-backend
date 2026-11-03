@@ -87,14 +87,14 @@ class WebAuth(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 401)
         self.assertEqual(
             response.json(),
-            {"statusCode": 401, "message": "Invalid email or password.", "error": "Unauthorized"},
+            {"statusCode": 401, "message": "Invalid email or password", "error": "Unauthorized"},
         )
 
     async def test_passwordless_email_login_is_generic_401(self):
         user = await self._user(passwordHash=None)
         response = await self._login(user)
         self.assertEqual(response.status_code, 401)
-        self.assertEqual(response.json()["message"], "Invalid email or password.")
+        self.assertEqual(response.json()["message"], "Invalid email or password")
 
     async def test_unconfirmed_email_is_refused(self):
         user = await self._user(emailConfirmRequired=True)
