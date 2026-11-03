@@ -14,7 +14,7 @@ from app.db import db
 from app.os.common import validators
 from app.os.common.activity import log_activity
 from app.os.common.deps import plus_user
-from app.os.common.http import nest_error, nest_router
+from app.os.common.http import invalid_data, nest_error, nest_router
 from app.os.common.ownership import assert_many_owned
 from app.os.common.query import string_list
 
@@ -185,7 +185,7 @@ async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
     sent = body.model_fields_set
     # null means "clear", which these columns can't be (NestJS failed in Prisma: 400).
     if any(field in sent and getattr(body, field) is None for field in ("name", "sortOrder")):
-        raise nest_error(400, "Invalid data")
+        raise invalid_data()
     parent_id = body.parentId if "parentId" in sent else existing.parentId
     if "parentId" in sent and body.parentId is not None:
         if body.parentId == id:

@@ -7,7 +7,7 @@ from app.db import db
 from app.os.common import validators
 from app.os.common.activity import log_activity
 from app.os.common.deps import plus_user
-from app.os.common.http import nest_error, nest_router
+from app.os.common.http import invalid_data, nest_error, nest_router
 
 router = nest_router("/tags")
 
@@ -87,7 +87,7 @@ async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
     existing = await _owned(user.id, id)
     sent = body.model_fields_set
     if "name" in sent and body.name is None:
-        raise nest_error(400, "Invalid data")  # NestJS: Prisma rejected the null
+        raise invalid_data()  # NestJS: Prisma rejected the null
     if "name" in sent and body.name != existing.name:
         await _assert_unique_name(user.id, body.name, id)
     data = {field: getattr(body, field) for field in ("name", "color") if field in sent}

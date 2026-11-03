@@ -61,6 +61,12 @@ def nest_error(status: int, message: str | list[str], **extra: Any) -> HTTPExcep
     return HTTPException(status, detail={"message": message, **extra})
 
 
+def invalid_data() -> HTTPException:
+    """What NestJS answered when Prisma refused a value (e.g. null on a required column):
+    its database error filter names the status in capitals."""
+    return nest_error(400, "Invalid data", error=HTTPStatus.BAD_REQUEST.name)
+
+
 def _is_api(request: Request) -> bool:
     path = request.url.path
     return path == "/api" or path.startswith("/api/")
@@ -113,7 +119,8 @@ def _database_error(status: int, message):
     async def handler(request: Request, exc: Exception):
         if not _is_api(request):
             raise exc  # unhandled before /api existed: still a plain 500
-        return _body(status, message(exc) if callable(message) else message)
+        # NestJS's database error filter used the status's name: "CONFLICT", "NOT_FOUND".
+        return _body(status, message(exc) if callable(message) else message, error=HTTPStatus(status).name)
 
     return handler
 

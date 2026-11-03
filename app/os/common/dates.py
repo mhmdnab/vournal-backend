@@ -194,3 +194,50 @@ def next_anniversary(value: datetime, tz: str) -> datetime:
         if candidate >= now:
             return candidate
     return _anniversary(now.year + 1, value.month, value.day)
+
+
+# ----- request values ------------------------------------------------------------
+
+DATE_ONLY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_ISO_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}"
+    r"(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}(?::?\d{2})?)?)?$",
+    re.I,
+)
+
+
+def is_iso_date_string(value) -> bool:
+    """class-validator's IsDateString for the forms the dashboard sends."""
+    return isinstance(value, str) and bool(_ISO_RE.match(value))
+
+
+def parse_instant(value: str) -> datetime | None:
+    """An ISO date/date-time → aware UTC, or None. A time without an offset counts as
+    UTC (the server's own zone in production, as JavaScript's Date read it there)."""
+    if not is_iso_date_string(value):
+        return None
+    text = value.strip().replace(" ", "T")
+    if text[-1:] in ("z", "Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        moment = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    return _utc(moment)
+
+
+def local_midnight(date_only: str, tz: str) -> datetime:
+    """"YYYY-MM-DD" → the instant that local day starts in `tz`."""
+    year, month, day = (int(part) for part in date_only.split("-"))
+    return _at(date(year, month, day), _MIDNIGHT, tz)
+
+
+def valid_zone(tz: str | None) -> str:
+    """The timezone if it's a real IANA name, else "UTC"."""
+    if not tz:
+        return "UTC"
+    try:
+        ZoneInfo(tz)
+        return tz
+    except Exception:  # noqa: BLE001
+        return "UTC"
