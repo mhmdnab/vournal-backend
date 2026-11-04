@@ -73,6 +73,7 @@ def include_os_routers() -> APIRouter:
             people,
             prayer_times,
             projects,
+            push,
             recipes,
             recurring_payments,
             reports,
@@ -133,5 +134,6 @@ def include_os_routers() -> APIRouter:
         api_router.include_router(onboarding.router)
         api_router.include_router(app_todos.router)
         api_router.include_router(journal.router)
+        api_router.include_router(push.router)
         _included = True
     return api_router

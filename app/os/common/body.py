@@ -54,6 +54,8 @@ def nested(rules: tuple):
     NestJS flattened them. An array is checked element by element."""
 
     def check(value, field):
+        if value is None:
+            return []  # class-validator doesn't validate a missing nested value
         if isinstance(value, dict):
             return [f"{field}.{p}" for p in _rule_problems(rules, value)]
         if isinstance(value, list):
