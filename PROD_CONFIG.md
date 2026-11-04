@@ -95,7 +95,9 @@ next request. Use a paid (always-on) instance.
 
 - **More than one instance is safe.** Each run takes a Postgres advisory lock
   inside a transaction, which works through Supabase's pooled (pgbouncer) URL, so
-  a job runs once across instances.
+  two instances never run a job at the same time. One may repeat a run another
+  just finished; that's harmless, as every job is safe to repeat (nothing is
+  notified, paid or repeated twice).
 - **Connections:** each running job holds one pooled connection while it runs (at
   most two at a time). Don't set `connection_limit` below 5.
 - **`VOURNAL_OS_JOBS=0`** switches the jobs off, e.g. for a one-off script process

@@ -84,6 +84,18 @@ class Sync(OsTestCase):
         free = await self.signed_in(await self.make_user(plan="free"))
         self.assertEqual((await free.post("/api/notifications/sync")).status_code, 403)
 
+    async def test_fired_reminders_never_crowd_out_a_new_one(self):
+        """Fired one-off reminders nobody ticked off stay; the 500-row page only reads due ones."""
+        user_id, past = self.client.user.id, self.now - timedelta(days=3)
+        await self.db.reminder.create_many(data=[{"userId": user_id, "title": f"Old {i}", "remindAt": past, "lastFiredAt": past + timedelta(minutes=1)}
+                                                 for i in range(520)])
+        await self.reminder(title="New", remindAt=iso(self.now - timedelta(minutes=1)))
+        from app.os import notification_sync
+
+        self.assertIn(user_id, await notification_sync.timed_candidate_users(self.now))
+        self.assertEqual((await self.client.post("/api/notifications/sync")).json()["created"], 1)
+        self.assertEqual([n.title for n in await self.db.notification.find_many(where={"userId": user_id})], ["New"])
+
 
 if __name__ == "__main__":
     unittest.main()

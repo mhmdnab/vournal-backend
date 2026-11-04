@@ -112,6 +112,17 @@ def _candidate(key, title, body, link, entity_type, entity_id) -> dict:
 # ----- timed checks --------------------------------------------------------------------
 
 
+# NestJS's due filter, in SQL: lastFiredAt < remindAt compares two columns, which the Prisma
+# client can't. Fired one-off reminders nobody ticked off stay in the table, so filtering after
+# a 500-row page could leave a new reminder out of it.
+_DUE_REMINDER = ('''NOT "isDone" AND ("snoozedUntil" <= $1::timestamp OR ("snoozedUntil" IS NULL AND "remindAt" <= $1::timestamp'''
+                 ''' AND ("lastFiredAt" IS NULL OR "lastFiredAt" < "remindAt")))''')
+
+
+def _sql_time(moment: datetime) -> str:
+    return moment.astimezone(timezone.utc).replace(tzinfo=None).isoformat(timespec="milliseconds")
+
+
 def _reminder_due(r, now: datetime) -> bool:
     """A snooze that has come, or a reminder whose time has come and that hasn't fired for it."""
     if r.snoozedUntil:
@@ -122,8 +133,8 @@ def _reminder_due(r, now: datetime) -> bool:
 async def _reminders(ctx: Ctx):
     """Due reminders, and the changes that mark them fired (applied after the notifications)."""
     resolve = await resolver(ctx.user_id)
-    rows = await db.reminder.find_many(where={"userId": ctx.user_id, "isDone": False,
-                                              "OR": [{"snoozedUntil": {"lte": ctx.now}}, {"snoozedUntil": None, "remindAt": {"lte": ctx.now}}]}, take=500)
+    due = await db.query_raw(f'SELECT id FROM "Reminder" WHERE "userId" = $2 AND {_DUE_REMINDER} LIMIT 500', _sql_time(ctx.now), ctx.user_id)
+    rows = await db.reminder.find_many(where={"id": {"in": [r["id"] for r in due]}}) if due else []
     T, out, updates = ctx.T, [], []
     for r in rows:
         if not _reminder_due(r, ctx.now):
@@ -544,8 +555,7 @@ async def lazy_sync(user) -> None:
 
 async def timed_candidate_users(now: datetime) -> set[str]:
     ids: set[str] = set()
-    reminders = await db.reminder.find_many(where={"isDone": False, "OR": [{"snoozedUntil": {"lte": now}}, {"snoozedUntil": None, "remindAt": {"lte": now}}]})
-    ids |= {r.userId for r in reminders if _reminder_due(r, now)}
+    ids |= {r["userId"] for r in await db.query_raw(f'SELECT DISTINCT "userId" FROM "Reminder" WHERE {_DUE_REMINDER}', _sql_time(now))}
     for rows in (
         await db.task.find_many(where={"reminderAt": {"gte": now - timedelta(minutes=10), "lte": now}, "status": {"not": "COMPLETED"}}, distinct=["userId"]),
         await db.event.find_many(where={"reminderMinutes": {"not": None}, "OR": [

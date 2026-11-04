@@ -51,7 +51,8 @@ def is_enabled() -> bool:
 def _deliver(sub, payload: dict) -> None:
     public, private, subject = _vapid
     data = {**payload, **({"url": payload["link"]} if payload.get("link") else {})}
-    _webpush({"endpoint": sub.endpoint, "keys": {"p256dh": sub.p256dh, "auth": sub.auth}}, json.dumps(data),
+    # raw UTF-8, as JSON.stringify sent it: escaped Arabic is 3x the bytes and long ones pass the 4 KB limit
+    _webpush({"endpoint": sub.endpoint, "keys": {"p256dh": sub.p256dh, "auth": sub.auth}}, json.dumps(data, ensure_ascii=False),
              vapid_private_key=private, vapid_claims={"sub": subject}, ttl=_TTL, headers={"Urgency": "normal"}, timeout=10)
 
 

@@ -60,6 +60,13 @@ class Push(OsTestCase):
         self.assertEqual(sent[0][2], 86400)
         left = sorted(s.endpoint for s in await self.db.pushsubscription.find_many(where={"userId": user.id}))
         self.assertEqual(left, ["https://push.example/0", "https://push.example/2"])  # the 410 one is gone, the 500 one kept
+        # raw UTF-8, as JSON.stringify sent it: Arabic is 2 bytes a letter, not a 6-byte escape
+        sent.clear()
+        arabic = {"title": "تذكير", "body": "ب" * 600, "link": None, "tag": "n3"}
+        with patch.object(push, "_vapid", ("PUB", "PRIV", "mailto:ops@vournal.app")), patch.object(push, "_webpush", lambda s, data, **k: sent.append(data)):
+            await push.send_to_user(user.id, [arabic])
+        self.assertEqual(json.loads(sent[0]), arabic)
+        self.assertLess(len(sent[0].encode()), 1300)
         with patch.object(push, "_vapid", None):
             self.assertEqual(await push.send_to_user(user.id, payloads), 0)
 

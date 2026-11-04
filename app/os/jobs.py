@@ -8,8 +8,9 @@
 
 Started from the app's startup; VOURNAL_OS_JOBS=0 switches them off. Each run holds a
 Postgres advisory lock for as long as it runs (in a transaction, so a crash or a dropped
-connection releases it), so with two processes a run happens once; every job is also safe
-to repeat. Accounts without Plus are skipped, and one failing account never stops a run.
+connection releases it), so two processes never run a job at the same time. One may repeat
+a run the other just finished (there's no run record), which is harmless: every job is safe
+to repeat (dedupe keys, conditional updates). Accounts without Plus are skipped, and one failing account never stops a run.
 
 Two lanes, each running one job at a time: the tick alone, so the long jobs never make a
 reminder late, and everything else. Each lane holds one connection for its lock."""
