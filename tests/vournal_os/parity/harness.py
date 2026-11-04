@@ -152,7 +152,10 @@ class ParityCase(unittest.IsolatedAsyncioTestCase):
         from app.db import db
         from app.rate_limit import limiter
 
+        from vournal_os.support import fake_bucket
+
         self.db = db
+        self.objects = fake_bucket(self)  # Python's attachments; NestJS keeps its own in Postgres
         limiter.reset()
         await db.connect()  # each test has its own event loop
         # Cleanups, not asyncTearDown: they still run when setup fails halfway.

@@ -81,9 +81,14 @@ def _is_api(request: Request) -> bool:
     return path == "/api" or path.startswith("/api/")
 
 
+# where @nestjs/common's exceptions name a status differently from Python's http module
+_NEST_PHRASES = {413: "Payload Too Large", 418: "I'm a teapot", 421: "Misdirected"}
+
+
 def _body(status: int, message: Any, **extra: Any) -> NestJSONResponse:
+    error = _NEST_PHRASES.get(status) or HTTPStatus(status).phrase
     return NestJSONResponse(
-        {"statusCode": status, "message": message, "error": HTTPStatus(status).phrase, **extra},
+        {"statusCode": status, "message": message, "error": error, **extra},
         status_code=status,
     )
 

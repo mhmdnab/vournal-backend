@@ -10,6 +10,31 @@ PASSWORD = "web-passphrase-1"
 CSRF = {"X-Requested-With": "life-os"}
 
 
+def fake_bucket(case: unittest.TestCase) -> dict[str, bytes]:
+    """The private bucket as a dict for one test: app.storage's object helpers read and
+    write it instead of R2 (the tests never reach the network)."""
+    from unittest.mock import patch
+
+    from app import storage
+
+    objects: dict[str, bytes] = {}
+
+    async def put_object(key: str, data: bytes, content_type: str) -> None:
+        objects[key] = bytes(data)
+
+    async def get_object(key: str) -> bytes | None:
+        return objects.get(key)
+
+    async def delete_object(key: str) -> bool:
+        return objects.pop(key, None) is not None
+
+    for name, fake in (("put_object", put_object), ("get_object", get_object), ("delete_object", delete_object)):
+        patcher = patch.object(storage, name, fake)
+        patcher.start()
+        case.addCleanup(patcher.stop)
+    return objects
+
+
 class OsTestCase(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         from app import security
@@ -23,6 +48,7 @@ class OsTestCase(unittest.IsolatedAsyncioTestCase):
         limiter.reset()
         self.emails: list[str] = []
         self.addAsyncCleanup(self._delete_users)
+        self.objects = fake_bucket(self)
 
     async def _delete_users(self):
         if self.emails:

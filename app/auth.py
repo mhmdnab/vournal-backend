@@ -540,6 +540,11 @@ async def delete_account(current) -> None:
     for entry in entries:
         if entry.audioUrl:
             await delete_audio(entry.audioUrl)
+    # vournal OS attachments live in the same bucket, under their own prefix.
+    from app import storage
+
+    for attachment in await db.attachment.find_many(where={"userId": current.id}):
+        await storage.delete_object(attachment.storageKey)
 
     # 2) Then the account. Cascade (schema onDelete) removes everything else.
     await db.user.delete(where={"id": current.id})

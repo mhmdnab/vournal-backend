@@ -18,6 +18,7 @@ Functions (all async — the network ones do I/O off the loop):
   create_signed_url(key, ttl)     -> a time-limited GET URL (or None)
   resolve_audio_path(key)         -> a local TEMP file path (caller deletes it)
   delete_audio(key)               -> True if an object was removed
+  put_object / get_object / delete_object(key) -> any object (vournal OS attachments)
 """
 
 from __future__ import annotations
@@ -164,3 +165,35 @@ async def delete_audio(key: str) -> bool:
         return await asyncio.to_thread(_delete)
     except (BotoCoreError, ClientError, StorageNotConfigured):
         return False
+
+
+# ----- any object (vournal OS attachments) ------------------------------------------
+# The same private bucket, under keys the caller chooses ("os/attachments/<user>/<id>").
+# Reads go only through an authorized route that streams the bytes; nothing is signed.
+
+
+async def put_object(key: str, data: bytes, content_type: str) -> None:
+    client, bucket = _client_and_bucket()
+    await asyncio.to_thread(
+        client.put_object, Bucket=bucket, Key=key, Body=data, ContentType=content_type, CacheControl="private, no-store"
+    )
+
+
+async def get_object(key: str) -> Optional[bytes]:
+    """The object's bytes, or None when it isn't there."""
+    client, bucket = _client_and_bucket()
+
+    def _get() -> Optional[bytes]:
+        try:
+            return client.get_object(Bucket=bucket, Key=key)["Body"].read()
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") in ("NoSuchKey", "404"):
+                return None
+            raise
+
+    return await asyncio.to_thread(_get)
+
+
+async def delete_object(key: str) -> bool:
+    """Remove an object; True only if one was there. Never raises (as delete_audio)."""
+    return await delete_audio(key)
