@@ -61,6 +61,7 @@ def include_os_routers() -> APIRouter:
             meal_plan,
             habits,
             household,
+            maintenance,
             important_dates,
             notes,
             notifications,
@@ -115,5 +116,6 @@ def include_os_routers() -> APIRouter:
         api_router.include_router(study.router)
         api_router.include_router(trips.router)
         api_router.include_router(trips.public_router)
+        api_router.include_router(maintenance.router)
         _included = True
     return api_router
