@@ -10,6 +10,7 @@ Run only through the guarded runner, with the reference started first:
 """
 
 import os
+import time
 import re
 import secrets
 import unittest
@@ -109,6 +110,9 @@ async def copy_reference_market_rates() -> None:
     from app.os import market_rates
 
     market_rates.reset_for_tests()
+    # no live refresh on the Python side either (the reference runs offline): a refresh
+    # attempt counts as just made, so stale stored rates stay what both sides answer with
+    market_rates._last_attempt = time.monotonic()
 
 
 def reference_sql(sql: str) -> str:

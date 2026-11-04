@@ -12,15 +12,26 @@ from app.os.common.http import invalid_data, nest_error, nest_router
 router = nest_router("/tags")
 
 
-async def view(row) -> dict:
-    tagged = {"tags": {"some": {"id": row.id}}}
+async def _counts(ids: list[str]) -> dict[str, tuple[int, int]]:
+    """Tasks and notes per tag in two grouped queries, whatever the number of tags
+    (Prisma's implicit join tables: _TagToTask.A and _NoteToTag.B hold the tag)."""
+    if not ids:
+        return {}
+    tasks = await db.query_raw('SELECT "A" AS id, COUNT(*)::int AS n FROM "_TagToTask" WHERE "A" = ANY($1) GROUP BY "A"', ids)
+    notes = await db.query_raw('SELECT "B" AS id, COUNT(*)::int AS n FROM "_NoteToTag" WHERE "B" = ANY($1) GROUP BY "B"', ids)
+    by_tasks, by_notes = {r["id"]: r["n"] for r in tasks}, {r["id"]: r["n"] for r in notes}
+    return {i: (by_tasks.get(i, 0), by_notes.get(i, 0)) for i in ids}
+
+
+async def view(row, counts: dict | None = None) -> dict:
+    task_count, note_count = (counts if counts is not None else await _counts([row.id]))[row.id]
     return {
         "id": row.id,
         "name": row.name,
         "color": row.color,
         "createdAt": row.createdAt,
-        "taskCount": await db.task.count(where=tagged),
-        "noteCount": await db.note.count(where=tagged),
+        "taskCount": task_count,
+        "noteCount": note_count,
     }
 
 
@@ -71,7 +82,8 @@ async def _assert_unique_name(user_id: str, name: str, exclude_id: str | None = 
 @router.get("")
 async def list_tags(user=Depends(plus_user)):
     rows = await db.tag.find_many(where={"userId": user.id}, order={"name": "asc"})
-    return {"items": [await view(r) for r in rows], "total": len(rows)}
+    counts = await _counts([r.id for r in rows])
+    return {"items": [await view(r, counts) for r in rows], "total": len(rows)}
 
 
 @router.post("", status_code=201)

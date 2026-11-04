@@ -54,7 +54,9 @@ def _metadata(fields: dict):
     if not fields:
         return None
     safe = to_json(fields)
-    return {"truncated": True} if len(json.dumps(safe, ensure_ascii=False)) > _MAX_METADATA else safe
+    # JSON.stringify(...).length: no spaces, and .length counts UTF-16 code units
+    text = json.dumps(safe, ensure_ascii=False, separators=(",", ":"))
+    return {"truncated": True} if len(text.encode("utf-16-le")) // 2 > _MAX_METADATA else safe
 
 
 async def log_activity(

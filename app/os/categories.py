@@ -141,11 +141,9 @@ async def list_categories(request: Request, user=Depends(plus_user)):
 @router.post("/reorder")
 async def reorder(body: ReorderBody, user=Depends(plus_user)):
     await assert_many_owned("category", [i.id for i in body.items], user.id)
-    async with db.tx() as tx:
+    async with db.batch_() as batch:  # one atomic request, as NestJS's $transaction([...])
         for item in body.items:
-            await tx.category.update_many(
-                where={"id": item.id, "userId": user.id}, data={"sortOrder": item.sortOrder}
-            )
+            batch.category.update_many(where={"id": item.id, "userId": user.id}, data={"sortOrder": item.sortOrder})
     return {"ok": True}
 
 

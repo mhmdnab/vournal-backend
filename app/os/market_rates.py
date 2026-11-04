@@ -63,12 +63,13 @@ class Snapshot:
 _snapshot = Snapshot()
 _loaded = False
 _refreshing: asyncio.Task | None = None
+_loading: asyncio.Future | None = None
 _last_attempt = 0.0
 
 
 def reset_for_tests() -> None:
-    global _snapshot, _loaded, _refreshing, _last_attempt
-    _snapshot, _loaded, _refreshing, _last_attempt = Snapshot(), False, None, 0.0
+    global _snapshot, _loaded, _refreshing, _last_attempt, _loading
+    _snapshot, _loaded, _refreshing, _last_attempt, _loading = Snapshot(), False, None, 0.0, None
 
 
 def _number(value) -> float | None:
@@ -112,19 +113,42 @@ async def _fetch_json(url: str):
 
 
 async def _load() -> None:
+    """The stored rates, read once: concurrent first requests share one read."""
+    global _loading
+    if _loading is None:
+        _loading = asyncio.ensure_future(_read_stored())
+    await asyncio.shield(_loading)
+
+
+async def _read_stored() -> None:
     global _snapshot, _loaded
     try:
         rows = await db.marketrate.find_many()
         if rows:
             newest = max(rows, key=lambda r: r.fetchedAt)
-            _snapshot = Snapshot(
+            stored = Snapshot(
                 rates={r.currency: r.ratePerUsd for r in rows},
                 source=newest.source,
                 fetched_at=newest.fetchedAt,
             )
+            # a refresh that landed while this read was in flight is newer: keep it
+            if _snapshot.fetched_at is None or _utc(stored.fetched_at) > _utc(_snapshot.fetched_at):
+                _snapshot = stored
     except Exception as exc:  # noqa: BLE001
         log.warning("Could not load stored market rates: %s", exc)
     _loaded = True
+
+
+def _utc(moment: datetime) -> datetime:
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+
+async def warm_up() -> None:
+    """At startup, in the background (NestJS's onModuleInit): never blocks, never raises."""
+    try:
+        await current()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Market-rate warm-up failed: %s", exc)
 
 
 async def current() -> Snapshot:
@@ -181,10 +205,10 @@ async def _do_refresh() -> bool:
             if len(rates) < MIN_USABLE:
                 raise ValueError("too few usable rates")
             fetched_at = datetime.now(timezone.utc)
-            async with db.tx() as tx:
+            async with db.batch_() as batch:  # one atomic request
                 for currency, rate in rates.items():
                     value = Decimal(str(rate))
-                    await tx.marketrate.upsert(
+                    batch.marketrate.upsert(
                         where={"currency": currency},
                         data={
                             "create": {"currency": currency, "ratePerUsd": value, "source": name, "fetchedAt": fetched_at},

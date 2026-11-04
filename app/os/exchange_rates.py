@@ -98,9 +98,9 @@ async def update_rates(body: RatesBody, user=Depends(plus_user)):
     """Rates the user types become manual overrides (USD is always 1)."""
     rates = {code: rate for code, rate in _valid_rates(body.rates).items() if code != BASE_CURRENCY}
     if rates:
-        async with db.tx() as tx:
+        async with db.batch_() as batch:  # one atomic request
             for currency, rate in rates.items():
-                await tx.exchangerate.upsert(
+                batch.exchangerate.upsert(
                     where={"userId_currency": {"userId": user.id, "currency": currency}},
                     data={
                         "create": {"userId": user.id, "currency": currency, "ratePerUsd": rate, "manual": True},

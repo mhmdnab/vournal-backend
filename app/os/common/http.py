@@ -226,3 +226,34 @@ def install_nest_errors(app: FastAPI) -> None:
     app.add_exception_handler(UniqueViolationError, _database_error(409, _unique_message))
     app.add_exception_handler(RecordNotFoundError, _database_error(404, "Not found"))
     app.add_exception_handler(ForeignKeyViolationError, _database_error(400, "Related record not found"))
+
+
+class EmptyJsonBody:
+    """Express handed NestJS `{}` for a write without a body; FastAPI would call the
+    body missing. Only /api writes with no body (or an empty JSON one) are touched."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or scope["method"] not in ("POST", "PUT", "PATCH") or not scope["path"].startswith("/api/"):
+            return await self.app(scope, receive, send)
+        content_type = dict(scope["headers"]).get(b"content-type", b"")
+        if content_type and not content_type.startswith(b"application/json"):
+            return await self.app(scope, receive, send)
+        # the body may come in several messages (some an empty chunk); keep them until it's complete
+        messages = []
+        while True:
+            message = await receive()
+            messages.append(message)
+            if message["type"] != "http.request" or not message.get("more_body"):
+                break
+        if all(m["type"] == "http.request" and not m.get("body") for m in messages):
+            messages = [{"type": "http.request", "body": b"{}", "more_body": False}]
+            if not content_type:
+                scope = {**scope, "headers": [*scope["headers"], (b"content-type", b"application/json")]}
+
+        async def replay():
+            return messages.pop(0) if messages else await receive()
+
+        await self.app(scope, replay, send)

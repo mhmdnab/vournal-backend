@@ -4,6 +4,7 @@ Routes for entries, todos, and (Phase 4) insights, on top of the Prisma client
 lifecycle and a health check.
 """
 
+import asyncio
 import logging
 import os
 from collections import defaultdict
@@ -50,7 +51,7 @@ from app.quota import (
     reserve_entry_quota,
 )
 from app.os import include_os_routers
-from app.os.common.http import install_nest_errors
+from app.os.common.http import EmptyJsonBody, install_nest_errors
 from app.rate_limit import limiter
 from app.storage import (
     create_signed_url,
@@ -122,9 +123,14 @@ async def lifespan(app: FastAPI):
             )
     except Exception:  # noqa: BLE001 — never block startup on the reaper
         log.exception("Orphan reaper failed on boot")
+    # vournal OS: load market rates in the background; startup never waits for the network
+    from app.os import market_rates
+
+    warm_up = asyncio.ensure_future(market_rates.warm_up())
     try:
         yield
     finally:
+        warm_up.cancel()  # still waiting on the network at shutdown: drop it
         await database.disconnect()
 
 
@@ -206,6 +212,7 @@ app.include_router(billing_paddle_router)
 # vournal OS (the web dashboard): everything under /api, answering in NestJS's
 # shape there only. Root routes above keep FastAPI's handlers.
 install_nest_errors(app)
+app.add_middleware(EmptyJsonBody)  # /api writes only: a missing body is {}, as in Express
 app.include_router(include_os_routers())
 
 

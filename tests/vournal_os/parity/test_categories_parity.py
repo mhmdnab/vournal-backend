@@ -66,6 +66,14 @@ class CategoriesParity(ParityCase):
         nest, py = await self.both("GET", "/categories?scope=EXPENSE")
         self.assertParity(nest, py)
 
+    async def test_top_level_name_shared_with_a_subcategory(self):
+        nest_car = (await self.nest.post("/categories", json={"scope": "EXPENSE", "name": "Car"})).json()["id"]
+        py_car = (await self.py.post("/api/categories", json={"scope": "EXPENSE", "name": "Car"})).json()["id"]
+        nest = await self.nest.post("/categories", json={"scope": "EXPENSE", "name": "Fuel", "parentId": nest_car})
+        py = await self.py.post("/api/categories", json={"scope": "EXPENSE", "name": "Fuel", "parentId": py_car})
+        self.assertParity(nest, py)
+        self.assertParity(*await self.both("POST", "/categories", {"scope": "EXPENSE", "name": "fuel"}))
+
     async def test_reorder(self):
         ids = [await self._ids(name) for name in ("Food", "Bills", "Other")]
         order = [40, 10, 20]

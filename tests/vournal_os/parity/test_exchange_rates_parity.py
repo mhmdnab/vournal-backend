@@ -19,6 +19,11 @@ class ExchangeRatesParity(ParityCase):
         self.assertParity(*await self.both("POST", "/exchange-rates/use-live", {}))
         self.assertParity(*await self.both("GET", "/exchange-rates"))
 
+    async def test_use_live_without_a_body(self):
+        """Express read a missing body as {}: no JSON at all is "all currencies"."""
+        self.assertParity(*await self.both("PUT", "/exchange-rates", {"rates": {"LBP": 90000}}))
+        self.assertParity(*await self.both("POST", "/exchange-rates/use-live"))
+
     async def test_use_live_for_some(self):
         self.assertParity(*await self.both("PUT", "/exchange-rates", {"rates": {"EUR": 0.95, "GBP": 0.81}}))
         self.assertParity(*await self.both("POST", "/exchange-rates/use-live", {"currencies": ["EUR"]}))
