@@ -37,6 +37,7 @@ def include_os_routers() -> APIRouter:
             events,
             exchange_rates,
             finance,
+            goals,
             habits,
             notes,
             notifications,
@@ -72,5 +73,6 @@ def include_os_routers() -> APIRouter:
         api_router.include_router(projects.router)
         api_router.include_router(documents.router)
         api_router.include_router(habits.router)
+        api_router.include_router(goals.router)
         _included = True
     return api_router
