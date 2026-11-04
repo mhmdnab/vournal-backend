@@ -1,0 +1,26 @@
+{
+ "context": [
+  {
+   "c": {
+    "now": "2026-11-04 09:05",
+    "weekday": "Wednesday",
+    "timezone": "Asia/Beirut",
+    "language": "en",
+    "currency": "USD",
+    "name": "Owner"
+   },
+   "out": "<context>Now: Wednesday 2026-11-04 09:05 (Asia/Beirut). App language: English. Default currency: USD. User's name: Owner.</context>"
+  },
+  {
+   "c": {
+    "now": "2026-11-04 21:30",
+    "weekday": "Wednesday",
+    "timezone": "UTC",
+    "language": "ar",
+    "currency": "LBP",
+    "name": null
+   },
+   "out": "<context>Now: Wednesday 2026-11-04 21:30 (UTC). App language: Arabic. Default currency: LBP.</context>"
+  }
+ ]
+}

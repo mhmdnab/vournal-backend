@@ -40,12 +40,20 @@ def tool_use(name: str, tool_input: dict, id: str = "toolu_1") -> dict:
     return {"type": "tool_use", "id": id, "name": name, "input": tool_input}
 
 
+def tools(*uses) -> dict:
+    """One round that calls tools: (name, input) pairs, with a thinking block first."""
+    blocks = [{"type": "thinking", "thinking": "Working it out.", "signature": "sig_parity"}]
+    blocks += [tool_use(name, tool_input, f"toolu_{n}") for n, (name, tool_input) in enumerate(uses, 1)]
+    return message(*blocks, stop="tool_use")
+
+
 def error(status: int, kind: str = "invalid_request_error", text_: str = "scripted failure") -> dict:
     return {"status": status, "body": {"type": "error", "error": {"type": kind, "message": text_}}}
 
 
 def script(*replies) -> None:
-    """The replies, in order, for each side; past the end every request gets a 500."""
+    """The replies, in order, for each side; past the end every request gets a 500. A reply
+    can be a function of the side ("nest" / "python"), for ids that differ between them."""
     with _lock:
         _script[:] = replies
         _cursor.clear()
@@ -67,6 +75,8 @@ class _Handler(BaseHTTPRequestHandler):
             n = _cursor.get(side, 0)
             _cursor[side] = n + 1
             reply = _script[n] if n < len(_script) else error(500, "api_error", "the script ran out")
+            if callable(reply):  # ids differ between the two databases: the reply is made per side
+                reply = reply(side)
         payload = json.dumps(reply["body"]).encode()
         self.send_response(reply["status"])
         self.send_header("content-type", "application/json")
