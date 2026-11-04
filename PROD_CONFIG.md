@@ -67,6 +67,40 @@ README / Render dashboard — unchanged by this.
   (the `production` profile's `env` block, already scaffolded) or as an EAS secret,
   so the TestFlight build points at prod.
 
+## 5. vournal OS — scheduled jobs and web push (when the merged backend ships)
+
+The web dashboard's backend now runs inside this one. Two things it needs:
+
+**Web push keys.** Set these on Render (never in the repo):
+
+| Key | Value | Why |
+| --- | --- | --- |
+| `VAPID_PUBLIC_KEY` | the vournalOS deployment's public key | Browsers subscribe with it |
+| `VAPID_PRIVATE_KEY` 🔒 | the vournalOS deployment's private key | Signs each push |
+| `VAPID_SUBJECT` | `mailto:` an address you read | Push services contact it about problems |
+
+- **Reuse the current vournalOS keys.** A browser's subscription belongs to the
+  public key it subscribed with, so new keys would silently stop push for everyone
+  until they subscribe again. Keys from `npx web-push generate-vapid-keys` (the
+  format vournalOS used) work as they are.
+- Without the keys, push is off: subscribing still works, nothing is sent, and the
+  bell still fills.
+
+**An always-on instance.** The jobs run inside the server: reminders and the other
+notifications every minute, the sweep every 15 minutes, recurring payments and
+repeat transactions hourly, market rates every 6 hours, and a 03:00 UTC cleanup.
+A free instance that sleeps runs none of them while asleep. The bell catches up
+when someone opens it, but pushes, auto-logged payments and repeats wait for the
+next request. Use a paid (always-on) instance.
+
+- **More than one instance is safe.** Each run takes a Postgres advisory lock
+  inside a transaction, which works through Supabase's pooled (pgbouncer) URL, so
+  a job runs once across instances.
+- **Connections:** each running job holds one pooled connection while it runs (at
+  most two at a time). Don't set `connection_limit` below 5.
+- **`VOURNAL_OS_JOBS=0`** switches the jobs off, e.g. for a one-off script process
+  or a second service that shouldn't run them.
+
 ---
 
 ## Cutover checklist (run once, in order)
