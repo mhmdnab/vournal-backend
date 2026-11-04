@@ -13,7 +13,7 @@ from vournal_os.parity.harness import ParityCase, copy_reference_market_rates, n
 from vournal_os.parity.seed import SeedMixin, at, day
 
 SIDE = {"nest": 0, "python": 1}
-ALLOWANCE = ("remainingToday", "mentionCount")
+ALLOWANCE = ("remainingToday", "remainingThisMonth", "mentionCount")  # NestJS: 100 a day; here: monthly, renamed
 
 
 def done(text="Done."):

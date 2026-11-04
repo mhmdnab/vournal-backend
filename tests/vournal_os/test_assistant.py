@@ -54,11 +54,11 @@ class Chat(ChatBase):
     async def test_each_message_spends_the_allowance(self):
         fm.script(fm.message(fm.text("Hi!")), fm.message(fm.text("Hi again!")))
         first = await self.say("hello")
-        self.assertEqual((first["status"], first["remainingToday"], first["messages"][1]["text"]), ("ok", 2999, "Hi!"))
+        self.assertEqual((first["status"], first["remainingThisMonth"], first["messages"][1]["text"]), ("ok", 2999, "Hi!"))
         from app.os import ai
 
         with patch.object(ai, "MONTHLY_LIMIT", 2):
-            self.assertEqual((await self.say("again", first["conversation"]["id"]))["remainingToday"], 0)
+            self.assertEqual((await self.say("again", first["conversation"]["id"]))["remainingThisMonth"], 0)
             self.assertEqual((await self.say("more"))["status"], "limit")
         self.assertEqual(len(fm.requests("python")), 2)
 

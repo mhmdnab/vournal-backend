@@ -173,7 +173,7 @@ async def send(user, text: str, conversation_id: str | None = None) -> dict:
     left = await ai.remaining(user.id, s.timezone)
 
     def fail(state: str, conversation=None) -> dict:
-        return {"status": state, "conversation": conversation, "messages": [], "remainingToday": left}
+        return {"status": state, "conversation": conversation, "messages": [], "remainingThisMonth": left}
 
     client = ai.client()
     if client is None:
@@ -253,7 +253,7 @@ async def send(user, text: str, conversation_id: str | None = None) -> dict:
         "status": "unavailable" if failed else "ok",
         "conversation": conv,
         "messages": [_view(user_row, []), {**_view(reply_row, []), "actions": [action_view(a) for a in actions]}],
-        "remainingToday": left,
+        "remainingThisMonth": left,
     }
 
 

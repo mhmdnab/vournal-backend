@@ -78,8 +78,8 @@ class Capture(OsTestCase):
     async def test_without_a_key_or_with_ai_off(self):
         with patch.object(self.ai, "_client", None):
             self.assertEqual((await self.client.get("/api/ai/status")).json(),
-                             {"configured": False, "enabled": True, "dailyLimit": 3000, "remainingToday": 3000})
-            self.assertEqual(await self.capture(), {"status": "not_configured", "draft": None, "remainingToday": 3000})
+                             {"configured": False, "enabled": True, "monthlyLimit": 3000, "remainingThisMonth": 3000})
+            self.assertEqual(await self.capture(), {"status": "not_configured", "draft": None, "remainingThisMonth": 3000})
         fake = self.model()
         await self.client.patch("/api/settings", json={"aiEnabled": False})
         self.assertEqual((await self.capture())["status"], "disabled")
@@ -91,7 +91,7 @@ class Capture(OsTestCase):
         food = next(c for c in (await self.client.get("/api/categories?scope=EXPENSE")).json()["items"] if c["name"] == "Food")
         await self.client.post("/api/people", json={"name": "Sara Khoury"})
         result = await self.capture(" lunch 12$ ")
-        self.assertEqual((result["status"], result["remainingToday"]), ("ok", 2999))
+        self.assertEqual((result["status"], result["remainingThisMonth"]), ("ok", 2999))
         self.assertEqual((result["draft"]["categoryId"], result["draft"]["accountId"], result["draft"]["currency"]), (food["id"], cash["id"], "USD"))
         request = fake.requests[0]
         self.assertEqual((request["model"], request["max_tokens"], request["betas"], request["fallbacks"]),
@@ -108,7 +108,7 @@ class Capture(OsTestCase):
         self.model({"stop": "refusal", "text": json.dumps(BLANK)}, anthropic.APIConnectionError(request=None), {"text": "not json"}, drafted(kind="unknown"))
         statuses = [(await self.capture())["status"] for _ in range(4)]
         self.assertEqual(statuses, ["not_understood", "unavailable", "unavailable", "not_understood"])
-        self.assertEqual((await self.client.get("/api/ai/status")).json()["remainingToday"], 2996)
+        self.assertEqual((await self.client.get("/api/ai/status")).json()["remainingThisMonth"], 2996)
 
     async def test_values_outside_the_enums_are_unavailable(self):
         """zod's enums (kind, priority, debtDirection) aren't in the wire schema; they're still enforced."""
@@ -124,11 +124,11 @@ class Capture(OsTestCase):
         for action, at in (("ai.chat", month_start - timedelta(minutes=1)), ("ai.chat", month_start + timedelta(minutes=1)), ("ai.food", month_start + timedelta(hours=1))):
             await self.db.activitylog.create(data={"userId": self.client.user.id, "action": action, "createdAt": at})
         with patch.object(self.ai, "MONTHLY_LIMIT", 3):
-            self.assertEqual((await self.client.get("/api/ai/status")).json()["remainingToday"], 1)
-            self.assertEqual((await self.capture())["remainingToday"], 0)
-            self.assertEqual(await self.capture(), {"status": "limit", "draft": None, "remainingToday": 0})
+            self.assertEqual((await self.client.get("/api/ai/status")).json()["remainingThisMonth"], 1)
+            self.assertEqual((await self.capture())["remainingThisMonth"], 0)
+            self.assertEqual(await self.capture(), {"status": "limit", "draft": None, "remainingThisMonth": 0})
             estimate = await self.client.post("/api/wellness/estimate", json={"text": "manoushe"})
-            self.assertEqual(estimate.json(), {"status": "limit", "items": [], "remainingToday": 0})
+            self.assertEqual(estimate.json(), {"status": "limit", "items": [], "remainingThisMonth": 0})
 
     async def test_a_burst_never_runs_past_the_allowance(self):
         fake = self.model()
@@ -143,7 +143,7 @@ class Capture(OsTestCase):
                                                           "protein": 14, "carbs": 70, "fat": None}]})})
         await self.client.patch("/api/settings", json={"language": "ar"})
         response = await self.client.post("/api/wellness/estimate", json={"text": " 2 man2oushe "})
-        self.assertEqual(response.json(), {"status": "ok", "remainingToday": 2999, "items": [
+        self.assertEqual(response.json(), {"status": "ok", "remainingThisMonth": 2999, "items": [
             {"name": "Manoushe", "servings": 2, "serving": "1 piece", "calories": 560, "protein": 14, "carbs": 70, "fat": None}]})
         self.assertEqual(fake.requests[0]["messages"][0]["content"], "<language>ar</language>\n<text>\n2 man2oushe\n</text>")
         self.assertEqual(fake.requests[0]["output_config"], {"effort": "low", "format": self.ai.PROMPTS["foodFormat"]})

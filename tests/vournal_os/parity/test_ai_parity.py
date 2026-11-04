@@ -9,7 +9,7 @@ from unittest.mock import patch
 from vournal_os.parity import fake_model as fm
 from vournal_os.parity.harness import ParityCase
 
-ALLOWANCE = ("remainingToday", "dailyLimit")
+ALLOWANCE = ("remainingToday", "dailyLimit", "remainingThisMonth", "monthlyLimit")  # NestJS: 100 a day; here: monthly, renamed
 BLANK = {"kind": "unknown", "title": "", "amount": None, "currency": None, "date": None, "time": None, "durationMinutes": None, "category": None,
          "account": None, "list": None, "quantity": None, "priority": None, "note": None, "debtDirection": None, "person": None}
 

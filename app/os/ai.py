@@ -86,7 +86,7 @@ async def spend(user_id: str, tz: str, action: str) -> int | None:
 
 async def status(user) -> dict:
     s = await ensure_os_profile(user)
-    return {"configured": _client is not None, "enabled": s.aiEnabled, "dailyLimit": MONTHLY_LIMIT, "remainingToday": await remaining(user.id, s.timezone)}
+    return {"configured": _client is not None, "enabled": s.aiEnabled, "monthlyLimit": MONTHLY_LIMIT, "remainingThisMonth": await remaining(user.id, s.timezone)}
 
 
 # ----- normalizing what the model returns -------------------------------------------------
@@ -350,7 +350,7 @@ async def capture(user, sentence: str) -> dict:
     left = await remaining(user.id, s.timezone)
 
     def done(state, draft=None):
-        return {"status": state, "draft": draft, "remainingToday": left}
+        return {"status": state, "draft": draft, "remainingThisMonth": left}
 
     if _client is None:
         return done("not_configured")
@@ -391,7 +391,7 @@ async def estimate_food(user, sentence: str) -> dict:
     left = await remaining(user.id, s.timezone)
 
     def done(state, items=None):
-        return {"status": state, "items": items or [], "remainingToday": left}
+        return {"status": state, "items": items or [], "remainingThisMonth": left}
 
     if _client is None:
         return done("not_configured")
