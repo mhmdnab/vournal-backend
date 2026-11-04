@@ -103,3 +103,12 @@ def plural(lang: Lang, count: float, forms: dict[str, str], **values) -> str:
     """The form for count's plural category (else "other"), with {count} filled in."""
     template = forms.get(plural_category(lang, count)) or forms["other"]
     return fmt(template, count=count, **values)
+
+
+def join_list(lang: Lang, items: list[str]) -> str:
+    """"a, b and c" / "أ، ب وج"."""
+    if len(items) <= 1:
+        return items[0] if items else ""
+    if lang == "ar":
+        return f"{'، '.join(items[:-1])} و{items[-1]}"
+    return f"{', '.join(items[:-1])} and {items[-1]}"

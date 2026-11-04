@@ -52,6 +52,7 @@ def include_os_routers() -> APIRouter:
             budgets,
             calendar,
             categories,
+            dashboard,
             debts,
             documents,
             events,
@@ -123,5 +124,6 @@ def include_os_routers() -> APIRouter:
         api_router.include_router(insights.router)
         api_router.include_router(reports.router)
         api_router.include_router(rituals.router)
+        api_router.include_router(dashboard.router)
         _included = True
     return api_router
