@@ -4,7 +4,12 @@ in a Beirut-time account with LBP and EUR money."""
 
 import unittest
 
-from vournal_os.parity.harness import ParityCase, copy_reference_market_rates
+from vournal_os.parity.harness import ParityCase, copy_reference_market_rates, normalize
+
+
+def _ties_by_date(body: dict) -> dict:
+    top = sorted(body.get("topExpenses", []), key=lambda t: (-t["amountInDefault"], t["date"]))
+    return {**body, "topExpenses": top}
 
 
 class FinanceParity(ParityCase):
@@ -63,7 +68,14 @@ class FinanceParity(ParityCase):
                       "?from=2026-10-10&to=2026-11-03", "?from=2026-01-01&to=2026-12-31", "?from=2026-11-01T10:00:00Z",
                       "?from=2026-11-05&to=2026-11-01", "?period=decade", "?from=nope"):
             with self.subTest(query=query):
-                self.assertParity(*await self.both("GET", f"/finance/summary{query}"))
+                nest, py = await self.both("GET", f"/finance/summary{query}")
+                self.assertEqual(nest.status_code, py.status_code)
+                if nest.status_code == 200:
+                    # NestJS ranked top expenses by amount over rows fetched with no ORDER BY, so
+                    # equal amounts come in physical row order, which is undefined on both sides
+                    self.assertEqual(normalize(_ties_by_date(nest.json())), normalize(_ties_by_date(py.json())))
+                else:
+                    self.assertParity(nest, py)
 
     async def test_forecast(self):
         await self.seed()
