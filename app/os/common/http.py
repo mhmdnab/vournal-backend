@@ -20,6 +20,7 @@ from fastapi.exception_handlers import (
     request_validation_exception_handler,
 )
 from fastapi.exceptions import RequestValidationError
+from fastapi.datastructures import DefaultPlaceholder
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from fastapi.routing import APIRoute
@@ -41,6 +42,10 @@ class NestRoute(APIRoute):
     floats before NestJSONResponse ever saw them. Every /api router uses it."""
 
     def __init__(self, path: str, endpoint, **kwargs):
+        model = kwargs.get("response_model")
+        if model is not None and not isinstance(model, DefaultPlaceholder):
+            # FastAPI would encode the answer itself, undoing to_json's NestJS shapes
+            raise TypeError(f"/api route {path!r}: response_model= is not allowed (return plain data)")
         if not getattr(endpoint, "__nest_json__", False):
             original = endpoint
 
@@ -257,3 +262,19 @@ class EmptyJsonBody:
             return messages.pop(0) if messages else await receive()
 
         await self.app(scope, replay, send)
+
+
+class TrailingSlash:
+    """Express matched "/api/tasks/" to "/api/tasks" (non-strict routing); FastAPI would
+    redirect. Only /api paths are touched."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        path = scope.get("path", "")
+        if scope["type"] == "http" and path.startswith("/api/") and len(path) > 5 and path.endswith("/"):
+            trimmed = path.rstrip("/")
+            raw = scope.get("raw_path")
+            scope = {**scope, "path": trimmed, **({"raw_path": raw.rstrip(b"/")} if raw else {})}
+        await self.app(scope, receive, send)

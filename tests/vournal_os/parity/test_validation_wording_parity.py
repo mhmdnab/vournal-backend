@@ -26,6 +26,12 @@ class WordingParity(ParityCase):
                 nest, py = await self.both("GET", path)
                 self.assertEqual((nest.status_code, nest.json()), (py.status_code, py.json()))
 
+    async def test_trailing_slash_matches(self):
+        """Express's non-strict routing: "/tasks/" is "/tasks"."""
+        for method, path, body in (("GET", "/tasks/", None), ("POST", "/tags/", {"name": "slashed"}), ("GET", "/debts/summary/", None)):
+            with self.subTest(path=path):
+                self.assertParity(*await self.both(method, path, body))
+
     async def test_body_messages(self):
         for path, body in BODIES:
             with self.subTest(path=path, body=body):

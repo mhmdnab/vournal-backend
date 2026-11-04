@@ -12,6 +12,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any
 
+from prisma.bases import _PrismaModel
 from pydantic import BaseModel
 
 # Prisma field name → JSON key, for any field the Python client made us rename.
@@ -46,8 +47,10 @@ def to_json(value: Any) -> Any:
     if isinstance(value, date):
         return _iso(datetime(value.year, value.month, value.day, tzinfo=timezone.utc))
     if isinstance(value, BaseModel):
-        # Unloaded relations were never set; leaving them out matches Prisma JS.
-        fields = {name: getattr(value, name) for name in value.model_fields_set}
+        # A database row: unloaded relations were never set, and leaving them out
+        # matches Prisma JS. Any other model is a whole answer, defaults included.
+        names = value.model_fields_set if isinstance(value, _PrismaModel) else type(value).model_fields
+        fields = {name: getattr(value, name) for name in names}
         return {FIELD_ALIASES.get(k, k): to_json(v) for k, v in fields.items()}
     if isinstance(value, dict):
         return {FIELD_ALIASES.get(k, k) if isinstance(k, str) else k: to_json(v) for k, v in value.items()}

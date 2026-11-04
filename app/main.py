@@ -51,7 +51,7 @@ from app.quota import (
     reserve_entry_quota,
 )
 from app.os import include_os_routers
-from app.os.common.http import EmptyJsonBody, install_nest_errors
+from app.os.common.http import EmptyJsonBody, TrailingSlash, install_nest_errors
 from app.rate_limit import limiter
 from app.storage import (
     create_signed_url,
@@ -213,6 +213,7 @@ app.include_router(billing_paddle_router)
 # shape there only. Root routes above keep FastAPI's handlers.
 install_nest_errors(app)
 app.add_middleware(EmptyJsonBody)  # /api writes only: a missing body is {}, as in Express
+app.add_middleware(TrailingSlash)  # /api only: "/api/tasks/" is "/api/tasks", as in Express
 app.include_router(include_os_routers())
 
 
