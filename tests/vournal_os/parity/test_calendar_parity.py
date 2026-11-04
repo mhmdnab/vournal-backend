@@ -3,7 +3,7 @@ reminders made through the API on both sides, in a Beirut-time account."""
 
 import unittest
 
-from vournal_os.parity.harness import ParityCase
+from vournal_os.parity.harness import ParityCase, copy_reference_market_rates
 
 SEED = [
     ("/tasks", {"title": "Pay rent", "dueAt": "2026-11-05", "priority": "HIGH"}),
@@ -20,6 +20,7 @@ SEED = [
 class CalendarParity(ParityCase):
     async def asyncSetUp(self):
         await super().asyncSetUp()
+        await copy_reference_market_rates()  # the feed's subscription costs convert currencies
         self.assertParity(*await self.both("PATCH", "/settings", {"timezone": "Asia/Beirut"}))
         for path, body in SEED:
             self.assertParity(*await self.both("POST", path, body))

@@ -7,19 +7,17 @@ message NestJS gave. POST /estimate (the AI food estimate) comes with the AI sec
 """
 
 from datetime import datetime
-from typing import ClassVar
 
 from fastapi import Depends, Request
-from pydantic import BaseModel, ConfigDict, model_validator
 
 from app.db import db
 from app.os import finance_utils as fu
 from app.os.common import dates, validators
 from app.os.common.activity import log_activity
+from app.os.common.body import RuleBody, choice, hhmm, iso_date, number, text, trim
 from app.os.common.deps import plus_user
 from app.os.common.http import invalid_data, nest_error, nest_router
 from app.os.common.i18n import to_lang
-from app.os.common.jsparse import _JS_SPACE
 from app.os.common.query import _query_int, unknown_params
 from app.os.foods_catalog import ACTIVITIES, activity_met, catalog_food, search_catalog
 from app.os.health_calc import _js_round, _round1, age_on, bmi, compute_targets, exercise_calories, sum_food, weeks_to_goal
@@ -43,63 +41,10 @@ def _num(value) -> float | None:
     return None if value is None else float(value)
 
 
-def _trim(value):
-    return value.strip(_JS_SPACE) if isinstance(value, str) else value
-
-
-# ----- bodies ------------------------------------------------------------------------
-# (field, optional, trimmed, rule): IsOptional skips null and absent; a required field
-# runs its rules on whatever is there, absent included.
-
-
-def _number(minimum, maximum, places=None):
-    return lambda v, f: validators.number_rules(v, f, minimum, maximum, places)
-
-
-def _text(maximum, minimum=None):
-    return lambda v, f: validators.text_rules(v, f, maximum, minimum)
-
-
-def _choice(choices):
-    return lambda v, f: validators.choice_rules(v, f, choices)
-
-
-def _date(v, f):
-    return [] if isinstance(v, str) and dates.is_iso_date_string(v) else [f"{f} must be a valid ISO 8601 date string"]
-
-
-def _hhmm(v, f):
-    return [] if isinstance(v, str) and validators.HHMM.match(v) else [f"{f} must be a time like 08:30"]
-
+# the rule-table bodies (common/body.py), under the names this module grew up with
+_trim, _number, _text, _choice, _date, _hhmm, _Body = trim, number, text, choice, iso_date, hhmm, RuleBody
 
 _MACRO_RULES = tuple((m, True, False, _number(0, 1000, 1)) for m in _MACROS)
-
-
-class _Body(BaseModel):
-    """Fields are plain values; RULES checks them before anything else runs."""
-
-    model_config = ConfigDict(extra="forbid")
-    RULES: ClassVar[tuple] = ()
-
-    @model_validator(mode="before")
-    @classmethod
-    def _check(cls, data):
-        if not isinstance(data, dict):
-            return data
-        names = [r[0] for r in cls.RULES]
-        problems = [f"property {k} should not exist" for k in data if k not in names]
-        data = {k: _trim(v) if any(r[0] == k and r[2] for r in cls.RULES) else v for k, v in data.items()}
-        for field, optional, _trimmed, rule in cls.RULES:
-            value = data.get(field)
-            if optional and value is None:
-                continue
-            problems += rule(value, field)
-        if problems:
-            raise ValueError("\n".join(problems))
-        return data
-
-    def sent(self, field: str) -> bool:
-        return field in self.model_fields_set
 
 
 class ProfileBody(_Body):
