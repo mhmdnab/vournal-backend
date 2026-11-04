@@ -124,13 +124,16 @@ async def lifespan(app: FastAPI):
     except Exception:  # noqa: BLE001 — never block startup on the reaper
         log.exception("Orphan reaper failed on boot")
     # vournal OS: load market rates in the background; startup never waits for the network
-    from app.os import market_rates
+    from app.os import jobs, market_rates
 
     warm_up = asyncio.ensure_future(market_rates.warm_up())
+    scheduled = jobs.start()  # vournal OS scheduled jobs (VOURNAL_OS_JOBS=0 switches them off)
     try:
         yield
     finally:
         warm_up.cancel()  # still waiting on the network at shutdown: drop it
+        if scheduled:
+            scheduled.cancel()
         await database.disconnect()
 
 
