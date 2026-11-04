@@ -221,13 +221,13 @@ async def update_day(body: DayBody, user=Depends(plus_user)):
 async def week(request: Request, user=Depends(plus_user)):
     """The week for the review screen: numbers, score, the stored review, last week's priorities."""
     errors = unknown_params(request, ("date",))
-    date = request.query_params.get("date")
-    if date is not None:
-        errors += _day_rule(date, "date")
+    asked = request.query_params.get("date")
+    if asked is not None:
+        errors += _day_rule(asked, "date")
     if errors:
         raise nest_error(400, errors)
     ctx = await _context(user)
-    week_start = _week_of(date, ctx["weekStartsOn"]) if date else (await _review_target(user, ctx))["weekStart"]
+    week_start = _week_of(asked, ctx["weekStartsOn"]) if asked else (await _review_target(user, ctx))["weekStart"]
     report = await reports.weekly(user, week_start)
     score = await _score_for(user, ctx, week_start)
     review = await db.weekreview.find_unique(where={"userId_weekStart": {"userId": user.id, "weekStart": key_to_date(week_start)}})
@@ -235,6 +235,10 @@ async def week(request: Request, user=Depends(plus_user)):
     logs = await db.daylog.find_many(where={"userId": user.id, "date": {"gte": key_to_date(week_start), "lte": key_to_date(add_days_key(week_start, 6))}},
                                      order={"date": "asc"})
     t, h, f, cal, g = report["tasks"], report["habits"], report["finance"], report["calendar"], report["goals"]
+    if t:  # the app's to-dos of the week count here too, as they do in the score
+        todos = await app_todos.task_counts(user.id, ctx["tz"], datetime.now(timezone.utc), date.fromisoformat(week_start),
+                                            date.fromisoformat(add_days_key(week_start, 6)))
+        t = {**t, "completed": t["completed"] + todos["done"], "pending": t["pending"] + todos["open"], "overdueNow": t["overdueNow"] + todos["overdue"]}
     return {
         "weekStart": week_start,
         "weekEnd": add_days_key(week_start, 6),

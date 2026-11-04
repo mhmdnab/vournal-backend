@@ -132,3 +132,18 @@ class AppTodosOnTheWeb(OsTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WeeklyReview(OsTestCase):
+    async def test_week_numbers_match_the_score(self):
+        """The review's task numbers count the app's to-dos, as its score does."""
+        web = await self.signed_in(await self.make_user(timezone="Asia/Beirut"))
+        await web.patch("/api/settings", json={"timezone": "Asia/Beirut"})
+        entry = await self.db.entry.create(data={"userId": web.user.id, "rawTranscript": "x", "emotions": []})
+        today = datetime.now(BEIRUT).date()
+        for text, done in (("Done one", True), ("Open one", False)):
+            await self.db.todo.create(data={"entryId": entry.id, "userId": web.user.id, "text": text, "done": done,
+                                            "dueDate": datetime(today.year, today.month, today.day, tzinfo=timezone.utc)})
+        week = (await web.get(f"/api/rituals/week?date={today.isoformat()}")).json()
+        self.assertEqual((week["stats"]["tasks"]["completed"], week["stats"]["tasks"]["pending"]), (1, 1))
+        self.assertIsNotNone(week["score"]["total"])

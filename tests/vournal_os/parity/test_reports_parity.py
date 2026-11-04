@@ -4,7 +4,7 @@ an empty account, Arabic, sections switched off, and bad periods. Beirut-time ac
 import unittest
 
 from vournal_os.parity.harness import ParityCase, copy_reference_market_rates
-from vournal_os.parity.seed import SeedMixin, day, last_month
+from vournal_os.parity.seed import SeedMixin, at, day, last_month
 
 
 class ReportsParity(SeedMixin, ParityCase):
@@ -34,7 +34,8 @@ class ReportsParity(SeedMixin, ParityCase):
     async def test_seeded_account(self):
         await self.seed_life()
         # deadlines on one day sort by priority (the seed's Wireframes is MEDIUM on day 2)
-        for body in ({"title": "Low one", "dueAt": day(2), "priority": "LOW"}, {"title": "Urgent one", "dueAt": day(2), "priority": "URGENT"}):
+        # (distinct times: the pending list sorts by due time only, so a tie has no fixed order)
+        for body in ({"title": "Low one", "dueAt": at(day(2), 9), "priority": "LOW"}, {"title": "Urgent one", "dueAt": at(day(2), 10), "priority": "URGENT"}):
             await self.on_each("POST", "/tasks", body)
         await self.reports()
         self.assertParity(*await self.both("PATCH", "/settings", {"language": "ar", "weekStartsOn": 6}))
