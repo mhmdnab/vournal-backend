@@ -20,6 +20,7 @@ from app.os.common.http import invalid_data, nest_error, nest_router
 from app.os.common.i18n import Lang, default_name, fmt, plural, to_lang
 from app.os.common.ownership import assert_many_owned, assert_owned
 from app.os.common.query import _query_bool, _query_int, unknown_params
+from app.os.household import household_id_of, list_access
 from app.os.profile import ensure_os_profile
 from app.os.tasks import PRIORITIES
 from app.os.transactions import as_decimal
@@ -62,17 +63,7 @@ def expense_notes(lang: Lang, count: int, list_name: str) -> str:
     return plural(lang, count, _MESSAGES[lang]["expenseNotes"], list=list_name)
 
 
-# ----- helpers (shopping.helpers, household.access) -----------------------------------------
-
-
-async def household_id_of(user_id: str) -> str | None:
-    member = await db.householdmember.find_unique(where={"userId": user_id})
-    return member.householdId if member else None
-
-
-def list_access(user_id: str, household_id: str | None) -> dict:
-    """Lists the user may open: their own, plus the ones shared with their household."""
-    return {"OR": [{"userId": user_id}, {"householdId": household_id}]} if household_id else {"userId": user_id}
+# ----- helpers (shopping.helpers) ----------------------------------------------------------
 
 
 async def resolve_shopping_list(user_id: str, list_id: str | None, household_id: str | None = None) -> dict:

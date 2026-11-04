@@ -202,6 +202,31 @@ class ParityCase(unittest.IsolatedAsyncioTestCase):
         if named.status_code != 200:
             raise AssertionError(f"Python name update failed: {named.status_code} {named.text}")
 
+    async def other_user(self, name: str) -> tuple[httpx.AsyncClient, httpx.AsyncClient]:
+        """A second Plus user, signed in on both sides (households, shared lists)."""
+        from app import security
+
+        email = f"parity-{uuid.uuid4().hex}@example.test"
+        address = f"10.{secrets.randbelow(256)}.{secrets.randbelow(256)}.{secrets.randbelow(254) + 1}"
+        nest = httpx.AsyncClient(
+            base_url=os.environ["NEST_REFERENCE_URL"], headers={**CSRF, "X-Forwarded-For": address},
+            limits=httpx.Limits(keepalive_expiry=1.0),
+        )
+        self.addAsyncCleanup(nest.aclose)
+        registered = await nest.post("/auth/register", json={
+            "email": email, "password": PARITY_PASSWORD, "name": name, "timezone": "UTC", "defaultCurrency": "USD", "language": "en",
+        })
+        if registered.status_code not in (200, 201):
+            raise AssertionError(f"NestJS register failed: {registered.status_code} {registered.text}")
+        self.addAsyncCleanup(self.db.user.delete_many, where={"email": email})
+        user = await self.db.user.create(
+            data={"email": email, "passwordHash": security.hash_password(PARITY_PASSWORD), "plan": "plus"}
+        )
+        py = await python_client(user)
+        self.addAsyncCleanup(py.aclose)
+        await py.patch("/api/users/me", json={"name": name})
+        return nest, py
+
     async def both(self, method: str, path: str, json: Any = None) -> tuple[httpx.Response, httpx.Response]:
         """The same request to NestJS (`path` under its /api base) and to Python."""
         kwargs = {} if json is None else {"json": json}

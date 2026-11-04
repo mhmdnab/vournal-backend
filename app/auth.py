@@ -545,8 +545,15 @@ async def delete_account(current) -> None:
 
     await storage.delete_objects([a.storageKey for a in await db.attachment.find_many(where={"userId": current.id})])
 
-    # 2) Then the account. Cascade (schema onDelete) removes everything else.
-    await db.user.delete(where={"id": current.id})
+    # 2) Then the account. Cascade (schema onDelete) removes everything else; a vournal
+    #    OS household it was in must not be left empty or without an owner.
+    from app.os.household import settle_household
+
+    async with db.tx() as tx:
+        membership = await tx.householdmember.find_unique(where={"userId": current.id})
+        await tx.user.delete(where={"id": current.id})
+        if membership:
+            await settle_household(tx, membership.householdId)
 
 
 @router.post("/forgot-password")

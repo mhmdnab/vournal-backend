@@ -60,6 +60,7 @@ def include_os_routers() -> APIRouter:
             goals,
             meal_plan,
             habits,
+            household,
             notes,
             notifications,
             prayer_times,
@@ -104,5 +105,6 @@ def include_os_routers() -> APIRouter:
         api_router.include_router(meal_plan.router)
         api_router.include_router(wellness.router)
         api_router.include_router(prayer_times.router)
+        api_router.include_router(household.router)
         _included = True
     return api_router
