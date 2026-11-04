@@ -76,6 +76,7 @@ def include_os_routers() -> APIRouter:
             tags,
             tasks,
             transactions,
+            trips,
             users,
             wellness,
         )
@@ -112,5 +113,7 @@ def include_os_routers() -> APIRouter:
         api_router.include_router(people.router)
         api_router.include_router(important_dates.router)
         api_router.include_router(study.router)
+        api_router.include_router(trips.router)
+        api_router.include_router(trips.public_router)
         _included = True
     return api_router
