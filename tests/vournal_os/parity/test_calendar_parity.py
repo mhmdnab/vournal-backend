@@ -75,6 +75,17 @@ class CalendarParity(ParityCase):
         self.assertEqual({i["sourceType"] for i in nest.json()["items"]} & {"bill", "subscription", "debt"}, {"bill", "subscription", "debt"})
         self.assertParity(*await self.both("GET", "/calendar/summary?from=2026-10-01&to=2027-01-31"))
 
+    async def test_feed_with_document_expiries(self):
+        """Document expiry items, which phase 3 could only check as empty."""
+        for body in ({"name": "Passport", "type": "PASSPORT", "expiryDate": "2026-11-18", "documentNumber": "P1"},
+                     {"name": "Lease", "type": "CONTRACT", "expiryDate": "2026-12-01"}, {"name": "Will"}):
+            self.assertParity(*await self.both("POST", "/documents", body))
+        for query in ("?from=2026-11-01&to=2026-12-31", "?from=2026-11-01&to=2026-12-31&types=document"):
+            with self.subTest(query=query):
+                nest, py = await self.both("GET", f"/calendar/feed{query}")
+                self.assertParity(nest, py)
+        self.assertEqual(sum(i["sourceType"] == "document" for i in nest.json()["items"]), 2)
+
     async def test_validation_shapes(self):
         for query in ("", "?from=2026-11-01", "?from=x&to=y", "?from=2026-11-01&to=2026-11-30&types=party",
                       "?from=2026-11-01&to=2026-11-30&includeCompleted=perhaps", "?from=2026-01-01&to=2027-03-01",
