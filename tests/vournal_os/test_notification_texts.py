@@ -23,6 +23,12 @@ class NotificationTexts(unittest.TestCase):
             moment = datetime.fromisoformat(c["iso"].replace("Z", "+00:00"))
             self.assertEqual(texts(c["lang"]).time(moment, c["tz"], c["fmt"]), c["text"], c)
 
+    def test_money_matches_nestjs(self):
+        from app.os.notification_texts import format_money
+
+        for c in GOLDEN["money"]:
+            self.assertEqual(format_money(c["amount"], c["currency"]), c["text"], c)
+
     def test_messages_fill_their_values(self):
         from app.os.notification_texts import texts
 

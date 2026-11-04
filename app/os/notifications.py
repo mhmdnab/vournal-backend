@@ -1,9 +1,6 @@
-"""/api/notifications (port of vournalOS NotificationsService's API part).
-
-Making notifications (the every-minute checks, the lazy sync before a list, and
-POST /sync) arrives with the scheduled jobs in a later phase; until then these
-routes read and change the rows that exist, as NestJS did with ?noSync=true.
-"""
+"""/api/notifications (port of vournalOS NotificationsService's API part). Making them is
+notification_sync.py: a list (unless ?noSync=true) and the unread count run a lazy sync
+first, as NestJS did, since the jobs may have slept; POST /sync runs a full one now."""
 
 from datetime import datetime, timezone
 
@@ -13,6 +10,8 @@ from app.db import db
 from app.os.common.query import _query_bool, _query_int, unknown_params
 from app.os.common.deps import plus_user
 from app.os.common.http import nest_error, nest_router
+from app.os.notification_sync import lazy_sync, sync_for_user
+from app.rate_limit import rate_limited
 
 router = nest_router("/notifications")
 
@@ -38,11 +37,13 @@ _LIST_NOTIFICATIONS_QUERY = ("unread", "noSync", "page", "pageSize")  # the Nest
 async def list_notifications(request: Request, user=Depends(plus_user)):
     errors = unknown_params(request, _LIST_NOTIFICATIONS_QUERY)
     unread = _query_bool(request, "unread", errors)
-    _query_bool(request, "noSync", errors)  # accepted; there is no lazy sync yet
+    no_sync = _query_bool(request, "noSync", errors)
     page = _query_int(request, "page", errors)
     page_size = _query_int(request, "pageSize", errors, MAX_PAGE_SIZE)
     if errors:
         raise nest_error(400, errors)
+    if not no_sync:
+        await lazy_sync(user)
     size = page_size or DEFAULT_PAGE_SIZE
     where = {"userId": user.id, **({"readAt": None} if unread else {})}
     rows = await db.notification.find_many(
@@ -60,7 +61,16 @@ async def list_notifications(request: Request, user=Depends(plus_user)):
 
 @router.get("/unread-count")
 async def unread_count(user=Depends(plus_user)):
+    await lazy_sync(user)
     return {"count": await db.notification.count(where={"userId": user.id, "readAt": None})}
+
+
+@router.post("/sync")
+async def sync(user=Depends(plus_user)):
+    """A full pass now (10 a minute)."""
+    if rate_limited("notifications-sync", user.id, 10, 60):
+        raise nest_error(429, "ThrottlerException: Too Many Requests")
+    return {"ok": True, "created": await sync_for_user(user, full=True)}
 
 
 @router.post("/read-all")

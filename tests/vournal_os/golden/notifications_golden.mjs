@@ -38,9 +38,14 @@ const calendar = {
   en: { weekdays: names('en-GB', { weekday: 'short' }, sundays), months: names('en-GB', { month: 'short' }, firsts) },
   ar: { weekdays: names('ar-LB-u-nu-latn', { weekday: 'short' }, sundays), months: names('ar-LB-u-nu-latn', { month: 'short' }, firsts) },
 };
-writeFileSync(join(here, '..', '..', '..', 'app/os/data/notification_texts.json'), JSON.stringify({ messages: { en: EN, ar: AR }, plurals: P, calendar }) + '\n');
+// fmtMoney: en-US currency with at most 2 decimals and the currency's own minimum
+const { SUPPORTED_CURRENCIES } = require(join(reference, 'dist/common/constants/currencies.js'));
+const money = (amount, currency) => new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 2 }).format(amount);
+const minDigits = Object.fromEntries(SUPPORTED_CURRENCIES.map((c) => [c, new Intl.NumberFormat('en-US', { style: 'currency', currency: c, maximumFractionDigits: 2 }).resolvedOptions().minimumFractionDigits]));
+writeFileSync(join(here, '..', '..', '..', 'app/os/data/notification_texts.json'), JSON.stringify({ messages: { en: EN, ar: AR }, plurals: P, calendar, minDigits }) + '\n');
 
-const golden = { plurals: [], when: [], date: [], time: [] };
+const golden = { plurals: [], when: [], date: [], time: [], money: [] };
+for (const c of SUPPORTED_CURRENCIES) for (const a of [0, 5, 12.5, 1234.567, 2.675, 0.125, -3.4, 10000.5]) golden.money.push({ currency: c, amount: a, text: money(a, c) });
 for (const lang of ['en', 'ar']) {
   const T = notificationTexts(lang);
   for (const key of Object.keys(P.en)) for (const n of [0, 1, 2, 3, 10, 11, 99, 100, 101]) golden.plurals.push({ lang, key, n, text: T.n(key, n, { name: 'Sara' }) });
