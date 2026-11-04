@@ -5,17 +5,37 @@ the dashboard (vournalOS-frontend) only changes its BACKEND_URL. The app's own
 routes stay at the root, untouched.
 """
 
+import time
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 
 from app.os.common.deps import csrf_check
 from app.os.common.http import nest_router
+from app.os.common.serialize import to_json
 
 api_router: APIRouter = nest_router("/api", dependencies=[Depends(csrf_check)])
+_STARTED = time.monotonic()
 
 
 @api_router.get("/health")
 async def health():
-    return {"status": "ok"}
+    """Public liveness + database check (NestJS's HealthController)."""
+    from app.db import db
+
+    started = time.monotonic()
+    try:
+        await db.query_raw("SELECT 1")
+    except Exception:  # noqa: BLE001 — any failure means the database is down
+        return JSONResponse(status_code=503, content={"status": "error", "db": "down"})
+    return {
+        "status": "ok",
+        "db": "up",
+        "dbLatencyMs": round((time.monotonic() - started) * 1000),
+        "uptimeSeconds": round(time.monotonic() - _STARTED),
+        "time": to_json(datetime.now(timezone.utc)),
+    }
 
 
 _included = False
@@ -52,6 +72,7 @@ def include_os_routers() -> APIRouter:
             tasks,
             transactions,
             users,
+            wellness,
         )
 
         api_router.include_router(auth.router)
@@ -80,5 +101,6 @@ def include_os_routers() -> APIRouter:
         api_router.include_router(shopping.router)
         api_router.include_router(recipes.router)
         api_router.include_router(meal_plan.router)
+        api_router.include_router(wellness.router)
         _included = True
     return api_router

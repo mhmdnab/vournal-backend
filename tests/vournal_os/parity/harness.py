@@ -166,7 +166,11 @@ class ParityCase(unittest.IsolatedAsyncioTestCase):
         # hop, so each test gets its own made-up local address on the reference.
         address = f"10.{secrets.randbelow(256)}.{secrets.randbelow(256)}.{secrets.randbelow(254) + 1}"
         self.nest = httpx.AsyncClient(
-            base_url=os.environ["NEST_REFERENCE_URL"], headers={**CSRF, "X-Forwarded-For": address}
+            base_url=os.environ["NEST_REFERENCE_URL"],
+            headers={**CSRF, "X-Forwarded-For": address},
+            # Node closes an idle connection after 5 s, httpx's own default: drop ours
+            # first, or a request can go out on a socket Node is closing (ReadError)
+            limits=httpx.Limits(keepalive_expiry=1.0),
         )
         self.addAsyncCleanup(self.nest.aclose)
         registered = await self.nest.post(

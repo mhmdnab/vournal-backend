@@ -75,3 +75,66 @@ def money(value, field: str, minimum: float | None = None):
     if minimum is not None and value < minimum:
         raise ValueError(f"{field} must not be less than {minimum}")
     return value
+
+
+# ----- class-validator rules on any JSON value -------------------------------------
+# These take whatever the body held (a wrong type included) and return every failing
+# rule's message in class-validator's order: the last decorator first.
+
+_NUMBER_WORDS = "must be a number conforming to the specified constraints"
+
+
+def _is_number(value) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def number_rules(value, field: str, minimum=None, maximum=None, places: int | None = None) -> list[str]:
+    """@IsNumber({maxDecimalPlaces: places}) — or @IsInt() when places is None — then
+    @Min(minimum) @Max(maximum). A non-number fails every rule."""
+    number = value if _is_number(value) else math.nan
+    if places is None:
+        return int_problems(number, field, minimum, maximum)
+    problems = []
+    if maximum is not None and not number <= maximum:
+        problems.append(f"{field} must not be greater than {maximum}")
+    if minimum is not None and not number >= minimum:
+        problems.append(f"{field} must not be less than {minimum}")
+    if not (math.isfinite(number) and _decimal_places(number) <= places):
+        problems.append(f"{field} {_NUMBER_WORDS}")
+    return problems
+
+
+def _js_truthy(value) -> bool:
+    return value not in (None, False, "", 0) and value == value
+
+
+def text_rules(value, field: str, maximum: int, minimum: int | None = None) -> list[str]:
+    """@IsString() then @MaxLength(maximum), or @Length(minimum, maximum) when a minimum
+    is given (after Trim). Length's message for a non-string follows its JavaScript
+    default: "longer" when the value is falsy, "shorter" past the limit, else both."""
+    if isinstance(value, str):
+        problem = length_message(field, value, minimum or 0, maximum)
+        return [problem] if problem else []
+    if minimum is None:
+        return [f"{field} must be shorter than or equal to {maximum} characters", f"{field} must be a string"]
+    size = len(value) if isinstance(value, list) else None
+    if not _js_truthy(value) or (size is not None and size < minimum):
+        problem = f"{field} must be longer than or equal to {minimum} characters"
+    elif size is not None and size > maximum:
+        problem = f"{field} must be shorter than or equal to {maximum} characters"
+    else:
+        problem = f"{field} must be longer than or equal to {minimum} and shorter than or equal to {maximum} characters"
+    return [problem, f"{field} must be a string"]
+
+
+def choice_rules(value, field: str, choices: tuple[str, ...]) -> list[str]:
+    """@IsEnum / @IsIn."""
+    return [] if isinstance(value, str) and value in choices else [f"{field} must be one of the following values: {', '.join(choices)}"]
+
+
+def bool_rules(value, field: str) -> list[str]:
+    return [] if isinstance(value, bool) else [f"{field} must be a boolean value"]
+
+
+def string_rules(value, field: str) -> list[str]:
+    return [] if isinstance(value, str) else [f"{field} must be a string"]

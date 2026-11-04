@@ -1,0 +1,436 @@
+[
+ {
+  "q": "manoushe",
+  "lang": "en",
+  "results": [
+   "manoushe-zaatar",
+   "manoushe-cheese",
+   "manoushe-mix"
+  ]
+ },
+ {
+  "q": "manoushe",
+  "lang": "ar",
+  "results": [
+   "manoushe-zaatar",
+   "manoushe-cheese",
+   "manoushe-mix"
+  ]
+ },
+ {
+  "q": "man2oushe jebne",
+  "lang": "en",
+  "results": [
+   "manoushe-cheese"
+  ]
+ },
+ {
+  "q": "man2oushe jebne",
+  "lang": "ar",
+  "results": [
+   "manoushe-cheese"
+  ]
+ },
+ {
+  "q": "منقوشة",
+  "lang": "en",
+  "results": [
+   "manoushe-zaatar",
+   "manoushe-cheese",
+   "manoushe-mix"
+  ]
+ },
+ {
+  "q": "منقوشة",
+  "lang": "ar",
+  "results": [
+   "manoushe-zaatar",
+   "manoushe-cheese",
+   "manoushe-mix"
+  ]
+ },
+ {
+  "q": "اكعكة",
+  "lang": "en",
+  "results": []
+ },
+ {
+  "q": "اكعكة",
+  "lang": "ar",
+  "results": []
+ },
+ {
+  "q": "شاورما دجاج",
+  "lang": "en",
+  "results": [
+   "shawarma-chicken"
+  ]
+ },
+ {
+  "q": "شاورما دجاج",
+  "lang": "ar",
+  "results": [
+   "shawarma-chicken"
+  ]
+ },
+ {
+  "q": "banana",
+  "lang": "en",
+  "results": [
+   "banana"
+  ]
+ },
+ {
+  "q": "banana",
+  "lang": "ar",
+  "results": [
+   "banana"
+  ]
+ },
+ {
+  "q": "أفوكادو",
+  "lang": "en",
+  "results": [
+   "avocado"
+  ]
+ },
+ {
+  "q": "أفوكادو",
+  "lang": "ar",
+  "results": [
+   "avocado"
+  ]
+ },
+ {
+  "q": "   ",
+  "lang": "en",
+  "results": []
+ },
+ {
+  "q": "   ",
+  "lang": "ar",
+  "results": []
+ },
+ {
+  "q": "chicken",
+  "lang": "en",
+  "results": [
+   "shawarma-chicken",
+   "chicken-breast",
+   "chicken-thigh",
+   "chicken-nuggets",
+   "crispy"
+  ]
+ },
+ {
+  "q": "chicken",
+  "lang": "ar",
+  "results": [
+   "shawarma-chicken",
+   "chicken-breast",
+   "chicken-thigh",
+   "chicken-nuggets",
+   "crispy"
+  ]
+ },
+ {
+  "q": "رز",
+  "lang": "en",
+  "results": [
+   "mansaf",
+   "rice",
+   "molokhia",
+   "fasolia"
+  ]
+ },
+ {
+  "q": "رز",
+  "lang": "ar",
+  "results": [
+   "mansaf",
+   "rice",
+   "molokhia",
+   "fasolia"
+  ]
+ },
+ {
+  "q": "Knéfé",
+  "lang": "en",
+  "results": []
+ },
+ {
+  "q": "Knéfé",
+  "lang": "ar",
+  "results": []
+ },
+ {
+  "q": "tea",
+  "lang": "en",
+  "results": [
+   "tea-sugar",
+   "beef-steak",
+   "cake"
+  ]
+ },
+ {
+  "q": "tea",
+  "lang": "ar",
+  "results": [
+   "tea-sugar",
+   "beef-steak",
+   "cake"
+  ]
+ },
+ {
+  "q": "ة",
+  "lang": "en",
+  "results": [
+   "hot-dog",
+   "manoushe-zaatar",
+   "manoushe-cheese",
+   "manoushe-mix",
+   "kaak",
+   "shawarma-meat",
+   "tabbouleh",
+   "labneh",
+   "labneh-sandwich",
+   "fatteh",
+   "kibbeh-fried",
+   "kibbeh-tray",
+   "kafta",
+   "mjaddara",
+   "molokhia",
+   "sfeeha",
+   "knefe",
+   "baklava",
+   "halawa",
+   "ashta"
+  ]
+ },
+ {
+  "q": "ة",
+  "lang": "ar",
+  "results": [
+   "hot-dog",
+   "manoushe-zaatar",
+   "manoushe-cheese",
+   "manoushe-mix",
+   "kaak",
+   "shawarma-meat",
+   "tabbouleh",
+   "labneh",
+   "labneh-sandwich",
+   "fatteh",
+   "kibbeh-fried",
+   "kibbeh-tray",
+   "kafta",
+   "mjaddara",
+   "molokhia",
+   "sfeeha",
+   "knefe",
+   "baklava",
+   "halawa",
+   "ashta"
+  ]
+ },
+ {
+  "q": "fattoush salad",
+  "lang": "en",
+  "results": []
+ },
+ {
+  "q": "fattoush salad",
+  "lang": "ar",
+  "results": []
+ },
+ {
+  "q": "labne",
+  "lang": "en",
+  "results": [
+   "labneh",
+   "labneh-sandwich"
+  ]
+ },
+ {
+  "q": "labne",
+  "lang": "ar",
+  "results": [
+   "labneh",
+   "labneh-sandwich"
+  ]
+ },
+ {
+  "q": "egg",
+  "lang": "en",
+  "results": [
+   "egg",
+   "egg-fried",
+   "omelette"
+  ]
+ },
+ {
+  "q": "egg",
+  "lang": "ar",
+  "results": [
+   "egg",
+   "egg-fried",
+   "omelette"
+  ]
+ },
+ {
+  "q": "شاي",
+  "lang": "en",
+  "results": [
+   "tea-sugar"
+  ]
+ },
+ {
+  "q": "شاي",
+  "lang": "ar",
+  "results": [
+   "tea-sugar"
+  ]
+ },
+ {
+  "q": "ka'ak",
+  "lang": "en",
+  "results": [
+   "kaak"
+  ]
+ },
+ {
+  "q": "ka'ak",
+  "lang": "ar",
+  "results": [
+   "kaak"
+  ]
+ },
+ {
+  "q": "zz",
+  "lang": "en",
+  "results": [
+   "pizza-slice"
+  ]
+ },
+ {
+  "q": "zz",
+  "lang": "ar",
+  "results": [
+   "pizza-slice"
+  ]
+ },
+ {
+  "q": "a",
+  "lang": "en",
+  "limit": 500,
+  "results": [
+   "ashta",
+   "arak",
+   "ayran",
+   "arabic-coffee",
+   "arabic-coffee-sugar",
+   "pita",
+   "pita-half",
+   "akkawi",
+   "apple",
+   "avocado",
+   "almonds",
+   "lahm-bi-ajeen",
+   "labneh-sandwich",
+   "mansaf",
+   "toast-brown",
+   "beer",
+   "manoushe-zaatar",
+   "manoushe-cheese",
+   "manoushe-mix",
+   "kaak",
+   "shawarma-chicken",
+   "shawarma-meat",
+   "shawarma-plate",
+   "falafel-sandwich",
+   "falafel",
+   "baba-ghanouj",
+   "tabbouleh",
+   "fattoush",
+   "labneh",
+   "foul",
+   "fatteh",
+   "kibbeh-tray",
+   "kafta",
+   "shish-tawook",
+   "tawook-sandwich",
+   "mjaddara",
+   "warak-enab",
+   "kousa-mahshi",
+   "molokhia",
+   "fasolia",
+   "sfeeha",
+   "fatayer-spinach",
+   "knefe",
+   "baklava",
+   "maamoul",
+   "halawa",
+   "olives",
+   "zaatar-oil",
+   "jallab",
+   "toast-white",
+   "baguette",
+   "croissant",
+   "pasta",
+   "oats",
+   "cornflakes",
+   "potato-boiled",
+   "fries",
+   "egg",
+   "egg-fried",
+   "chicken-breast",
+   "chicken-thigh",
+   "beef-steak",
+   "minced-beef",
+   "tuna",
+   "salmon",
+   "fish-grilled",
+   "turkey-slices",
+   "mortadella",
+   "milk-full",
+   "milk-low",
+   "laban",
+   "greek-yogurt",
+   "halloumi",
+   "white-cheese",
+   "kashkaval",
+   "cheese-triangle",
+   "banana",
+   "orange",
+   "grapes",
+   "watermelon",
+   "dates",
+   "strawberries",
+   "mango",
+   "orange-juice",
+   "cucumber",
+   "tomato",
+   "salad",
+   "salad-plain",
+   "vegetable-soup",
+   "lentil-soup",
+   "pizza-slice",
+   "crispy",
+   "chocolate-bar",
+   "chips",
+   "nuts",
+   "peanut-butter",
+   "nutella",
+   "ice-cream",
+   "cake",
+   "honey",
+   "sugar",
+   "soda",
+   "coffee-black",
+   "latte",
+   "nescafe-3in1",
+   "tea-sugar",
+   "protein-shake"
+  ]
+ }
+]

@@ -35,6 +35,27 @@ class WordingParity(ParityCase):
             with self.subTest(path=path):
                 self.assertParity(*await self.both(method, path, body))
 
+    async def test_wellness_rule_messages(self):
+        """Bodies checked rule by rule: a wrong or missing value gets every message."""
+        for method, path, body in (
+            ("POST", "/wellness/foods", {}),
+            ("POST", "/wellness/foods", {"name": 7, "calories": "1", "protein": 1.25, "fat": -1, "isFavorite": "yes"}),
+            ("POST", "/wellness/foods", {"name": ["a"], "calories": 1}),
+            ("POST", "/wellness/water", {"addMl": "10"}),
+            ("POST", "/wellness/water", {"addMl": 1.5, "date": 5}),
+            ("POST", "/wellness/exercise", {}),
+            ("POST", "/wellness/food-logs", {"servings": 0.123, "meal": "BRUNCH", "source": "x", "catalogId": 1, "name": 5}),
+            ("PUT", "/wellness/profile", {"logReminderTime": "8:30", "sex": "OTHER", "heightCm": 99.55, "trackFat": 1, "bogus": True}),
+            ("PUT", "/wellness/profile", {"weeklyRateKg": 0.05, "calorieTargetOverride": 799.5}),
+            ("PUT", "/wellness/weight", {"weightKg": 80, "note": 5}),
+            ("PUT", "/wellness/weight", {}),
+            ("GET", "/wellness/foods/search?q=a&q=b", None),
+            ("GET", "/wellness/history?days=3", None),
+        ):
+            with self.subTest(path=path, body=body):
+                nest, py = await self.both(method, path, body)
+                self.assertEqual((nest.status_code, nest.json()), (py.status_code, py.json()))
+
     async def test_body_messages(self):
         for path, body in BODIES:
             with self.subTest(path=path, body=body):

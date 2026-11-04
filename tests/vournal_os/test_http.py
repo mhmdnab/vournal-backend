@@ -115,13 +115,24 @@ class ApiHttp(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(to_json(1e21), float)  # JS switches to exponent form here
         self.assertTrue(math.isnan(to_json(math.nan)))
 
-    async def test_api_health(self):
+    async def test_api_health_checks_the_database(self):
+        """NestJS's liveness check: 503 {status, db} when the database doesn't answer."""
+        from app.db import db
         from app.main import app
 
         async with _client(app) as client:
-            response = await client.get("/api/health")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"status": "ok"})
+            down = await client.get("/api/health")
+            await db.connect()
+            try:
+                up = await client.get("/api/health")
+            finally:
+                await db.disconnect()
+        self.assertEqual((down.status_code, down.json()), (503, {"status": "error", "db": "down"}))
+        body = up.json()
+        self.assertEqual((up.status_code, body["status"], body["db"]), (200, "ok", "up"))
+        self.assertEqual(sorted(body), ["db", "dbLatencyMs", "status", "time", "uptimeSeconds"])
+        self.assertRegex(body["time"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$")
+        self.assertIsInstance(body["uptimeSeconds"], int)
 
 
 if __name__ == "__main__":
