@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import Depends, Request
 
 from app.db import db
+from app.os import app_todos
 from app.os.calendar_utils import (
     DAY,
     ENTITY_LINKS,
@@ -42,6 +43,7 @@ router = nest_router("/calendar")
 SOURCE_TYPES = (
     "event", "task", "bill", "subscription", "birthday", "anniversary", "importantDate", "document",
     "maintenance", "trip", "tripItem", "assessment", "reminder", "studySession", "debt",
+    "appTodo",  # the app's to-dos (vournal OS had none)
 )
 MAX_RANGE_DAYS = 400
 _ONE_MS = timedelta(milliseconds=1)
@@ -51,7 +53,7 @@ SOURCE_SECTION = {
     "event": None, "task": "tasks", "bill": "finance", "subscription": "finance", "birthday": "people",
     "anniversary": "people", "importantDate": "people", "document": "documents", "maintenance": "maintenance",
     "trip": "travel", "tripItem": "travel", "assessment": "study", "studySession": "study",
-    "reminder": "reminders", "debt": "finance",
+    "reminder": "reminders", "debt": "finance", "appTodo": "tasks",
 }
 
 # Titles the feed writes itself (everything else is the user's own text).
@@ -215,6 +217,12 @@ async def _events(ctx: Ctx) -> list[dict]:
                 )
             )
     return out
+
+
+async def _app_todos(ctx: Ctx) -> list[dict]:
+    """The app's to-dos on their days, with their repeats (the app's own rule)."""
+    todos = await app_todos.for_user(ctx.user_id)
+    return app_todos.calendar_items(todos, ctx.start_date, ctx.end_date, ctx.tz, ctx.include_completed, ctx.now)
 
 
 async def _tasks(ctx: Ctx) -> list[dict]:
@@ -668,6 +676,7 @@ async def feed_for(user, request: Request, include_completed: bool | None = None
             (lambda: _study_sessions(ctx), has("studySession")),
             (lambda: _reminders(ctx), has("reminder")),
             (lambda: _debts(ctx), has("debt")),
+            (lambda: _app_todos(ctx), has("appTodo")),
         )
         if wanted_here
     ]

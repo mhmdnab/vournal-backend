@@ -7,6 +7,7 @@ from datetime import timedelta
 from fastapi import Depends
 
 from app.db import db
+from app.os import app_todos
 from app.os import life_data as life
 from app.os.common import dates
 from app.os.common.deps import plus_user
@@ -108,10 +109,15 @@ async def _tasks(ctx: life.LifeContext) -> dict:
     today_from, today_to = dates.start_of_day(now, tz), dates.end_of_day(now, tz)
     overdue = life.overdue_task_where(uid, now, today_from)
     oldest = await db.task.find_first(where=overdue, order={"dueAt": "asc"})
+    oldest_day = day_key(oldest.dueAt, tz) if oldest and oldest.dueAt else None
+    todos = await app_todos.task_counts(uid, tz, now)  # the app's to-dos count too
+    if todos["oldestOverdueDay"] and (oldest_day is None or todos["oldestOverdueDay"].isoformat() < oldest_day):
+        oldest_day = todos["oldestOverdueDay"].isoformat()
     return {
-        "overdueCount": await db.task.count(where=overdue),
-        "oldestOverdueDays": diff_days_key(day_key(oldest.dueAt, tz), ctx.today) if oldest and oldest.dueAt else None,
-        "dueTodayCount": await db.task.count(where={"userId": uid, "status": {"not": "COMPLETED"}, "dueAt": {"gte": today_from, "lte": today_to}}),
+        "overdueCount": await db.task.count(where=overdue) + todos["overdue"],
+        "oldestOverdueDays": diff_days_key(oldest_day, ctx.today) if oldest_day else None,
+        "dueTodayCount": await db.task.count(where={"userId": uid, "status": {"not": "COMPLETED"}, "dueAt": {"gte": today_from, "lte": today_to}})
+        + todos["dueToday"],
         "completedThisWeek": await db.task.count(where={"userId": uid, "status": "COMPLETED", "completedAt": {"gte": week_from, "lte": now}}),
         "completedLastWeekSamePeriod": await db.task.count(where={"userId": uid, "status": "COMPLETED",
                                                                   "completedAt": {"gte": last_week_from, "lte": last_week_same_to}}),

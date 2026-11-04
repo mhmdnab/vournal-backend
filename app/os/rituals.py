@@ -3,12 +3,12 @@ the weekly review and the weekly life score. The lists the rituals show come fro
 /api/dashboard; this stores what the user did (DayLog, WeekReview) and works out the score."""
 
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import Depends, Request
 
 from app.db import db
-from app.os import reports
+from app.os import app_todos, reports
 from app.os.common import dates, validators
 from app.os.common.activity import log_activity
 from app.os.common.body import RuleBody, number, text
@@ -148,12 +148,15 @@ async def _score_for(user, ctx: dict, week_start: str, report: dict | None = Non
     logs = await db.daylog.find_many(where={"userId": user.id, "date": {"gte": key_to_date(week_start), "lte": key_to_date(last_day)}})
     money = await _month_to_date(user, f"{last_day[:7]}-01", ctx["tz"], last_day) if "finance" in ctx["sections"] else None
     t, h = report["tasks"], report["habits"]
+    # the app's to-dos of the week count with the web's tasks
+    todos = await app_todos.task_counts(user.id, ctx["tz"], datetime.now(timezone.utc), date.fromisoformat(week_start), date.fromisoformat(week_end)) \
+        if t else None
     return compute_life_score({
-        "tasks": {"completed": t["completed"], "open": t["pending"] + t["overdue"]} if t else None,
+        "tasks": {"completed": t["completed"] + todos["done"], "open": t["pending"] + t["overdue"] + todos["open"]} if t else None,
         "habits": {"done": h["done"], "expected": h["expected"]} if h else None,
         "money": money,
         "rituals": {"planned": sum(1 for l in logs if l.plannedAt), "reviewed": sum(1 for l in logs if l.reviewedAt), "days": days_elapsed},
-        "overdueNow": t["overdueNow"] if t else None,
+        "overdueNow": t["overdueNow"] + todos["overdue"] if t else None,
     })
 
 

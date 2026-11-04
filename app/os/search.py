@@ -21,22 +21,26 @@ from app.os.profile import ensure_os_profile
 router = nest_router("/search")
 
 SEARCH_TYPES = ("task", "project", "event", "expense", "income", "goal", "habit", "note", "shopping", "subscription", "bill", "trip",
-                "person", "document", "course", "assessment", "reminder", "maintenance", "recipe", "debt")
+                "person", "document", "course", "assessment", "reminder", "maintenance", "recipe", "debt",
+                "todo")  # the app's to-dos (vournal OS had none)
 TYPE_SECTION = {"task": "tasks", "project": "projects", "event": "calendar", "expense": "finance", "income": "finance", "goal": "goals",
                 "habit": "habits", "note": "notes", "shopping": "shopping", "subscription": "finance", "bill": "finance", "trip": "travel",
                 "person": "people", "document": "documents", "course": "study", "assessment": "study", "reminder": "reminders",
-                "maintenance": "maintenance", "recipe": "meals", "debt": "finance"}
+                "maintenance": "maintenance", "recipe": "meals", "debt": "finance",
+                "todo": "tasks"}
 MESSAGES = {
     "en": {"project": "Project · {status}", "repeats": "Repeats", "subscription": "Subscription", "goal": "{type} goal · {status}",
            "habit": "{frequency} habit", "habitArchived": "{frequency} habit · Archived", "note": "Note", "noteArchived": "Archived note",
            "purchased": "Purchased", "toBuy": "To buy", "person": "Person", "debtIOwe": "I owe {amount}", "debtOwedToMe": "Owed to me · {amount}",
            "documentExpires": "{type} · expires {date}", "course": "Course", "reminder": "Reminder", "reminderDone": "Reminder · Done",
-           "recipe": "Recipe", "recipeMinutes": "Recipe · {minutes} min"},
+           "recipe": "Recipe", "recipeMinutes": "Recipe · {minutes} min",
+           "todo": "To-do from your journal", "todoDone": "To-do from your journal · Done"},
     "ar": {"project": "مشروع · {status}", "repeats": "متكرر", "subscription": "اشتراك", "goal": "هدف {type} · {status}",
            "habit": "عادة · {frequency}", "habitArchived": "عادة · {frequency} · مؤرشفة", "note": "ملاحظة", "noteArchived": "ملاحظة مؤرشفة",
            "purchased": "تم الشراء", "toBuy": "للشراء", "person": "شخص", "debtIOwe": "عليّ {amount}", "debtOwedToMe": "لي {amount}",
            "documentExpires": "{type} · تنتهي صلاحيته في {date}", "course": "مقرر", "reminder": "تذكير", "reminderDone": "تذكير · تم",
-           "recipe": "وصفة", "recipeMinutes": "وصفة · {minutes} د"},
+           "recipe": "وصفة", "recipeMinutes": "وصفة · {minutes} د",
+           "todo": "مهمة من يومياتك", "todoDone": "مهمة من يومياتك · تمت"},
 }
 _SPACES = re.compile("[" + re.escape(_JS_SPACE) + "]+")
 _WORD_BREAK = re.compile("[" + re.escape(_JS_SPACE) + r"\-_/.,،؛]+")
@@ -215,6 +219,11 @@ async def search(user, q_raw: str | None, types: list[str] | None, limit: int | 
             left = max(0, float(d.principal) - paid)
             add("debt", d.id, d.title, fmt(M["debtIOwe" if d.direction == "I_OWE" else "debtOwedToMe"], amount=money(lang, left, d.currency)),
                 f"/finance/debts?id={d.id}", iso_ms(d.dueDate) if d.dueDate else None, "finance")
+
+    if want("todo"):
+        for t in await db.todo.find_many(where={"userId": uid, "text": like}, order=[{"done": "asc"}, {"createdAt": "desc"}], take=per_type):
+            when = t.startAt or t.dueDate
+            add("todo", t.id, t.text, M["todoDone"] if t.done else M["todo"], f"/journal/{t.entryId}", iso_ms(when) if when else None, "tasks")
 
     needle = q.lower()
     ranked = sorted(((r, rank_title(r["title"], needle), i) for i, r in enumerate(out)),

@@ -1,11 +1,13 @@
 """/api/dashboard (port of vournalOS DashboardService): everything the home screen needs in
 one call. A disabled section's widget is null and never queried."""
 
-from datetime import timedelta
+from datetime import date, timedelta
 
 from fastapi import Depends
 
+from app import todo_rules
 from app.db import db
+from app.os import app_todos
 from app.os import life_data as life
 from app.os.common import dates
 from app.os.common.collation import locale_key
@@ -81,13 +83,28 @@ async def _tasks(ctx) -> dict:
     candidates = await db.task.find_many(where={"userId": uid, "status": {"not": "COMPLETED"}, "dueAt": {"lte": today_to},
                                                 "OR": [{"focusDate": None}, {"focusDate": {"not": today_d}}]},
                                          include=_TASK_INCLUDE, order={"dueAt": "asc"}, take=60)
-    today_items = sorted((_task(t, ctx) for t in today),
+    # the app's to-dos list with the web's own tasks (a to-do counts on its own day)
+    zone = app_todos.zone(tz)
+    day = date.fromisoformat(ctx.today)
+    todos = await app_todos.for_user(uid)
+    todo_today = [t for t in todos if todo_rules.local_day(t, zone) == day]
+    todo_overdue = [t for t in todos if app_todos.is_overdue(t, day, now, zone)]
+    todo_open = [t for t in todos if not t.done and (d := todo_rules.local_day(t, zone)) and d <= day]
+
+    def views(rows, todos_too) -> list[dict]:
+        return [_task(t, ctx) for t in rows] + [app_todos.as_task(t, tz, day, now) for t in todos_too]
+
+    def priority_order(items: list[dict]) -> list[dict]:
+        return sorted(items, key=lambda t: (PRIORITY_RANK[t["priority"]], dates.parse_instant(t["dueAt"]).timestamp() if t["dueAt"] else 0))
+
+    today_items = sorted(views(today, todo_today),
                          key=lambda t: (t["status"] == "COMPLETED", PRIORITY_RANK[t["priority"]], locale_key(t["dueAt"] or "")))
     return {
-        "todayTasks": {"items": today_items, "total": len(today), "completed": sum(1 for t in today if t.status == "COMPLETED")},
-        "overdue": {"count": overdue_count, "items": [_task(t, ctx) for t in sorted(overdue, key=_by_priority)[:6]]},
+        "todayTasks": {"items": today_items, "total": len(today) + len(todo_today),
+                       "completed": sum(1 for t in today if t.status == "COMPLETED") + sum(1 for t in todo_today if t.done)},
+        "overdue": {"count": overdue_count + len(todo_overdue), "items": priority_order(views(overdue, todo_overdue))[:6]},
         "topPriorities": {"date": ctx.today, "items": [_task(t, ctx) for t in focus],
-                          "suggestions": [_task(t, ctx) for t in sorted(candidates, key=_by_priority)[:3]] if len(focus) < 3 else []},
+                          "suggestions": priority_order(views(candidates, todo_open))[:3] if len(focus) < 3 else []},
     }
 
 
