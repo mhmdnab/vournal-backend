@@ -32,7 +32,7 @@ class Pure(unittest.TestCase):
         self.assertEqual(assistant.for_replay(blocks[:3]), blocks[:3])
 
 
-class Chat(OsTestCase):
+class ChatBase(OsTestCase):
     async def asyncSetUp(self):
         await super().asyncSetUp()
         from app.os import ai
@@ -49,6 +49,8 @@ class Chat(OsTestCase):
         self.assertEqual(response.status_code, 200, response.text)
         return response.json()
 
+
+class Chat(ChatBase):
     async def test_each_message_spends_the_allowance(self):
         fm.script(fm.message(fm.text("Hi!")), fm.message(fm.text("Hi again!")))
         first = await self.say("hello")
@@ -98,6 +100,69 @@ class Chat(OsTestCase):
         self.assertEqual((await stranger.get("/api/assistant/conversations")).json(), {"items": [], "total": 0})
         free = await self.signed_in(await self.make_user(plan="free"))
         self.assertEqual((await free.post("/api/assistant/chat", json={"message": "hi"})).status_code, 403)
+
+
+class AppTodos(ChatBase):
+    """The app's to-dos in the chat: listed with the web's tasks and on the agenda, ticked and
+    rescheduled through the app's own rules, never deleted; and no journal text anywhere."""
+
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        uid = self.client.user.id
+        await self.db.user.update(where={"id": uid}, data={"timezone": "Asia/Beirut"})  # the app's own zone, as the phone sets it
+        self.entry = await self.db.entry.create(data={"userId": uid, "rawTranscript": "zebra secret: I need milk and to call mom", "summary": "zebra day"})
+        today = datetime.now(timezone.utc).date()
+        self.milk = await self.db.todo.create(data={"entryId": self.entry.id, "userId": uid, "text": "Buy milk", "urgency": 3,
+                                                     "dueDate": datetime(today.year, today.month, today.day, tzinfo=timezone.utc)})
+        self.call = await self.db.todo.create(data={"entryId": self.entry.id, "userId": uid, "text": "Call mom"})
+        await self.client.post("/api/tasks", json={"title": "Web task"})
+
+    def results(self) -> list:
+        """The tool results the model got back in the last request."""
+        last = fm.requests("python")[-1]["body"]["messages"][-1]["content"]
+        return [json.loads(c["content"]) if c["content"].startswith(("{", "[")) else c["content"] for c in last]
+
+    async def test_listed_with_tasks_and_on_the_agenda_without_journal_text(self):
+        today = datetime.now(timezone.utc).date().isoformat()
+        fm.script(fm.tools(("list_tasks", {}), ("list_tasks", {"query": "MILK"}), ("get_agenda", {"from": today, "to": today}),
+                           ("search", {"query": "zebra"}), ("search", {"query": "milk"}), ("get_options", {})), fm.message(fm.text("ok")))
+        await self.say("what do I have?")
+        listed, queried, agenda, zebra, milk, options = self.results()
+        self.assertEqual([(t["title"], t.get("source")) for t in listed["items"]], [("Web task", None), ("Buy milk", "app"), ("Call mom", "app")])
+        self.assertEqual(listed["total"], 3)
+        self.assertEqual(listed["items"][1]["priority"], "URGENT")
+        self.assertIn("vournal app", listed["appTodos"])
+        self.assertEqual([t["title"] for t in queried["items"]], ["Buy milk"])
+        self.assertIn("Buy milk", [x["title"] for x in agenda])
+        self.assertEqual(zebra, [])
+        self.assertEqual([(r["type"], r["title"]) for r in milk], [("todo", "Buy milk")])
+        sent = json.dumps(fm.requests("python")[-1]["body"], ensure_ascii=False)
+        self.assertNotIn("zebra", sent.replace('"query":"zebra"', "").replace('"zebra"', ""))
+        self.assertNotIn("secret", sent)
+
+    async def test_ticked_rescheduled_and_never_deleted(self):
+        fm.script(fm.tools(("update_task", {"id": self.call.id, "status": "done"}),
+                           ("update_task", {"id": self.milk.id, "date": "2026-12-01", "time": "09:30", "priority": "LOW"}),
+                           ("update_task", {"id": self.milk.id, "title": "Buy oat milk"}),
+                           ("update_task", {"id": self.call.id, "time": "10:00", "date": "2026-02-30"}),
+                           ("delete_item", {"type": "task", "id": self.milk.id})), fm.message(fm.text("done")))
+        reply = await self.say("tick call mom, move milk")
+        ticked, moved, renamed, bad_day, deleted = self.results()
+        self.assertEqual((ticked["ok"], ticked["status"]), (True, "COMPLETED"))
+        self.assertEqual((moved["due"], moved["priority"]), ("2026-12-01 09:30", "MEDIUM"))  # the app has no "low": urgency 0 reads Medium
+        self.assertIn("vournal app", renamed)
+        self.assertTrue(bad_day.startswith("Error: "))
+        self.assertIn("can't be deleted here", deleted)
+        call = await self.db.todo.find_unique(where={"id": self.call.id})
+        milk = await self.db.todo.find_unique(where={"id": self.milk.id})
+        self.assertEqual((call.done, milk.text, milk.urgency, milk.dueDate.date().isoformat()), (True, "Buy milk", 0, "2026-12-01"))
+        actions = {a["kind"]: a for a in reply["messages"][1]["actions"]}
+        self.assertEqual((actions["complete"]["entityType"], actions["complete"]["link"], actions["complete"]["canUndo"]),
+                         ("app_todo", f"/journal/{self.entry.id}", True))
+        self.assertNotIn("delete", actions)
+        undone = await self.client.post(f"/api/assistant/actions/{actions['complete']['id']}/undo")
+        self.assertEqual(undone.json()["status"], "undone")
+        self.assertFalse((await self.db.todo.find_unique(where={"id": self.call.id})).done)
 
 
 if __name__ == "__main__":

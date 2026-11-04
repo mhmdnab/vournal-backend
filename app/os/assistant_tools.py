@@ -15,7 +15,8 @@ from pydantic import BaseModel, ValidationError
 from starlette.requests import Request
 
 from app.db import db
-from app.os import accounts, calendar, debts, events, notes, reminders, search, shopping, spending_plan, tasks, transactions, wellness
+from app import todo_rules
+from app.os import accounts, app_todos, calendar, debts, events, notes, reminders, search, shopping, spending_plan, tasks, transactions, wellness
 from app.os.ai import _round
 from app.os.calendar_utils import local_date_time
 from app.os.common import prayer
@@ -23,6 +24,7 @@ from app.os.common.http import _validation_messages
 from app.os.common.jsparse import js_date, js_slice, js_to_string
 from app.os.common.serialize import to_json
 from app.os.household import household_id_of, list_access
+from app.schemas import TaskDetailsRequest
 
 MAX_RESULT_CHARS = 12_000
 DATE_RE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
@@ -335,8 +337,82 @@ async def _list_tasks(i: dict, ctx: Ctx) -> dict:
     res = await tasks.list_tasks(_req({"status": status, "dueFrom": opt_date(i.get("due_from")), "dueTo": opt_date(i.get("due_to")),
                                        "overdue": True if i.get("overdue") is True else None, "q": query,
                                        "sort": "dueAt", "order": "asc", "page": 1, "pageSize": _limit(i.get("limit"))}), user=ctx.user)
-    return _json({"total": res["total"], "items": [{"id": t["id"], "title": t["title"], "status": t["status"], "priority": t["priority"],
-                                                     "due": _due_text(t, ctx.tz)} for t in res["items"]]})
+    items = [{"id": t["id"], "title": t["title"], "status": t["status"], "priority": t["priority"], "due": _due_text(t, ctx.tz)} for t in res["items"]]
+    found = await _app_todos(i, ctx, query)
+    out = {"total": res["total"] + len(found), "items": items + [_app_todo_item(t, ctx.tz) for t in found[:_limit(i.get("limit"))]]}
+    if found:
+        out["appTodos"] = APP_TODOS_NOTE
+    return _json(out)
+
+
+# ----- the app's to-dos (vournal OS had none) ----------------------------------------------
+
+APP_TODOS_NOTE = ('Items with "source": "app" are to-dos from the user\'s voice journal in the vournal app. update_task can tick or untick '
+                  "them and change their day, time and priority; they can't be renamed or deleted here.")
+APP_ONLY = "This to-do comes from the vournal app: here only its day, time, priority and done can change."
+_PRIORITY_URGENCY = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "URGENT": 3}
+
+
+async def _app_todos(i: dict, ctx: Ctx, query: str | None) -> list:
+    """The app's to-dos for list_tasks, filtered as the tasks were (status, days, overdue, words)."""
+    status = i.get("status")
+    todos = await app_todos.for_user(ctx.user_id, **({"done": True} if status == "done" else {} if status == "all" else {"done": False}))
+    zone, now = app_todos.zone(ctx.tz), datetime.now(timezone.utc)
+    today = datetime.fromisoformat(ctx.today).date()
+    start, end = opt_date(i.get("due_from")), opt_date(i.get("due_to"))
+
+    def keep(t) -> bool:
+        day = todo_rules.local_day(t, zone)
+        if (start or end) and day is None:
+            return False
+        if start and day.isoformat() < start or end and day.isoformat() > end:
+            return False
+        if i.get("overdue") is True and not app_todos.is_overdue(t, today, now, zone):
+            return False
+        return not query or query.casefold() in t.text.casefold()
+
+    return sorted((t for t in todos if keep(t)), key=app_todos._sort_key)
+
+
+def _app_todo_item(t, tz: str) -> dict:
+    due = app_todos.due_instant(t, tz)
+    return {"id": t.id, "title": t.text, "status": "COMPLETED" if t.done else "TODO", "priority": app_todos.URGENCY_PRIORITY.get(t.urgency, "MEDIUM"),
+            "due": (_local_date_time(due, tz) if t.startAt else local_day(due, tz)) if due else None, "source": "app"}
+
+
+async def _app_todo(ctx: Ctx, id: str):
+    return await db.todo.find_first(where={"id": id, "userId": ctx.user_id})
+
+
+async def _update_app_todo(i: dict, ctx: Ctx, todo) -> dict:
+    """update_task on an app to-do, through the app's own rules (todo_rules)."""
+    if any(k in i for k in ("title", "repeat", "stop_repeating", "clear_due")) or i.get("status") == "in_progress":
+        raise ToolError(APP_ONLY)
+    link = f"/journal/{todo.entryId}"
+    if i.get("status") == "done":
+        ticked = await todo_rules.set_done(ctx.user, todo.id, True, advance=True)
+        advanced = not ticked.done  # a repeat moves to its next day instead of being ticked
+        return _done({"kind": "complete", "entityType": "app_todo", "entityId": todo.id, "label": todo.text, "link": link,
+                      "undo": None if advanced else {"op": "reopen_app_todo", "id": todo.id}},
+                     {**_app_todo_item(ticked, ctx.tz), "status": "COMPLETED"})
+    if i.get("status") == "todo" and todo.done:
+        todo = await todo_rules.set_done(ctx.user, todo.id, False)
+    fields = {}
+    if opt_date(i.get("date")):
+        fields["date"] = i["date"]
+    elif "date" in i:
+        raise ToolError('"date" must be YYYY-MM-DD')
+    if opt_time(i.get("time")):
+        fields["time"] = i["time"]
+    if _is_priority(i.get("priority")):
+        fields["urgency"] = _PRIORITY_URGENCY[i["priority"]]
+    if fields:
+        try:
+            todo = await todo_rules.update_details(ctx.user, todo.id, TaskDetailsRequest(**fields))
+        except HTTPException as exc:
+            raise ToolError(exc.detail if isinstance(exc.detail, str) else "That change didn't work") from exc
+    return _done({"kind": "update", "entityType": "app_todo", "entityId": todo.id, "label": todo.text, "link": link, "undo": None},
+                 _app_todo_item(todo, ctx.tz))
 
 
 async def _get_money(i: dict, ctx: Ctx) -> dict:
@@ -463,7 +539,13 @@ async def _create_task(i: dict, ctx: Ctx) -> dict:
 
 async def _update_task(i: dict, ctx: Ctx) -> dict:
     id = _req_str(i.get("id"), "id")
-    current = await tasks.get(id, user=ctx.user)
+    try:
+        current = await tasks.get(id, user=ctx.user)
+    except HTTPException as exc:
+        todo = await _app_todo(ctx, id) if exc.status_code == 404 else None
+        if todo is None:
+            raise
+        return await _update_app_todo(i, ctx, todo)
     link = f"/tasks?id={id}"
     if i.get("status") == "done":
         t = await tasks.complete(id, user=ctx.user)
@@ -766,6 +848,8 @@ async def reverse(user, undo: dict) -> None:
         await remove(user, undo["type"], undo["id"])
     elif undo["op"] == "reopen_task":
         await tasks.reopen(undo["id"], user=user)
+    elif undo["op"] == "reopen_app_todo":
+        await todo_rules.set_done(user, undo["id"], False)
     else:
         await debts.remove_payment(undo["debtId"], undo["paymentId"], user=user)
 
@@ -774,7 +858,12 @@ async def describe(ctx: Ctx, kind, id: str) -> dict:
     """Label and link for an item the user owns; the route's 404 otherwise."""
     tz, user = ctx.tz, ctx.user
     if kind == "task":
-        t = await tasks.get(id, user=user)
+        try:
+            t = await tasks.get(id, user=user)
+        except HTTPException as exc:
+            if exc.status_code == 404 and await _app_todo(ctx, id):
+                raise ToolError("This to-do comes from the vournal app: it can't be deleted here.") from exc
+            raise
         return {"label": t["title"], "link": f"/tasks?id={id}"}
     if kind == "event":
         e = await events.get(id, user=user)
