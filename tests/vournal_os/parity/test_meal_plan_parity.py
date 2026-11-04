@@ -49,7 +49,8 @@ class MealPlanParity(ParityCase):
 
     async def test_validation(self):
         for body in ({}, {"date": "2026-11-09"}, {"date": "x", "title": "a"}, {"date": "2026-11-09", "title": "a", "mealType": "BRUNCH"},
-                     {"date": "2026-11-09", "title": "a", "servings": 0}, {"date": "2026-11-09", "recipeId": "cnosuchrecipexxxxxxxxxxxxx"}):
+                     {"date": "2026-11-09", "title": "a", "servings": 0}, {"date": "2026-11-09", "recipeId": "cnosuchrecipexxxxxxxxxxxxx"},
+                     {"date": "2026-11-09", "title": "Dinner", "recipeId": "cnosuchrecipexxxxxxxxxxxxx"}):
             with self.subTest(body=body):
                 self.assertParity(*await self.both("POST", "/meal-plan", body))
         self.assertParity(*await self.both("POST", "/meal-plan/generate-shopping", {}))

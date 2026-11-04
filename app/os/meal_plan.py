@@ -12,6 +12,7 @@ from app.db import db
 from app.os.common import dates, validators
 from app.os.common.activity import log_activity
 from app.os.common.deps import plus_user
+from app.os.common.jsparse import _JS_SPACE
 from app.os.common.http import nest_error, nest_router
 from app.os.common.query import unknown_params
 from app.os.profile import ensure_os_profile
@@ -211,10 +212,10 @@ async def generate_shopping(body: GenerateBody, user=Depends(plus_user)):
             continue
         factor = e.servings / r.servings if e.servings and r.servings else 1
         for ing in r.ingredients or []:
-            name = ing.name.strip()
+            name = ing.name.strip(_JS_SPACE)
             if not name:
                 continue
-            unit = (ing.unit or "").strip() or None
+            unit = (ing.unit or "").strip(_JS_SPACE) or None
             key = ingredient_key(name, unit)
             qty = float(ing.quantity) * factor if ing.quantity is not None else 0
             if key in agg:
@@ -260,7 +261,8 @@ async def create(body: CreateBody, user=Depends(plus_user)):
     day = _parse(body.date)
     title = body.title
     if body.recipeId:
-        title = title or await _recipe_name(user.id, body.recipeId)
+        name = await _recipe_name(user.id, body.recipeId)  # the ownership check, title or not
+        title = title or name
     if not title:
         raise nest_error(400, "title is required when no recipe is selected")
     row = await db.mealplanentry.create(

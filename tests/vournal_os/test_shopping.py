@@ -61,5 +61,18 @@ class Shopping(OsTestCase):
         self.assertEqual([(l["name"], l["id"]) for l in lists], [("البقالة", item["listId"])])
 
 
+class JsTrim(unittest.TestCase):
+    """JavaScript's trim() and \\s: a byte-order mark is space, U+001C–U+001F and U+0085 aren't."""
+
+    def test_ingredient_key_and_trimmed_use_javascript_space(self):
+        from app.os.common import validators
+        from app.os.shopping import ingredient_key
+
+        self.assertEqual(ingredient_key("\ufeffMilk\u3000 Full", " L\ufeff"), "milk full|l")
+        self.assertEqual(ingredient_key("Milk\x1f", None), "milk\x1f|")
+        self.assertEqual(validators.trimmed("\ufeff Bread ", "name", 1, 60), "Bread")
+        self.assertEqual(validators.trimmed("Bread\x85", "name", 1, 60), "Bread\x85")
+
+
 if __name__ == "__main__":
     unittest.main()

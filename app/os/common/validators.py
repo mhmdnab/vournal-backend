@@ -3,7 +3,7 @@
 import math
 import re
 
-from app.os.common.jsparse import decimal_places
+from app.os.common.jsparse import _JS_SPACE, decimal_places
 
 HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}\Z")
 ICON_NAME = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*\Z")
@@ -39,7 +39,7 @@ def trimmed(value, field: str, low: int, high: int):
         return value
     if not isinstance(value, str):
         raise ValueError(f"{field} must be a string")
-    value = value.strip()
+    value = value.strip(_JS_SPACE)  # String#trim's set: a byte-order mark is space
     if problem := length_message(field, value, low, high):
         raise ValueError(problem)
     return value

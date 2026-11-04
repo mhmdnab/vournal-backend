@@ -15,6 +15,7 @@ from app.os.common.activity import log_activity
 from app.os.common.currency import Converter, get_converter, round_money
 from app.os.common.defaults import SUPPORTED_CURRENCIES
 from app.os.common.deps import plus_user
+from app.os.common.jsparse import _JS_SPACE
 from app.os.common.http import invalid_data, nest_error, nest_router
 from app.os.common.i18n import Lang, default_name, fmt, plural, to_lang
 from app.os.common.ownership import assert_many_owned, assert_owned
@@ -102,9 +103,12 @@ async def next_item_sort_order(list_id: str) -> int:
     return (top.sortOrder if top else -1) + 1
 
 
+_JS_SPACES = re.compile("[" + re.escape(_JS_SPACE) + "]+")  # JavaScript's \s
+
+
 def ingredient_key(name: str, unit: str | None) -> str:
     """Case-insensitive merge key for (name, unit)."""
-    return f"{re.sub(r'\s+', ' ', name.strip().lower())}|{(unit or '').strip().lower()}"
+    return f"{_JS_SPACES.sub(' ', name.strip(_JS_SPACE).lower())}|{(unit or '').strip(_JS_SPACE).lower()}"
 
 
 # ----- views ---------------------------------------------------------------------------------

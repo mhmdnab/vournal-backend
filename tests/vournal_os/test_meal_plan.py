@@ -17,6 +17,11 @@ class MealPlan(OsTestCase):
             self.assertEqual((response.status_code, response.json()["message"]), (404, "Meal plan entry not found"))
         stolen = await other.post("/api/meal-plan", json={"date": "2026-11-10", "recipeId": recipe["id"]})
         self.assertEqual((stolen.status_code, stolen.json()["message"]), (404, "Recipe not found"))
+        # a title of one's own doesn't skip the recipe's ownership check
+        for recipe_id in (recipe["id"], "cnosuchrecipexxxxxxxxxxxxx"):
+            titled = await other.post("/api/meal-plan", json={"date": "2026-11-10", "title": "Dinner", "recipeId": recipe_id})
+            self.assertEqual((titled.status_code, titled.json()["message"]), (404, "Recipe not found"))
+        self.assertEqual(await self.db.mealplanentry.count(where={"userId": other.user.id}), 0)
 
     async def test_generate_shopping_scales_and_merges(self):
         client = await self.signed_in()
