@@ -5,6 +5,7 @@ Free accounts may read and delete their account (spec: Plus unlocks the web).
 """
 
 import re
+from datetime import datetime, timezone
 
 from fastapi import Depends, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -16,7 +17,9 @@ from app.os.auth import clear_session_cookies, web_user_out
 from app.os.common import validators
 from app.os.common.deps import plus_user, web_user
 from app.os.common.http import nest_error, nest_router
+from app.os.export import export_account
 from app.os.profile import ensure_os_profile
+from app.rate_limit import rate_limited
 
 router = nest_router("/users")
 
@@ -66,6 +69,17 @@ async def update_me(body: UpdateMeBody, user=Depends(plus_user)):
         data["avatarColor"] = body.avatarColor
     settings = await db.usersettings.update(where={"userId": user.id}, data=data)
     return web_user_out(user, settings)
+
+
+@router.get("/me/export")
+async def export(response: Response, user=Depends(plus_user)):
+    """Everything the account owns, as a JSON download (5 a minute, as NestJS allowed)."""
+    if rate_limited("export", user.id, 5, 60):
+        raise nest_error(429, "ThrottlerException: Too Many Requests")
+    data = await export_account(user)
+    response.headers["Content-Disposition"] = f'attachment; filename="life-os-export-{datetime.now(timezone.utc).date().isoformat()}.json"'
+    response.headers["Cache-Control"] = "no-store"
+    return data
 
 
 @router.delete("/me")

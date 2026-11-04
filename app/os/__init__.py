@@ -67,6 +67,7 @@ def include_os_routers() -> APIRouter:
             important_dates,
             notes,
             notifications,
+            onboarding,
             people,
             prayer_times,
             projects,
@@ -127,5 +128,6 @@ def include_os_routers() -> APIRouter:
         api_router.include_router(rituals.router)
         api_router.include_router(dashboard.router)
         api_router.include_router(search.router)
+        api_router.include_router(onboarding.router)
         _included = True
     return api_router
