@@ -52,6 +52,23 @@ class Anchors(OsTestCase):
         self.assertIsNone(await settings(user.id))
         self.assertIsNone((await resolver(user.id))("2026-11-03", {"start": {"prayer": "isha", "offset": 0}}))
 
+    async def test_a_prayer_that_does_not_happen_that_day(self):
+        """Tromsø in polar night has no sunset: an anchor to Maghrib keeps the stored time
+        (lists, repeats) and can't be set (400), rather than a crash or an ended series."""
+        from app.os.common.prayer import NO_SUCH_PRAYER, resolve_or_fail, resolver, save_settings
+        from app.os.profile import ensure_os_profile
+
+        user = await self.make_user()
+        await ensure_os_profile(user)
+        await save_settings(user.id, {"cityId": None, "lat": 69.6492, "lng": 18.9553, "method": "MuslimWorldLeague",
+                                      "madhab": "shafi", "adjustments": None})
+        resolve = await resolver(user.id)
+        self.assertIsNone(resolve("2026-12-21", {"start": {"prayer": "maghrib", "offset": 10}}))
+        self.assertIsNotNone(resolve("2026-12-21", {"start": {"prayer": "dhuhr", "offset": 0}})[0])
+        with self.assertRaises(HTTPException) as caught:
+            await resolve_or_fail(user.id, "2026-12-21", {"start": {"prayer": "maghrib", "offset": 10}})
+        self.assertEqual((caught.exception.status_code, caught.exception.detail["message"]), (400, NO_SUCH_PRAYER))
+
     def test_anchor_validation(self):
         from pydantic import ValidationError
 

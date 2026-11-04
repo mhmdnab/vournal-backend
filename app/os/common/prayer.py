@@ -31,6 +31,8 @@ PRAYER_METHODS = (  # in prayer.util's order (its validation message lists them)
 MAX_ADJUSTMENT = 30
 NO_ADJUSTMENTS = {p: 0 for p in PRAYERS}
 SETTINGS_MISSING = "Choose your city for prayer times first (Settings → Preferences)"
+# far north or south, some prayers don't happen on some days (no sunset in polar night)
+NO_SUCH_PRAYER = "That prayer doesn't happen on this day at your place"
 
 Resolver = Callable[[str, Any], "tuple[datetime, datetime | None] | None"]
 
@@ -222,7 +224,9 @@ async def resolver(user_id: str) -> Resolver:
         if s is None:
             return None
         anchor = read_anchor(raw)
-        return resolve_anchor(s, day, anchor) if anchor else None
+        resolved = resolve_anchor(s, day, anchor) if anchor else None
+        # no such prayer that day: the stored time is used, as with no anchor at all
+        return resolved if resolved and resolved[0] is not None else None
 
     return resolve
 
@@ -232,4 +236,7 @@ async def resolve_or_fail(user_id: str, day: str, anchor: dict) -> tuple[datetim
     s = await settings(user_id)
     if s is None:
         raise nest_error(400, SETTINGS_MISSING)
-    return resolve_anchor(s, day, anchor)
+    start, end = resolve_anchor(s, day, anchor)
+    if start is None:
+        raise nest_error(400, NO_SUCH_PRAYER)
+    return start, end

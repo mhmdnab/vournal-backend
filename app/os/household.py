@@ -144,6 +144,8 @@ async def _remove_membership(household_id: str, user_id: str) -> None:
         await tx.shoppinglist.update_many(where={"userId": user_id, "householdId": household_id}, data={"householdId": None})
         await tx.event.update_many(where={"userId": user_id, "householdId": household_id}, data={"householdId": None})
         await tx.householdmember.delete(where={"userId": user_id})
+        # codes they made stop working, so someone removed can't let themselves back in
+        await tx.householdinvite.delete_many(where={"createdById": user_id, "usedAt": None})
         await settle_household(tx, household_id)
 
 

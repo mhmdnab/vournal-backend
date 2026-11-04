@@ -81,8 +81,10 @@ class TripsParity(ParityCase):
         await self.pair("POST", self.at(rome, "/items/reorder"), {"items": []})
         await self.pair("DELETE", tuple(f"/trips/{t}/items/{i}" for t, i in zip(rome, items[3])))
         # money spent on the trip, in two currencies
-        for body in ({"type": "EXPENSE", "title": "Dinner", "amount": 85, "currency": "EUR"}, {"type": "EXPENSE", "title": "Taxi", "amount": 40}):
-            self.assertParity(*[await c.post(f"{p}/transactions", json={**body, "tripId": t, "date": f"{day(-1)}T18:00:00.000Z"})
+        # different times: expenses are listed by date only, so a tie has no fixed order on either side
+        for body in ({"type": "EXPENSE", "title": "Dinner", "amount": 85, "currency": "EUR", "date": f"{day(-1)}T18:00:00.000Z"},
+                     {"type": "EXPENSE", "title": "Taxi", "amount": 40, "date": f"{day(-1)}T20:00:00.000Z"}):
+            self.assertParity(*[await c.post(f"{p}/transactions", json={**body, "tripId": t})
                                 for c, p, t in ((self.nest, "", rome[0]), (self.py, "/api", rome[1]))])
         self.assertParity(*[await c.post(f"{p}/tasks", json={"title": "Check in online", "tripId": t, "dueAt": day(-3)})
                             for c, p, t in ((self.nest, "", rome[0]), (self.py, "/api", rome[1]))])

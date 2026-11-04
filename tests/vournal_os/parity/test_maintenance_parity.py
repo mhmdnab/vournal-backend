@@ -65,10 +65,10 @@ class MaintenanceParity(ParityCase):
         await self.pair("DELETE", tuple(f"{p}/logs/{l['items'][0]['id']}" for p, l in zip(oil, logs)))  # lastDoneAt follows what's left
         await self.pair("DELETE", tuple(f"{p}/logs/cnosuchlogxxxxxxxxxxxxxxx" for p in oil))
         await self.pair("GET", oil)
-        for body in ({"nextDueAt": None}, {"rrule": None}, {"rrule": "FREQ=WEEKLY;byday=mo"}, {"estimatedCost": 20}, {"isActive": False},
-                     {"lastDoneAt": None, "description": None}, {"nextDueAt": "2027-01-15", "area": "OTHER"}, {"rrule": "FREQ=SECONDLY"}):
+        for n, body in enumerate(({"nextDueAt": None}, {"rrule": None}, {"rrule": "FREQ=WEEKLY;byday=mo"}, {"estimatedCost": 20}, {"isActive": False},
+                     {"lastDoneAt": None, "description": None}, {"nextDueAt": "2027-01-15", "area": "OTHER"}, {"rrule": "FREQ=SECONDLY"})):
             with self.subTest(update=body):
-                await self.pair("PATCH", tuple(p for p in (await self.make({"title": f"U{len(str(body))}", "rrule": "FREQ=MONTHLY"}))), body)
+                await self.pair("PATCH", tuple(p for p in (await self.make({"title": f"Update {n}", "rrule": "FREQ=MONTHLY"}))), body)
         await self.pair("DELETE", doctor)
         await self.pair("GET", doctor)
         await self.pair("GET", "/maintenance")

@@ -547,13 +547,17 @@ async def delete_account(current) -> None:
 
     # 2) Then the account. Cascade (schema onDelete) removes everything else; a vournal
     #    OS household it was in must not be left empty or without an owner.
+    #    (A transaction only then: the cascade of a big account mustn't hit its time limit.)
     from app.os.household import settle_household
 
-    async with db.tx() as tx:
-        membership = await tx.householdmember.find_unique(where={"userId": current.id})
+    await db.householdinvite.delete_many(where={"createdById": current.id, "usedAt": None})
+    membership = await db.householdmember.find_unique(where={"userId": current.id})
+    if membership is None:
+        await db.user.delete(where={"id": current.id})
+        return
+    async with db.tx(timeout=timedelta(seconds=60)) as tx:
         await tx.user.delete(where={"id": current.id})
-        if membership:
-            await settle_household(tx, membership.householdId)
+        await settle_household(tx, membership.householdId)
 
 
 @router.post("/forgot-password")
