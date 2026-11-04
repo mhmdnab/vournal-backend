@@ -64,6 +64,9 @@ class HabitsParity(ParityCase):
         )
         self.assertParity(*await self.both("GET", "/habits"))
         self.assertParity(*await self.on_both("POST", water, "/check", {"date": "2999-01-01"}))
+        self.assertParity(*await self.on_both("POST", water, "/check", {"count": None}))  # null <= 0: the day's log goes
+        self.assertParity(*await self.on_both("POST", gym, "/check", {"date": "0001-01-01"}))  # Date.UTC: 1901
+        self.assertParity(*await self.on_both("GET", gym, "/history?from=1901-01-01&to=1901-01-03"))
         self.assertParity(*await self.on_both("DELETE", water))
 
     async def test_validation(self):

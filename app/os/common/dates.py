@@ -151,12 +151,8 @@ def parse_date_only(value) -> datetime | None:
     match = re.match(r"^(\d{4})-(\d{2})-(\d{2})", value, re.ASCII)
     if not match:
         return None
-    year, month, day = int(match[1]), int(match[2]), int(match[3])
-    months = year * 12 + month - 1
-    try:
-        return _date_only(date(months // 12, months % 12 + 1, 1) + (day - 1) * _DAY)
-    except (ValueError, OverflowError):
-        return None
+    day = jsparse.roll_date(int(match[1]), int(match[2]), int(match[3]))  # Date.UTC: 0050 is 1950
+    return None if day is None else _date_only(day)
 
 
 def format_date_only(value: datetime) -> str:

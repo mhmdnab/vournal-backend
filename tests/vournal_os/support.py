@@ -28,7 +28,11 @@ def fake_bucket(case: unittest.TestCase) -> dict[str, bytes]:
     async def delete_object(key: str) -> bool:
         return objects.pop(key, None) is not None
 
-    for name, fake in (("put_object", put_object), ("get_object", get_object), ("delete_object", delete_object)):
+    async def delete_objects(keys: list[str]) -> None:
+        for key in keys:
+            objects.pop(key, None)
+
+    for name, fake in (("put_object", put_object), ("get_object", get_object), ("delete_object", delete_object), ("delete_objects", delete_objects)):
         patcher = patch.object(storage, name, fake)
         patcher.start()
         case.addCleanup(patcher.stop)

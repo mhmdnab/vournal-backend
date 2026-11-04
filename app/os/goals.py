@@ -701,7 +701,7 @@ async def update_milestone(goal_id: str, id: str, body: MilestoneUpdate, user=De
         data["dueDate"] = dates.parse_date_only(body.dueDate)
     if "sortOrder" in sent:
         data["sortOrder"] = body.sortOrder
-    if body.completed is not None:
+    if "completed" in sent:  # null reopens it, as NestJS read it
         data["completedAt"] = (existing.completedAt or datetime.now(timezone.utc)) if body.completed else None
     m = await db.goalmilestone.update(where={"id": existing.id}, data=data or {"title": existing.title})
     await _log_completion(user.id, goal_id, existing.completedAt, m.completedAt, m)

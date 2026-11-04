@@ -39,8 +39,12 @@ def is_iso8601(value) -> bool:
     return isinstance(value, str) and ISO8601.match(value) is not None
 
 
-def roll_date(year: int, month: int, day: int) -> date | None:
-    """Date.UTC(year, month - 1, day): days past the month's end roll into the next."""
+def roll_date(year: int, month: int, day: int, full_year: bool = True) -> date | None:
+    """Date.UTC(year, month - 1, day): days past the month's end roll into the next, and
+    (full_year) a year 0–99 means 1900–1999, as JavaScript's MakeFullYear does. Parsing a
+    date string doesn't do that: js_date passes full_year=False."""
+    if full_year and 0 <= year <= 99:
+        year += 1900
     months = year * 12 + month - 1
     try:
         return date(months // 12, months % 12 + 1, 1) + timedelta(days=day - 1)
@@ -71,7 +75,7 @@ def js_date(value) -> datetime | None:
         if hours > 23 or minutes > 59:
             return None
         offset = sign * timedelta(hours=hours, minutes=minutes)
-    start = roll_date(year, month, day)
+    start = roll_date(year, month, day, full_year=False)
     if start is None:
         return None
     moment = datetime(start.year, start.month, start.day, tzinfo=timezone.utc)

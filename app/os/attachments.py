@@ -12,6 +12,7 @@ from urllib.parse import quote
 from fastapi import Depends, Request
 from fastapi.responses import Response
 from starlette.datastructures import UploadFile
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import storage
 from app.db import db
@@ -87,15 +88,35 @@ async def list_attachments(request: Request, user=Depends(plus_user)):
 
 @router.post("", status_code=201)
 async def create(request: Request, user=Depends(plus_user)):
-    form = await request.form(max_files=1)
-    files = [(k, v) for k, v in form.multi_items() if isinstance(v, UploadFile)]
-    if any(name != "file" for name, _ in files):
-        raise nest_error(400, "Unexpected field")
+    try:
+        async with request.form(max_files=1) as form:  # temp files close when the request is done
+            return await _create(form, user)
+    except StarletteHTTPException as exc:
+        raise _multer_error(exc) from exc
+
+
+def _multer_error(exc: StarletteHTTPException) -> Exception:
+    """Starlette's multipart refusals in multer's (and NestJS's) words."""
+    detail = str(exc.detail)
+    if detail.startswith("Too many files"):
+        return nest_error(400, "Too many files")
+    if "boundary" in detail.lower():
+        return nest_error(400, "Multipart: Boundary not found")
+    return exc
+
+
+async def _create(form, user) -> dict:
+    # busboy drops a file part whose name is empty (an empty browser file input)
+    files = [(k, v) for k, v in form.multi_items() if isinstance(v, UploadFile) and _upload_name(v.filename)]
+    stray = next((name for name, _ in files if name != "file"), None)
+    if stray is not None:
+        raise nest_error(400, f"Unexpected file field - {stray}")
     upload = files[0][1] if files else None
     # multer stops an oversize file before anything else is looked at
     if upload is not None and (upload.size or 0) > MAX_ATTACHMENT_BYTES:
         raise nest_error(413, "File too large")
-    values = {k: v for k, v in form.multi_items() if not isinstance(v, UploadFile)}
+    # Starlette reads a file part with an empty name as an empty text field; busboy saw a file and multer dropped it
+    values = {k: v for k, v in form.multi_items() if not isinstance(v, UploadFile) and not (k == "file" and v == "")}
     errors = [f"property {k} should not exist" for k in values if k not in _FIELDS] + _target_errors(values)
     if errors:
         raise nest_error(400, errors)
@@ -171,5 +192,4 @@ async def delete_rows(client, user_id: str, entity_type: str, entity_ids: list[s
 
 
 async def delete_objects(keys: list[str]) -> None:
-    for key in keys:
-        await storage.delete_object(key)  # best-effort, never raises
+    await storage.delete_objects(keys)  # best-effort, never raises

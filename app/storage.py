@@ -18,7 +18,7 @@ Functions (all async — the network ones do I/O off the loop):
   create_signed_url(key, ttl)     -> a time-limited GET URL (or None)
   resolve_audio_path(key)         -> a local TEMP file path (caller deletes it)
   delete_audio(key)               -> True if an object was removed
-  put_object / get_object / delete_object(key) -> any object (vournal OS attachments)
+  put_object / get_object / delete_object(key) / delete_objects(keys) -> any object (vournal OS attachments)
 """
 
 from __future__ import annotations
@@ -197,3 +197,17 @@ async def get_object(key: str) -> Optional[bytes]:
 async def delete_object(key: str) -> bool:
     """Remove an object; True only if one was there. Never raises (as delete_audio)."""
     return await delete_audio(key)
+
+
+async def delete_objects(keys: list[str]) -> None:
+    """Remove many objects, 1,000 per request (S3 DeleteObjects). Never raises."""
+    keys = [k for k in keys if k]
+    if not keys:
+        return
+    try:
+        client, bucket = _client_and_bucket()
+        for i in range(0, len(keys), 1000):
+            chunk = [{"Key": k} for k in keys[i : i + 1000]]
+            await asyncio.to_thread(client.delete_objects, Bucket=bucket, Delete={"Objects": chunk, "Quiet": True})
+    except (BotoCoreError, ClientError, StorageNotConfigured):
+        return

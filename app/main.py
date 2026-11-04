@@ -161,6 +161,11 @@ async def _limit_body_size(request, call_next):
     if content_length is not None:
         try:
             if int(content_length) > _MAX_REQUEST_BYTES:
+                if request.url.path.startswith("/api/"):  # vournal OS: NestJS's answer (multer)
+                    return JSONResponse(
+                        status_code=413,
+                        content={"statusCode": 413, "message": "File too large", "error": "Payload Too Large"},
+                    )
                 return JSONResponse(
                     status_code=413, content={"detail": "Request body too large."}
                 )

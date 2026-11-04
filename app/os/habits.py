@@ -460,7 +460,10 @@ async def check(id: str, body: CheckBody, user=Depends(plus_user)):
     day = _valid_date(body.date, ctx)
     key = {"habitId_date": {"habitId": habit.id, "date": day}}
     existing = await db.habitlog.find_unique(where=key)
-    nxt = body.count if body.count is not None else min(MAX_CHECK_COUNT, (existing.count if existing else 0) + 1)
+    if "count" in body.model_fields_set:
+        nxt = body.count if body.count is not None else 0  # null <= 0 in JavaScript: the day's log goes
+    else:
+        nxt = min(MAX_CHECK_COUNT, (existing.count if existing else 0) + 1)
     if nxt <= 0:
         if existing:
             await db.habitlog.delete(where={"id": existing.id})

@@ -240,7 +240,7 @@ async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
     verb = "updated"
     for flag, on, off in (("isArchived", "archived", "unarchived"), ("isPinned", "pinned", "unpinned"), ("isFavorite", "favorited", "unfavorited")):
         value = getattr(body, flag)
-        if value is not None and value != getattr(existing, flag):
+        if flag in sent and value != getattr(existing, flag):  # null counts as "off" here, as in NestJS
             verb = on if value else off
             break
     await log_activity(user.id, f"note.{verb}", entity_id=id, title=row.title)

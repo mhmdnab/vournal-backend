@@ -50,6 +50,14 @@ class AttachmentsParity(ParityCase):
         self.assertParity(*await self.upload(ids, fields={"extra": "1"}))
         self.assertParity(*await self.upload(ids, name='a/b\\c:"d".png'))
         self.assertParity(*await self.upload(("cnosuchtaskxxxxxxxxxxxxxx", "cnosuchtaskxxxxxxxxxxxxxx")))
+        for files in ({"photo": ("a.png", PNG, "image/png")}, [("file", ("a.png", PNG, "image/png")), ("file", ("b.png", PNG, "image/png"))],
+                      {"file": ("", b"", "application/octet-stream")}):
+            out = []
+            for client, prefix, task in ((self.nest, "", ids[0]), (self.py, "/api", ids[1])):
+                out.append(await client.post(f"{prefix}/attachments", data={"entityType": "TASK", "entityId": task}, files=files))
+            self.assertParity(*out)
+        broken = [await c.post(f"{p}/attachments", content=b"--x\r\n", headers={"content-type": "multipart/form-data"}) for c, p in ((self.nest, ""), (self.py, "/api"))]
+        self.assertParity(*broken)
         for query in ("", "?entityType=TASK", "?entityType=TASK&entityId=cnosuchtaskxxxxxxxxxxxxxx", "?entityType=TASK&entityId=x&bogus=1"):
             with self.subTest(query=query):
                 self.assertParity(*await self.both("GET", f"/attachments{query}"))
