@@ -11,7 +11,6 @@ from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Any, List, Optional
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dotenv import load_dotenv
 from fastapi import (
@@ -60,6 +59,8 @@ from app.storage import (
     save_audio,
 )
 from app.transcription import MAX_BYTES, SUPPORTED_FORMATS, looks_like_audio, transcribe
+from app import todo_rules
+from app.todo_rules import _compose_start_at, _parse_due, _user_tz  # shared with the web's app-todos
 from app.schemas import (
     CreateEntryRequest,
     EntityChip,
@@ -77,7 +78,6 @@ from app.task_intelligence import (
     first_occurrence_day,
     known_place_spelling,
     metadata_out,
-    next_occurrence_day,
     normalize_metadata,
     verified_day,
 )
@@ -232,58 +232,6 @@ async def health():
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def _user_tz(tz_name: Optional[str]):
-    """Resolve a stored IANA timezone name to a tzinfo, falling back to UTC for
-    a missing or unrecognized value — a bad tz must never break ingestion."""
-    if not tz_name:
-        return timezone.utc
-    try:
-        return ZoneInfo(tz_name)
-    except (ZoneInfoNotFoundError, ValueError):
-        return timezone.utc
-
-
-def _parse_due(value: Optional[str]) -> Optional[datetime]:
-    """Parse an extracted dueDate string ("YYYY-MM-DD") into a datetime.
-
-    Tolerates bad/None values by returning None rather than raising.
-    """
-    if not value or not isinstance(value, str):
-        return None
-    try:
-        parsed = datetime.fromisoformat(value.strip())
-    except ValueError:
-        return None
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed
-
-
-def _compose_start_at(
-    due: Optional[str], time_str: Optional[str], tz
-) -> Optional[datetime]:
-    """Combine an extracted dueDate ("YYYY-MM-DD") and time ("HH:MM") into a
-    startAt UTC instant. Returns None unless BOTH are present and valid — an
-    untimed todo (no spoken time) has no startAt.
-
-    The extracted time is the speaker's LOCAL wall clock (the prompt is given
-    their local now), so the day+time is interpreted in the user's timezone `tz`
-    and converted to UTC. "2pm tomorrow" for an Asia/Beirut (UTC+3) user stores
-    11:00Z. Rendering back to "2:00 PM" is the client's job.
-    """
-    day = _parse_due(due)
-    if day is None or not time_str:
-        return None
-    try:
-        hour, minute = (int(part) for part in time_str.split(":"))
-        # dueDate only carries the calendar day; build the local wall-clock
-        # datetime in the user's zone, then normalize to UTC for storage.
-        local = datetime(day.year, day.month, day.day, hour, minute, tzinfo=tz)
-        return local.astimezone(timezone.utc)
-    except (ValueError, TypeError):
-        return None
 
 
 async def _load_entry(entry_id: str):
@@ -756,122 +704,25 @@ async def list_todos(done: Optional[bool] = None, current=Depends(get_current_us
     ]
 
 
-def _next_occurrence_update(task, tz) -> Optional[dict]:
-    """The fields that move a repeating to-do to its next day, or None when the
-    series has no next day. The clock time stays the same on the person's wall."""
-    today = datetime.now(tz).date()
-    until = task.recurrenceUntil.astimezone(tz).date() if task.recurrenceUntil else None
-    anchor = task.dueDate.date() if task.dueDate else today
-    day = next_occurrence_day(
-        anchor, task.recurrence, task.recurrenceInterval, task.recurrenceWeekdays, today, until
-    )
-    if day is None:
-        return None
-    clock = task.startAt.astimezone(tz).strftime("%H:%M") if task.startAt else None
-    return {
-        "done": False,
-        "dueDate": _parse_due(day.isoformat()),
-        "startAt": _compose_start_at(day.isoformat(), clock, tz),
-    }
-
-
 @app.patch("/todos/{todo_id}", response_model=TodoOut)
 async def update_todo(
     todo_id: str, body: UpdateTodoRequest, current=Depends(get_current_user)
 ):
-    existing = await db.todo.find_unique(where={"id": todo_id})
-    if existing is None or existing.userId != current.id:
-        raise HTTPException(status_code=404, detail="Todo not found")
-    data = {"done": body.done}
-    if body.done and body.advance and existing.recurrence:
-        data = _next_occurrence_update(existing, _user_tz(current.timezone)) or data
-    todo = await db.todo.update(where={"id": todo_id}, data=data)
-    return TodoOut(
-        id=todo.id,
-        text=todo.text,
-        dueDate=todo.dueDate,
-        startAt=todo.startAt,
-        done=todo.done,
-        **metadata_out(todo),
-    )
+    todo = await todo_rules.set_done(current, todo_id, body.done, body.advance)
+    return TodoOut(**todo_rules.todo_fields(todo))
 
 
 @app.patch("/todos/{todo_id}/details", response_model=TodoOut)
 async def update_task_details(
     todo_id: str, body: TaskDetailsRequest, current=Depends(get_current_user)
 ):
-    task = await db.todo.find_unique(where={"id": todo_id})
-    if task is None or task.userId != current.id:
-        raise HTTPException(404, "Todo not found")
-    fields = body.model_fields_set
-    data = {key: getattr(body, key) for key in fields - {"date", "time", "dismiss"}}
-    if "urgency" in fields:
-        data["urgencyUnclear"] = False
-    if "recurrence" in fields:
-        data["recurrenceUnclear"] = False
-        if body.recurrence != "weekly" and "recurrenceWeekdays" not in fields:
-            data["recurrenceWeekdays"] = []  # repeat days only mean something weekly
-    tz = _user_tz(current.timezone)
-    if "date" in fields or "time" in fields:
-        day = (
-            body.date
-            if "date" in fields
-            else task.dueDate.date().isoformat() if task.dueDate else None
-        )
-        clock = (
-            body.time
-            if "time" in fields
-            else task.startAt.astimezone(tz).strftime("%H:%M") if task.startAt else None
-        )
-        if clock and not day:
-            raise HTTPException(422, "Choose a date before adding a time.")
-        start = _compose_start_at(day, clock, tz)
-        if (
-            start
-            and start.astimezone(tz).strftime("%Y-%m-%d %H:%M") != f"{day} {clock}"
-        ):
-            raise HTTPException(
-                422, "That time does not exist in your timezone. Choose another time."
-            )
-        if start:
-            local = datetime.fromisoformat(f"{day}T{clock}").replace(tzinfo=tz)
-            if local.replace(fold=0).utcoffset() != local.replace(fold=1).utcoffset():
-                raise HTTPException(
-                    422,
-                    "That time occurs twice during the clock change. Choose an unambiguous time.",
-                )
-        data.update(dueDate=_parse_due(day), startAt=start)
-    if not data.get("dueDate", task.dueDate):
-        first = first_occurrence_day(
-            data.get("recurrence", task.recurrence),
-            data.get("recurrenceWeekdays", task.recurrenceWeekdays),
-            datetime.now(tz).date(),
-        )
-        if first:
-            data["dueDate"] = _parse_due(first.isoformat())
-    until = data.get("recurrenceUntil", task.recurrenceUntil)
-    anchor = data.get("startAt", task.startAt) or data.get("dueDate", task.dueDate)
-    if until and anchor and until < anchor:
-        raise HTTPException(422, "The repeat end must be after the first occurrence.")
-    # Explicit dismissal is persistent; no fabricated answer is written.
-    data["dismissedQuestions"] = list(set(task.dismissedQuestions + body.dismiss))
-    task = await db.todo.update(where={"id": todo_id}, data=data)
-    return TodoOut(
-        id=task.id,
-        text=task.text,
-        dueDate=task.dueDate,
-        startAt=task.startAt,
-        done=task.done,
-        **metadata_out(task),
-    )
+    task = await todo_rules.update_details(current, todo_id, body)
+    return TodoOut(**todo_rules.todo_fields(task))
 
 
 @app.delete("/todos/{todo_id}", status_code=204)
 async def delete_todo(todo_id: str, current=Depends(get_current_user)):
-    existing = await db.todo.find_unique(where={"id": todo_id})
-    if existing is None or existing.userId != current.id:
-        raise HTTPException(status_code=404, detail="Todo not found")
-    await db.todo.delete(where={"id": todo_id})
+    await todo_rules.delete(current, todo_id)
 
 
 # ---- Insights ----------------------------------------------------------------
