@@ -72,6 +72,7 @@ def include_os_routers() -> APIRouter:
             reminders,
             settings,
             shopping,
+            study,
             tags,
             tasks,
             transactions,
@@ -110,5 +111,6 @@ def include_os_routers() -> APIRouter:
         api_router.include_router(household.router)
         api_router.include_router(people.router)
         api_router.include_router(important_dates.router)
+        api_router.include_router(study.router)
         _included = True
     return api_router
