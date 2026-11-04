@@ -3,6 +3,7 @@ documents decrypted for their owner, and no secret and nothing of another accoun
 
 import json
 import unittest
+from datetime import datetime, timedelta, timezone
 
 from vournal_os.support import OsTestCase
 
@@ -41,6 +42,20 @@ class Export(OsTestCase):
         client = await self.signed_in()
         codes = [(await client.get("/api/users/me/export")).status_code for _ in range(6)]
         self.assertEqual(codes, [200] * 5 + [429])
+
+    async def test_an_account_without_plus_can_still_take_its_data(self):
+        """Owner's call (4 Nov 2026): when Plus lapses, the export stays open; the rest of /api doesn't."""
+        lapsed = await self.make_user(planExpiresAt=datetime.now(timezone.utc) - timedelta(days=1))
+        await self.db.task.create(data={"userId": lapsed.id, "title": "Made while on Plus"})
+        for user in (lapsed, await self.make_user(plan="free")):
+            client = await self.signed_in(user)
+            response = await client.get("/api/users/me/export")
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(response.json()["user"]["email"], user.email)
+            self.assertEqual((await client.get("/api/tasks")).status_code, 403)
+        self.assertEqual([t["title"] for t in response.json()["data"]["tasks"]], [])
+        lapsed_client = await self.signed_in(lapsed)
+        self.assertEqual([t["title"] for t in (await lapsed_client.get("/api/users/me/export")).json()["data"]["tasks"]], ["Made while on Plus"])
 
 
 if __name__ == "__main__":

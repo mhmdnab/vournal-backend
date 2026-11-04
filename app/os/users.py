@@ -72,8 +72,9 @@ async def update_me(body: UpdateMeBody, user=Depends(plus_user)):
 
 
 @router.get("/me/export")
-async def export(response: Response, user=Depends(plus_user)):
-    """Everything the account owns, as a JSON download (5 a minute, as NestJS allowed)."""
+async def export(response: Response, user=Depends(web_user)):
+    """Everything the account owns, as a JSON download (5 a minute, as NestJS allowed).
+    Open without Plus: an account whose Plus lapsed can still take its data."""
     if rate_limited("export", user.id, 5, 60):
         raise nest_error(429, "ThrottlerException: Too Many Requests")
     data = await export_account(user)
