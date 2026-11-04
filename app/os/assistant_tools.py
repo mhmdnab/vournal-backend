@@ -43,6 +43,7 @@ class ToolError(Exception):
 class Ctx:
     def __init__(self, user, tz: str, today: str):
         self.user, self.user_id, self.tz, self.today = user, user.id, tz, today
+        self.twins_named: set[str] = set()  # titles create_task already pointed to an app to-do this message
 
 
 # ----- results ---------------------------------------------------------------------------
@@ -380,6 +381,23 @@ def _app_todo_item(t, tz: str) -> dict:
             "due": (_local_date_time(due, tz) if t.startAt else local_day(due, tz)) if due else None, "source": "app"}
 
 
+def _app_when(todo, date: str | None, at: str | None, ctx: Ctx) -> dict:
+    """The day and time the model gave (the web's time zone) as the app's rules read them (the
+    app account's own zone, which can differ): the same moment."""
+    if at is None and date is not None and not todo.startAt:
+        return {"date": date}  # a day alone is a calendar day, in any zone
+    if at is None and date is not None:
+        at = local_time(todo.startAt, ctx.tz)  # moving to another day keeps the time it had
+    if at is not None and date is None:
+        date = local_day(todo.startAt, ctx.tz) if todo.startAt else todo.dueDate.date().isoformat() if todo.dueDate else None
+        if date is None:
+            return {"time": at}  # the app's rules answer "Choose a date before adding a time."
+    if at is None:
+        return {}
+    moment = local_date_time(date, at, ctx.tz).astimezone(todo_rules._user_tz(ctx.user.timezone))
+    return {"date": moment.date().isoformat(), "time": moment.strftime("%H:%M")}
+
+
 async def _app_todo(ctx: Ctx, id: str):
     return await db.todo.find_first(where={"id": id, "userId": ctx.user_id})
 
@@ -397,13 +415,9 @@ async def _update_app_todo(i: dict, ctx: Ctx, todo) -> dict:
                      {**_app_todo_item(ticked, ctx.tz), "status": "COMPLETED"})
     if i.get("status") == "todo" and todo.done:
         todo = await todo_rules.set_done(ctx.user, todo.id, False)
-    fields = {}
-    if opt_date(i.get("date")):
-        fields["date"] = i["date"]
-    elif "date" in i:
+    if "date" in i and not opt_date(i.get("date")):
         raise ToolError('"date" must be YYYY-MM-DD')
-    if opt_time(i.get("time")):
-        fields["time"] = i["time"]
+    fields = _app_when(todo, opt_date(i.get("date")), opt_time(i.get("time")), ctx)
     if _is_priority(i.get("priority")):
         fields["urgency"] = _PRIORITY_URGENCY[i["priority"]]
     if fields:
@@ -513,8 +527,21 @@ async def _get_prayer_times(i: dict, ctx: Ctx) -> dict:
     return _json({"date": date, "times": {k: local_time(v, ctx.tz) if isinstance(v, datetime) else v for k, v in times.items()}})
 
 
+def _same_title(text: str) -> str:
+    return " ".join(text.casefold().split())
+
+
 async def _create_task(i: dict, ctx: Ctx) -> dict:
     title = _req_str(i.get("title"), "title")
+    # the spec: before adding, look at both lists, so "add X" doesn't duplicate an app to-do;
+    # asked again in the same message, it's added (the user wants a separate web task)
+    key = _same_title(title)
+    if key not in ctx.twins_named:
+        twin = next((t for t in await app_todos.for_user(ctx.user_id, done=False) if _same_title(t.text) == key), None)
+        if twin:
+            ctx.twins_named.add(key)
+            return {"content": f'An open to-do "{twin.text}" already exists in the vournal app (id {twin.id}); nothing was added. '
+                               "Use update_task on it, or call create_task again with the same title if the user wants a separate task."}
     repeat = read_repeat(i.get("repeat"))
     anchor = read_prayer(i.get("prayer"), False)
     # a recurring or prayer-timed task needs a first day
@@ -550,7 +577,8 @@ async def _update_task(i: dict, ctx: Ctx) -> dict:
     if i.get("status") == "done":
         t = await tasks.complete(id, user=ctx.user)
         nxt = t.get("nextOccurrence")
-        return _done({"kind": "complete", "entityType": "task", "entityId": id, "label": t["title"], "link": link, "undo": {"op": "reopen_task", "id": id}},
+        undo = {"op": "reopen_task", "id": id, **({"nextId": nxt["id"]} if nxt else {})}  # undo also removes the next copy
+        return _done({"kind": "complete", "entityType": "task", "entityId": id, "label": t["title"], "link": link, "undo": undo},
                      {"id": id, "title": t["title"], "status": "COMPLETED", "next": {"id": nxt["id"]} if nxt else None})
     if i.get("status") == "todo" and current["status"] == "COMPLETED":
         await tasks.reopen(id, user=ctx.user)
@@ -807,11 +835,18 @@ async def _log_water(i: dict, ctx: Ctx) -> dict:
 
 
 async def _log_weight(i: dict, ctx: Ctx) -> dict:
+    from app.os.calendar_utils import date_only_value
+
     date = opt_date(i.get("date"))
-    res = await wellness.log_weight(_check(wellness.WeightBody, {"weightKg": _positive(i.get("kg"), "kg"), **({"date": date} if date else {})}), user=ctx.user)
-    w = next((x for x in res["items"] if x["date"] == (date or ctx.today)), None) or res["items"][-1]
-    return _done({"kind": "create", "entityType": "weight", "entityId": w["id"], "label": f"{js_to_string(float(w['weightKg']))} kg", "link": "/health/progress",
-                  "undo": {"op": "delete", "type": "weight", "id": w["id"]}}, {"id": w["id"], "kg": w["weightKg"]})
+    body = _check(wellness.WeightBody, {"weightKg": _positive(i.get("kg"), "kg"), **({"date": date} if date else {})})
+    day = date_only_value(date or ctx.today)
+    before = await db.weightlog.find_first(where={"userId": ctx.user_id, "date": day})
+    await wellness.log_weight(body, user=ctx.user)
+    w = await db.weightlog.find_first(where={"userId": ctx.user_id, "date": day})  # by its day (the route lists only the last year)
+    # a day holds one weight: undo puts back the one this replaced, or removes the new one
+    undo = {"op": "restore_weight", "id": w.id, "previousKg": float(before.weightKg)} if before else {"op": "delete", "type": "weight", "id": w.id}
+    return _done({"kind": "create", "entityType": "weight", "entityId": w.id, "label": f"{js_to_string(float(w.weightKg))} kg", "link": "/health/progress",
+                  "undo": undo}, {"id": w.id, "kg": w.weightKg})
 
 
 async def _delete_item(i: dict, ctx: Ctx) -> dict:
@@ -848,6 +883,10 @@ async def reverse(user, undo: dict) -> None:
         await remove(user, undo["type"], undo["id"])
     elif undo["op"] == "reopen_task":
         await tasks.reopen(undo["id"], user=user)
+        if undo.get("nextId"):
+            await tasks.remove(undo["nextId"], user=user)
+    elif undo["op"] == "restore_weight":
+        await db.weightlog.update_many(where={"id": undo["id"], "userId": user.id}, data={"weightKg": undo["previousKg"]})
     elif undo["op"] == "reopen_app_todo":
         await todo_rules.set_done(user, undo["id"], False)
     else:

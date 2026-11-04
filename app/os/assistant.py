@@ -222,7 +222,12 @@ async def send(user, text: str, conversation_id: str | None = None) -> dict:
             content = for_replay(res.get("content") or [])
             uses = [b for b in res.get("content") or [] if b.get("type") == "tool_use"]
             if res.get("stop_reason") != "tool_use" or not uses:
-                reply = {"content": content, "text": _text_of(res.get("content") or []) or REPLY["failed"][lang]}
+                # a reply cut off mid tool call (max_tokens) keeps no unanswered call: replayed, it
+                # would fail every later message in the chat (a fix; NestJS stored it as it was)
+                kept = [b for b in content if b.get("type") != "tool_use"]
+                if not any(b.get("type") == "text" and b.get("text", "").strip(_JS_SPACE) for b in kept) and uses:
+                    kept = [{"type": "text", "text": REPLY["failed"][lang]}]
+                reply = {"content": kept, "text": _text_of(kept) or REPLY["failed"][lang]}
                 break
             results = []
             for use in uses:

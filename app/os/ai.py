@@ -153,6 +153,12 @@ def match_person(people: list[dict], name: str) -> dict | None:
     return by_first[0] if len(by_first) == 1 else None
 
 
+# zod's enums, which betaZodOutputFormat moved into descriptions on the wire: parse() still
+# enforced them, so a reply outside them was "unavailable"
+CAPTURE_KINDS = ("task", "expense", "income", "event", "reminder", "note", "shopping", "habit", "debt", "unknown")
+CAPTURE_ENUMS = {"kind": CAPTURE_KINDS, "priority": ("LOW", "MEDIUM", "HIGH", "URGENT", None), "debtDirection": ("I_OWE", "OWED_TO_ME", None)}
+
+
 def normalize_capture(raw: dict, lookups: dict) -> dict | None:
     """The model's capture as a form draft with the user's own ids; None when nothing is usable
     (unknown kind, empty title, or money without an amount)."""
@@ -275,7 +281,7 @@ class Unavailable(Exception):
     """The provider failed, or the reply didn't fit the output format."""
 
 
-async def _structured(system: str, content: str, output_format: dict):
+async def _structured(system: str, content: str, output_format: dict, enums: dict | None = None):
     """One structured-output request: (refused, parsed reply or None)."""
     try:
         response = await _client.beta.messages.create(
@@ -310,7 +316,8 @@ async def _structured(system: str, content: str, output_format: dict):
         except ValueError as exc:
             log.warning("AI request failed: the reply wasn't the structured output")
             raise Unavailable from exc
-        if not _shape_ok(value, output_format["schema"], output_format["schema"].get("$defs", {})):
+        if not _shape_ok(value, output_format["schema"], output_format["schema"].get("$defs", {})) or any(
+                value.get(k) not in allowed for k, allowed in (enums or {}).items()):
             log.warning("AI request failed: the reply didn't match the output format")
             raise Unavailable
         parsed = value if parsed is None else parsed
@@ -371,7 +378,7 @@ async def capture(user, sentence: str) -> dict:
         return done("limit")
     left = spent
     try:
-        refused, raw = await _structured(PROMPTS["captureSystem"], content, PROMPTS["captureFormat"])
+        refused, raw = await _structured(PROMPTS["captureSystem"], content, PROMPTS["captureFormat"], CAPTURE_ENUMS)
     except Unavailable:
         return done("unavailable")
     draft = normalize_capture(raw, lookups) if raw and not refused else None

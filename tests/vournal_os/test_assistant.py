@@ -89,6 +89,36 @@ class Chat(ChatBase):
         self.assertEqual([(m["role"], m["content"][-1]["type"]) for m in replay],
                          [("user", "text"), ("assistant", "tool_use"), ("user", "tool_result"), ("assistant", "text"), ("user", "text")])
 
+    async def test_a_cut_off_reply_never_breaks_the_chat(self):
+        """A reply stopped by max_tokens mid tool call is stored without the call, or as the
+        canned text when nothing else is left, so the next message replays a valid history."""
+        cut = fm.message({"type": "thinking", "thinking": "t", "signature": "s"}, fm.text("Logging"),
+                         fm.tool_use("log_food", {"name": "Rice"}), stop="max_tokens")
+        empty = fm.message({"type": "thinking", "thinking": "t", "signature": "s"}, fm.tool_use("log_food", {}), stop="max_tokens")
+        fm.script(cut, empty, fm.message(fm.text("ok")))
+        conv = (await self.say("log my lunch"))["conversation"]["id"]
+        second = await self.say("and dinner", conv)
+        self.assertEqual(second["messages"][1]["text"], "Something went wrong on my side. Please try again.")
+        await self.say("thanks", conv)
+        replay = fm.requests("python")[-1]["body"]["messages"]
+        uses = [b for m in replay if m["role"] == "assistant" for b in m["content"] if b["type"] == "tool_use"]
+        self.assertEqual(uses, [])
+        self.assertEqual([b["type"] for b in replay[1]["content"]], ["thinking", "text"])
+        self.assertEqual(replay[3]["content"], [{"type": "text", "text": "Something went wrong on my side. Please try again."}])
+
+    async def test_undo_puts_back_what_was_there(self):
+        await self.client.put("/api/wellness/weight", json={"weightKg": 80})
+        task = (await self.client.post("/api/tasks", json={"title": "Gym", "dueAt": "2026-11-02", "rrule": "FREQ=WEEKLY"})).json()
+        fm.script(fm.tools(("log_weight", {"kg": 81}), ("log_weight", {"kg": 70, "date": "2026-10-01"}), ("update_task", {"id": task["id"], "status": "done"})),
+                  fm.message(fm.text("ok")))
+        actions = (await self.say("weigh, tick gym"))["messages"][1]["actions"]
+        for a in actions:
+            self.assertEqual((await self.client.post(f"/api/assistant/actions/{a['id']}/undo")).status_code, 200, a)
+        weights = (await self.client.get("/api/wellness/weight?days=365")).json()["items"]
+        self.assertEqual([w["weightKg"] for w in weights], [80])  # today's 80 restored; the new 1 October entry removed
+        tasks = (await self.client.get("/api/tasks?status=TODO")).json()["items"]
+        self.assertEqual([(t["id"], t["title"]) for t in tasks], [(task["id"], "Gym")])  # reopened, and next week's copy gone
+
     async def test_conversations_stay_with_their_owner(self):
         fm.script(fm.message(fm.text("ok")))
         conv = (await self.say("mine"))["conversation"]["id"]
@@ -163,6 +193,25 @@ class AppTodos(ChatBase):
         undone = await self.client.post(f"/api/assistant/actions/{actions['complete']['id']}/undo")
         self.assertEqual(undone.json()["status"], "undone")
         self.assertFalse((await self.db.todo.find_unique(where={"id": self.call.id})).done)
+
+    async def test_add_checks_the_apps_list_first(self):
+        fm.script(fm.tools(("create_task", {"title": "buy  MILK"})), fm.tools(("create_task", {"title": "Buy milk"})), fm.message(fm.text("ok")))
+        await self.say("add buy milk")
+        refused = fm.requests("python")[1]["body"]["messages"][-1]["content"][0]["content"]
+        self.assertIn("already exists in the vournal app", refused)
+        self.assertIn(self.milk.id, refused)
+        titles = [t["title"] for t in (await self.client.get("/api/tasks")).json()["items"]]
+        self.assertEqual(titles.count("Buy milk"), 1)  # the second ask, in the same message, adds it
+
+    async def test_times_are_the_web_users_even_when_the_phone_is_elsewhere(self):
+        await self.db.user.update(where={"id": self.client.user.id}, data={"timezone": "Europe/London"})
+        fm.script(fm.tools(("update_task", {"id": self.milk.id, "date": "2026-12-01", "time": "09:00"}),
+                           ("update_task", {"id": self.call.id, "date": "2026-12-02", "time": "23:30"})), fm.message(fm.text("ok")))
+        await self.say("move them")
+        moved, late = self.results()
+        self.assertEqual((moved["due"], late["due"]), ("2026-12-01 09:00", "2026-12-02 23:30"))
+        milk = await self.db.todo.find_unique(where={"id": self.milk.id})
+        self.assertEqual(milk.startAt, datetime(2026, 12, 1, 7, 0, tzinfo=timezone.utc))  # 09:00 Beirut
 
 
 if __name__ == "__main__":

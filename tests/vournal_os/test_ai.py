@@ -110,6 +110,12 @@ class Capture(OsTestCase):
         self.assertEqual(statuses, ["not_understood", "unavailable", "unavailable", "not_understood"])
         self.assertEqual((await self.client.get("/api/ai/status")).json()["remainingToday"], 2996)
 
+    async def test_values_outside_the_enums_are_unavailable(self):
+        """zod's enums (kind, priority, debtDirection) aren't in the wire schema; they're still enforced."""
+        self.model(drafted(kind="todo", title="call mom"), drafted(kind="task", title="x", priority="high"),
+                   drafted(kind="debt", title="x", amount=5, debtDirection="OWES_ME", person="Rami"), drafted(kind="task", title="ok", priority="HIGH"))
+        self.assertEqual([(await self.capture())["status"] for _ in range(4)], ["unavailable", "unavailable", "unavailable", "ok"])
+
     async def test_the_allowance_is_monthly_in_the_users_time_zone_and_shared(self):
         self.model()
         tz = ZoneInfo("Asia/Beirut")
