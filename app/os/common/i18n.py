@@ -72,3 +72,34 @@ def translate_default_name(current: str, lang: Lang) -> str | None:
     other language; otherwise None (the user renamed it, or it's their own)."""
     target = _AR.get(current) if lang == "ar" else _EN.get(current)
     return target if target and target != current else None
+
+
+def fmt(template: str, **values) -> str:
+    """Replace {name} placeholders; unknown or null names stay as written (vournalOS fmt)."""
+    import re
+
+    return re.sub(r"\{(\w+)\}", lambda m: m[0] if values.get(m[1]) is None else str(values[m[1]]), template)
+
+
+def plural_category(lang: Lang, count: float) -> str:
+    """Intl.PluralRules(lang).select(count) for whole numbers: CLDR's English and Arabic rules."""
+    n = abs(count)
+    if lang == "ar":
+        if n == 0:
+            return "zero"
+        if n == 1:
+            return "one"
+        if n == 2:
+            return "two"
+        if float(n).is_integer() and 3 <= n % 100 <= 10:
+            return "few"
+        if float(n).is_integer() and 11 <= n % 100 <= 99:
+            return "many"
+        return "other"
+    return "one" if n == 1 and float(count).is_integer() else "other"
+
+
+def plural(lang: Lang, count: float, forms: dict[str, str], **values) -> str:
+    """The form for count's plural category (else "other"), with {count} filled in."""
+    template = forms.get(plural_category(lang, count)) or forms["other"]
+    return fmt(template, count=count, **values)

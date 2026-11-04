@@ -45,6 +45,7 @@ def include_os_routers() -> APIRouter:
             recurring_payments,
             reminders,
             settings,
+            shopping,
             tags,
             tasks,
             transactions,
@@ -74,5 +75,6 @@ def include_os_routers() -> APIRouter:
         api_router.include_router(documents.router)
         api_router.include_router(habits.router)
         api_router.include_router(goals.router)
+        api_router.include_router(shopping.router)
         _included = True
     return api_router
