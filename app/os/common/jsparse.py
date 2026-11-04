@@ -144,3 +144,8 @@ def js_sum(values) -> float:
     for value in values:
         total += value
     return total
+
+
+def js_slice(text: str, size: int) -> str:
+    """String#slice(0, size): `size` counts UTF-16 units, as JavaScript does (a half emoji at the cut is dropped)."""
+    return text.encode("utf-16-le", "surrogatepass")[: size * 2].decode("utf-16-le", errors="ignore")

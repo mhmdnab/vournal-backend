@@ -3,7 +3,7 @@ calorie target from the profile, food / exercise / water / weight logs, and the 
 balance. Everything optional is behind a toggle on the profile.
 
 Bodies are checked rule by rule as class-validator did, so a wrong type gets every
-message NestJS gave. POST /estimate (the AI food estimate) comes with the AI section.
+message NestJS gave. POST /estimate (the AI food estimate) lives in app/os/ai.py.
 """
 
 from datetime import datetime
@@ -11,6 +11,7 @@ from datetime import datetime
 from fastapi import Depends, Request
 
 from app.db import db
+from app.os import ai
 from app.os import finance_utils as fu
 from app.os.common import dates, validators
 from app.os.common.activity import log_activity
@@ -611,6 +612,13 @@ async def remove_food(id: str, user=Depends(plus_user)):
     log = await _owned_log(user.id, id)
     await db.foodlog.delete(where={"id": log.id})
     return await _day(user, dates.format_date_only(log.date))
+
+
+@router.post("/estimate")
+async def estimate(body: ai.EstimateBody, user=Depends(plus_user)):
+    """AI calorie estimate of a described meal (needs AI on). Saves nothing."""
+    ai.throttle("ai-food", user.id)
+    return await ai.estimate_food(user, body.text)
 
 
 # ----- exercise, water, weight -----------------------------------------------------------

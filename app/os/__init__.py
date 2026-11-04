@@ -47,6 +47,7 @@ def include_os_routers() -> APIRouter:
     if not _included:
         from app.os import (
             accounts,
+            ai,
             app_todos,
             attachments,
             auth,
@@ -135,5 +136,6 @@ def include_os_routers() -> APIRouter:
         api_router.include_router(app_todos.router)
         api_router.include_router(journal.router)
         api_router.include_router(push.router)
+        api_router.include_router(ai.router)
         _included = True
     return api_router

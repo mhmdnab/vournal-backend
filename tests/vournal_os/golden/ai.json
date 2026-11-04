@@ -1,0 +1,1090 @@
+{
+ "capture": [
+  {
+   "raw": {
+    "kind": "expense",
+    "title": "lunch",
+    "amount": 12.345,
+    "currency": "usd",
+    "date": "2026-11-03",
+    "time": null,
+    "durationMinutes": null,
+    "category": " food  & DINING",
+    "account": "visa card",
+    "list": null,
+    "quantity": null,
+    "priority": null,
+    "note": null,
+    "debtDirection": null,
+    "person": null
+   },
+   "out": {
+    "kind": "expense",
+    "title": "lunch",
+    "amount": 12.35,
+    "currency": "USD",
+    "date": "2026-11-03",
+    "time": null,
+    "durationMinutes": null,
+    "categoryId": "c-food",
+    "categoryName": "Food & Dining",
+    "accountId": "a-visa",
+    "listId": null,
+    "quantity": null,
+    "priority": null,
+    "note": null,
+    "debtDirection": null,
+    "personId": null,
+    "personName": null
+   }
+  },
+  {
+   "raw": {
+    "kind": "expense",
+    "title": "taxi",
+    "amount": 0,
+    "currency": null,
+    "date": null,
+    "time": null,
+    "durationMinutes": null,
+    "category": null,
+    "account": null,
+    "list": null,
+    "quantity": null,
+    "priority": null,
+    "note": null,
+    "debtDirection": null,
+    "person": null
+   },
+   "out": null
+  },
+  {
+   "raw": {
+    "kind": "expense",
+    "title": "taxi",
+    "amount": 300000,
+    "currency": "XYZ",
+    "date": null,
+    "time": null,
+    "durationMinutes": null,
+    "category": "Taxis",
+    "account": null,
+    "list": null,
+    "quantity": null,
+    "priority": null,
+    "note": null,
+    "debtDirection": null,
+    "person": null
+   },
+   "out": {
+    "kind": "expense",
+    "title": "taxi",
+    "amount": 300000,
+    "currency": "USD",
+    "date": null,
+    "time": null,
+    "durationMinutes": null,
+    "categoryId": null,
+    "categoryName": null,
+    "accountId": null,
+    "listId": null,
+    "quantity": null,
+    "priority": null,
+    "note": null,
+    "debtDirection": null,
+    "personId": null,
+    "personName": null
+   }
+  },
+  {
+   "raw": {
+    "kind": "income",
+    "title": "Salary",
+    "amount": 2000,
+    "currency": null,
+    "date": "2026-02-30",
+    "time": null,
+    "durationMinutes": null,
+    "category": "salary",
+    "account": null,
+    "list": null,
+    "quantity": null,
+    "priority": null,
+    "note": null,
+    "debtDirection": null,
+    "person": null
+   },
+   "out": {
+    "kind": "income",
+    "title": "Salary",
+    "amount": 2000,
+    "currency": "USD",
+    "date": null,
+    "time": null,
+    "durationMinutes": null,
+    "categoryId": "c-salary",
+    "categoryName": "Salary",
+    "accountId": null,
+    "listId": null,
+    "quantity": null,
+    "priority": null,
+    "note": null,
+    "debtDirection": null,
+    "personId": null,
+    "personName": null
+   }
+  },
+  {
+   "raw": {
+    "kind": "event",
+    "title": "Dentist",
+    "amount": null,
+    "currency": null,
+    "date": "2026-11-05",
+    "time": "9:05",
+    "durationMinutes": 2000.6,
+    "category": null,
+    "account": null,
+    "list": null,
+    "quantity": null,
+    "priority": null,
+    "note": null,
+    "debtDirection": null,
+    "person": null
+   },
+   "out": {
+    "kind": "event",
+    "title": "Dentist",
+    "amount": null,
+    "currency": null,
+    "date": "2026-11-05",
+    "time": "09:05",
+    "durationMinutes": 1440,
+    "categoryId": null,
+    "categoryName": null,
+    "accountId": null,
+    "listId": null,
+    "quantity": null,
+    "priority": null,
+    "note": null,
+    "debtDirection": null,
+    "personId": null,
+    "personName": null
+   }
+  },
+  {
+   "raw": {
+    "kind": "event",
+    "title": "Call",
+    "amount": null,
+    "currency": null,
+    "date": null,
+    "time": "24:00",
+    "durationMinutes": -5,
+    "category": null,
+    "account": null,
+    "list": null,
+    "quantity": null,
+    "priority": null,
+    "note": null,
+    "debtDirection": null,
+    "person": null
+   },
+   "out": {
+    "kind": "event",
+    "title": "Call",
+    "amount": null,
+    "currency": null,
+    "date": null,
+    "time": null,
+    "durationMinutes": null,
+    "categoryId": null,
+    "categoryName": null,
+    "accountId": null,
+    "listId": null,
+    "quantity": null,
+    "priority": null,
+    "note": null,
+    "debtDirection": null,
+    "personId": null,
+    "personName": null
+   }
+  },
+  {
+   "raw": {
+    "kind": "reminder",
+    "title": "اتصل بأمي",
+    "amount": null,
+    "currency": null,
+    "date": "2026-11-05",
+    "time": "18:30",
+    "durationMinutes": null,
+    "category": null,
+    "account": null,
+    "list": null,
+    "quantity": null,
+    "priority": null,
+    "note": "   ",
+    "debtDirection": null,
+    "person": null
+   },
+   "out": {
+    "kind": "reminder",
+    "title": "اتصل بأمي",
+    "amount": null,
+    "currency": null,
+    "date": "2026-11-05",
+    "time": "18:30",
+    "durationMinutes": null,
+    "categoryId": null,
+    "categoryName": null,
+    "accountId": null,
+    "listId": null,
+    "quantity": null,
+    "priority": null,
+    "note": null,
+    "debtDirection": null,
+    "personId": null,
+    "personName": null
+   }
+  },
+  {
+   "raw": {
+    "kind": "task",
+    "title": "  Pay rent  ",
+    "amount": null,
+    "currency": null,
+    "date": null,
+    "time": null,
+    "durationMinutes": null,
+    "category": null,
+    "account": null,
+    "list": null,
+    "quantity": null,
+    "priority": "HIGH",
+    "note": " before Friday ",
+    "debtDirection": null,
+    "person": null
+   },
+   "out": {
+    "kind": "task",
+    "title": "Pay rent",
+    "amount": null,
+    "currency": null,
+    "date": null,
+    "time": null,
+    "durationMinutes": null,
+    "categoryId": null,
+    "categoryName": null,
+    "accountId": null,
+    "listId": null,
+    "quantity": null,
+    "priority": "HIGH",
+    "note": "before Friday",
+    "debtDirection": null,
+    "personId": null,
+    "personName": null
+   }
+  },
+  {
+   "raw": {
+    "kind": "note",
+    "title": "",
+    "amount": null,
+    "currency": null,
+    "date": null,
+    "time": null,
+    "durationMinutes": null,
+    "category": null,
+    "account": null,
+    "list": null,
+    "quantity": null,
+    "priority": null,
+    "note": "idea",
+    "debtDirection": null,
+    "person": null
+   },
+   "out": null
+  },
+  {
+   "raw": {
+    "kind": "shopping",
+    "title": "Milk",
+    "amount": null,
+    "currency": null,
+    "date": null,
+    "time": null,
+    "durationMinutes": null,
+    "category": null,
+    "account": null,
+    "list": "home",
+    "quantity": 2.555,
+    "priority": "LOW",
+    "note": null,
+    "debtDirection": null,
+    "person": null
+   },
+   "out": {
+    "kind": "shopping",
+    "title": "Milk",
+    "amount": null,
+    "currency": null,
+    "date": null,
+    "time": null,
+    "durationMinutes": null,
+    "categoryId": null,
+    "categoryName": null,
+    "accountId": null,
+    "listId": "l-home",
+    "quantity": 2.56,
+    "priority": null,
+    "note": null,
+    "debtDirection": null,
+    "personId": null,
+    "personName": null
+   }
+  },
+  {
+   "raw": {
+    "kind": "habit",
+    "title": "Run every morning",
+    "amount": 5,
+    "currency": null,
+    "date": null,
+    "time": null,
+    "durationMinutes": null,
+    "category": null,
+    "account": null,
+    "list": null,
+    "quantity": null,
+    "priority": null,
+    "note": null,
+    "debtDirection": null,
+    "person": null
+   },
+   "out": {
+    "kind": "habit",
+    "title": "Run every morning",
+    "amount": null,
+    "currency": null,
+    "date": null,
+    "time": null,
+    "durationMinutes": null,
+    "categoryId": null,
+    "categoryName": null,
+    "accountId": null,
+    "listId": null,
+    "quantity": null,
+    "priority": null,
+    "note": null,
+    "debtDirection": null,
+    "personId": null,
+    "personName": null
+   }
+  },
+  {
+   "raw": {
+    "kind": "debt",
+    "title": "",
+    "amount": 50,
+    "currency": null,
+    "date": null,
+    "time": null,
+    "durationMinutes": null,
+    "category": null,
+    "account": null,
+    "list": null,
+    "quantity": null,
+    "priority": null,
+    "note": null,
+    "debtDirection": "OWED_TO_ME",
+    "person": "ahmad"
+   },
+   "out": {
+    "kind": "debt",
+    "title": "ahmad",
+    "amount": 50,
+    "currency": "USD",
+    "date": null,
+    "time": null,
+    "durationMinutes": null,
+    "categoryId": null,
+    "categoryName": null,
+    "accountId": null,
+    "listId": null,
+    "quantity": null,
+    "priority": null,
+    "note": null,
+    "debtDirection": "OWED_TO_ME",
+    "personId": "p-ahmad",
+    "personName": "ahmad"
+   }
+  },
+  {
+   "raw": {
+    "kind": "debt",
+    "title": "dinner",
+    "amount": 20,
+    "currency": "lbp",
+    "date": null,
+    "time": null,
+    "durationMinutes": null,
+    "category": null,
+    "account": null,
+    "list": null,
+    "quantity": null,
+    "priority": null,
+    "note": null,
+    "debtDirection": "I_OWE",
+    "person": "Sara"
+   },
+   "out": {
+    "kind": "debt",
+    "title": "dinner",
+    "amount": 20,
+    "currency": "LBP",
+    "date": null,
+    "time": null,
+    "durationMinutes": null,
+    "categoryId": null,
+    "categoryName": null,
+    "accountId": null,
+    "listId": null,
+    "quantity": null,
+    "priority": null,
+    "note": null,
+    "debtDirection": "I_OWE",
+    "personId": null,
+    "personName": "Sara"
+   }
+  },
+  {
+   "raw": {
+    "kind": "debt",
+    "title": "loan",
+    "amount": 200,
+    "currency": null,
+    "date": null,
+    "time": null,
+    "durationMinutes": null,
+    "category": null,
+    "account": null,
+    "list": null,
+    "quantity": null,
+    "priority": null,
+    "note": null,
+    "debtDirection": null,
+    "person": "Rami"
+   },
+   "out": null
+  },
+  {
+   "raw": {
+    "kind": "debt",
+    "title": "loan",
+    "amount": 200,
+    "currency": null,
+    "date": null,
+    "time": null,
+    "durationMinutes": null,
+    "category": null,
+    "account": null,
+    "list": null,
+    "quantity": null,
+    "priority": null,
+    "note": null,
+    "debtDirection": "I_OWE",
+    "person": "  "
+   },
+   "out": null
+  },
+  {
+   "raw": {
+    "kind": "unknown",
+    "title": "hello",
+    "amount": null,
+    "currency": null,
+    "date": null,
+    "time": null,
+    "durationMinutes": null,
+    "category": null,
+    "account": null,
+    "list": null,
+    "quantity": null,
+    "priority": null,
+    "note": null,
+    "debtDirection": null,
+    "person": null
+   },
+   "out": null
+  },
+  {
+   "raw": {
+    "kind": "task",
+    "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "amount": null,
+    "currency": null,
+    "date": null,
+    "time": null,
+    "durationMinutes": null,
+    "category": null,
+    "account": null,
+    "list": null,
+    "quantity": null,
+    "priority": null,
+    "note": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+    "debtDirection": null,
+    "person": null
+   },
+   "out": {
+    "kind": "task",
+    "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "amount": null,
+    "currency": null,
+    "date": null,
+    "time": null,
+    "durationMinutes": null,
+    "categoryId": null,
+    "categoryName": null,
+    "accountId": null,
+    "listId": null,
+    "quantity": null,
+    "priority": null,
+    "note": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+    "debtDirection": null,
+    "personId": null,
+    "personName": null
+   }
+  }
+ ],
+ "lookups": {
+  "expenseCategories": [
+   {
+    "id": "c-food",
+    "name": "Food & Dining"
+   },
+   {
+    "id": "c-taxi",
+    "name": "Transport"
+   }
+  ],
+  "incomeCategories": [
+   {
+    "id": "c-salary",
+    "name": "Salary"
+   }
+  ],
+  "accounts": [
+   {
+    "id": "a-cash",
+    "name": "Cash"
+   },
+   {
+    "id": "a-visa",
+    "name": "Visa  Card"
+   }
+  ],
+  "shoppingLists": [
+   {
+    "id": "l-home",
+    "name": "Home"
+   }
+  ],
+  "people": [
+   {
+    "id": "p-ahmad",
+    "name": "Ahmad Khalil"
+   },
+   {
+    "id": "p-rami",
+    "name": "Rami"
+   },
+   {
+    "id": "p-sara1",
+    "name": "Sara A"
+   },
+   {
+    "id": "p-sara2",
+    "name": "Sara B"
+   }
+  ],
+  "defaultCurrency": "USD"
+ },
+ "people": [
+  {
+   "name": "Ahmad",
+   "out": "p-ahmad"
+  },
+  {
+   "name": "ahmad khalil",
+   "out": "p-ahmad"
+  },
+  {
+   "name": "Sara",
+   "out": null
+  },
+  {
+   "name": "Rami",
+   "out": "p-rami"
+  },
+  {
+   "name": "Nobody",
+   "out": null
+  }
+ ],
+ "estimate": [
+  {
+   "raw": {
+    "items": [
+     {
+      "name": " Manoushe zaatar ",
+      "servings": 2,
+      "serving": "1 piece",
+      "calories": 560.6,
+      "protein": 14.26,
+      "carbs": 70,
+      "fat": null
+     },
+     {
+      "name": "Laban",
+      "servings": 0,
+      "serving": null,
+      "calories": 120,
+      "protein": -1,
+      "carbs": 900,
+      "fat": 4.44
+     }
+    ]
+   },
+   "out": [
+    {
+     "name": "Manoushe zaatar",
+     "servings": 2,
+     "serving": "1 piece",
+     "calories": 561,
+     "protein": 14.3,
+     "carbs": 70,
+     "fat": null
+    },
+    {
+     "name": "Laban",
+     "servings": 1,
+     "serving": "",
+     "calories": 120,
+     "protein": null,
+     "carbs": 500,
+     "fat": 4.4
+    }
+   ]
+  },
+  {
+   "raw": {
+    "items": [
+     {
+      "name": "Rice",
+      "servings": 1.555,
+      "serving": "cup",
+      "calories": 205.5,
+      "protein": 4.25,
+      "carbs": 44.45,
+      "fat": 0.05
+     },
+     {
+      "name": "Bread",
+      "servings": 2.345,
+      "serving": "slice",
+      "calories": 160.49,
+      "protein": 0.15,
+      "carbs": 1.005,
+      "fat": 499.96
+     }
+    ]
+   },
+   "out": [
+    {
+     "name": "Rice",
+     "servings": 1.56,
+     "serving": "cup",
+     "calories": 206,
+     "protein": 4.3,
+     "carbs": 44.5,
+     "fat": 0.1
+    },
+    {
+     "name": "Bread",
+     "servings": 2.35,
+     "serving": "slice",
+     "calories": 160,
+     "protein": 0.2,
+     "carbs": 1,
+     "fat": 500
+    }
+   ]
+  },
+  {
+   "raw": {
+    "items": [
+     {
+      "name": "",
+      "servings": 1,
+      "serving": "x",
+      "calories": 10,
+      "protein": null,
+      "carbs": null,
+      "fat": null
+     },
+     {
+      "name": "Cake",
+      "servings": 75.123,
+      "serving": "slice",
+      "calories": 9000,
+      "protein": null,
+      "carbs": null,
+      "fat": null
+     },
+     {
+      "name": "Water",
+      "servings": 1,
+      "serving": "cup",
+      "calories": -1,
+      "protein": null,
+      "carbs": null,
+      "fat": null
+     }
+    ]
+   },
+   "out": [
+    {
+     "name": "Cake",
+     "servings": 50,
+     "serving": "slice",
+     "calories": 5000,
+     "protein": null,
+     "carbs": null,
+     "fat": null
+    }
+   ]
+  },
+  {
+   "raw": {
+    "items": [
+     {
+      "name": "Item 0",
+      "servings": 1,
+      "serving": "p",
+      "calories": 0,
+      "protein": null,
+      "carbs": null,
+      "fat": null
+     },
+     {
+      "name": "Item 1",
+      "servings": 1,
+      "serving": "p",
+      "calories": 1,
+      "protein": null,
+      "carbs": null,
+      "fat": null
+     },
+     {
+      "name": "Item 2",
+      "servings": 1,
+      "serving": "p",
+      "calories": 2,
+      "protein": null,
+      "carbs": null,
+      "fat": null
+     },
+     {
+      "name": "Item 3",
+      "servings": 1,
+      "serving": "p",
+      "calories": 3,
+      "protein": null,
+      "carbs": null,
+      "fat": null
+     },
+     {
+      "name": "Item 4",
+      "servings": 1,
+      "serving": "p",
+      "calories": 4,
+      "protein": null,
+      "carbs": null,
+      "fat": null
+     },
+     {
+      "name": "Item 5",
+      "servings": 1,
+      "serving": "p",
+      "calories": 5,
+      "protein": null,
+      "carbs": null,
+      "fat": null
+     },
+     {
+      "name": "Item 6",
+      "servings": 1,
+      "serving": "p",
+      "calories": 6,
+      "protein": null,
+      "carbs": null,
+      "fat": null
+     },
+     {
+      "name": "Item 7",
+      "servings": 1,
+      "serving": "p",
+      "calories": 7,
+      "protein": null,
+      "carbs": null,
+      "fat": null
+     },
+     {
+      "name": "Item 8",
+      "servings": 1,
+      "serving": "p",
+      "calories": 8,
+      "protein": null,
+      "carbs": null,
+      "fat": null
+     },
+     {
+      "name": "Item 9",
+      "servings": 1,
+      "serving": "p",
+      "calories": 9,
+      "protein": null,
+      "carbs": null,
+      "fat": null
+     },
+     {
+      "name": "Item 10",
+      "servings": 1,
+      "serving": "p",
+      "calories": 10,
+      "protein": null,
+      "carbs": null,
+      "fat": null
+     },
+     {
+      "name": "Item 11",
+      "servings": 1,
+      "serving": "p",
+      "calories": 11,
+      "protein": null,
+      "carbs": null,
+      "fat": null
+     },
+     {
+      "name": "Item 12",
+      "servings": 1,
+      "serving": "p",
+      "calories": 12,
+      "protein": null,
+      "carbs": null,
+      "fat": null
+     },
+     {
+      "name": "Item 13",
+      "servings": 1,
+      "serving": "p",
+      "calories": 13,
+      "protein": null,
+      "carbs": null,
+      "fat": null
+     },
+     {
+      "name": "Item 14",
+      "servings": 1,
+      "serving": "p",
+      "calories": 14,
+      "protein": null,
+      "carbs": null,
+      "fat": null
+     },
+     {
+      "name": "Item 15",
+      "servings": 1,
+      "serving": "p",
+      "calories": 15,
+      "protein": null,
+      "carbs": null,
+      "fat": null
+     },
+     {
+      "name": "Item 16",
+      "servings": 1,
+      "serving": "p",
+      "calories": 16,
+      "protein": null,
+      "carbs": null,
+      "fat": null
+     }
+    ]
+   },
+   "out": [
+    {
+     "name": "Item 0",
+     "servings": 1,
+     "serving": "p",
+     "calories": 0,
+     "protein": null,
+     "carbs": null,
+     "fat": null
+    },
+    {
+     "name": "Item 1",
+     "servings": 1,
+     "serving": "p",
+     "calories": 1,
+     "protein": null,
+     "carbs": null,
+     "fat": null
+    },
+    {
+     "name": "Item 2",
+     "servings": 1,
+     "serving": "p",
+     "calories": 2,
+     "protein": null,
+     "carbs": null,
+     "fat": null
+    },
+    {
+     "name": "Item 3",
+     "servings": 1,
+     "serving": "p",
+     "calories": 3,
+     "protein": null,
+     "carbs": null,
+     "fat": null
+    },
+    {
+     "name": "Item 4",
+     "servings": 1,
+     "serving": "p",
+     "calories": 4,
+     "protein": null,
+     "carbs": null,
+     "fat": null
+    },
+    {
+     "name": "Item 5",
+     "servings": 1,
+     "serving": "p",
+     "calories": 5,
+     "protein": null,
+     "carbs": null,
+     "fat": null
+    },
+    {
+     "name": "Item 6",
+     "servings": 1,
+     "serving": "p",
+     "calories": 6,
+     "protein": null,
+     "carbs": null,
+     "fat": null
+    },
+    {
+     "name": "Item 7",
+     "servings": 1,
+     "serving": "p",
+     "calories": 7,
+     "protein": null,
+     "carbs": null,
+     "fat": null
+    },
+    {
+     "name": "Item 8",
+     "servings": 1,
+     "serving": "p",
+     "calories": 8,
+     "protein": null,
+     "carbs": null,
+     "fat": null
+    },
+    {
+     "name": "Item 9",
+     "servings": 1,
+     "serving": "p",
+     "calories": 9,
+     "protein": null,
+     "carbs": null,
+     "fat": null
+    },
+    {
+     "name": "Item 10",
+     "servings": 1,
+     "serving": "p",
+     "calories": 10,
+     "protein": null,
+     "carbs": null,
+     "fat": null
+    },
+    {
+     "name": "Item 11",
+     "servings": 1,
+     "serving": "p",
+     "calories": 11,
+     "protein": null,
+     "carbs": null,
+     "fat": null
+    },
+    {
+     "name": "Item 12",
+     "servings": 1,
+     "serving": "p",
+     "calories": 12,
+     "protein": null,
+     "carbs": null,
+     "fat": null
+    },
+    {
+     "name": "Item 13",
+     "servings": 1,
+     "serving": "p",
+     "calories": 13,
+     "protein": null,
+     "carbs": null,
+     "fat": null
+    },
+    {
+     "name": "Item 14",
+     "servings": 1,
+     "serving": "p",
+     "calories": 14,
+     "protein": null,
+     "carbs": null,
+     "fat": null
+    }
+   ]
+  }
+ ],
+ "userMessage": [
+  {
+   "ctx": {
+    "today": "2026-11-04",
+    "weekday": "Wednesday",
+    "timezone": "Asia/Beirut",
+    "language": "ar",
+    "defaultCurrency": "LBP",
+    "expenseCategories": [
+     "Food",
+     "Transport"
+    ],
+    "incomeCategories": [],
+    "accounts": [
+     "Cash"
+    ],
+    "shoppingLists": [
+     "Home",
+     "Work"
+    ]
+   },
+   "text": "ghada 12$ mbere7",
+   "out": "<context>\ntoday: 2026-11-04 (Wednesday), timezone Asia/Beirut\ninterface language: ar\ndefault currency: LBP\nexpense categories: Food, Transport\nincome categories: (none)\naccounts: Cash\nshopping lists: Home, Work\n</context>\n\n<text>\nghada 12$ mbere7\n</text>"
+  }
+ ]
+}
