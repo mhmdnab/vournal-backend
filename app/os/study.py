@@ -194,12 +194,13 @@ def _iso_ms(moment: datetime) -> str:
     return moment.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
-def expand_events(events, start: datetime, end: datetime, tz: str) -> list[dict]:
+def expand_events(events, start: datetime, end: datetime, tz: str, view=None) -> list[dict]:
     """One-off and weekly events → occurrences overlapping [start, end], on the user's
-    wall clock (event-expansion.ts; prayer anchors aren't followed here, as in NestJS)."""
+    wall clock (event-expansion.ts; prayer anchors aren't followed here, as in NestJS).
+    `view(event)` is what each occurrence carries (a class, unless the caller says)."""
     out = []
     for ev in events:
-        rest = {**{f: getattr(ev, f) for f in _CLASS_FIELDS}, "course": course_brief(ev.course)}
+        rest = view(ev) if view else {**{f: getattr(ev, f) for f in _CLASS_FIELDS}, "course": course_brief(ev.course)}
         duration = max(timedelta(0), ev.endAt - ev.startAt) if ev.endAt else timedelta(0)
 
         def make(first: datetime) -> dict:

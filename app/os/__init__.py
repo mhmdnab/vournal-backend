@@ -91,6 +91,7 @@ def include_os_routers() -> APIRouter:
             trips,
             users,
             wellness,
+            work,
         )
 
         api_router.include_router(auth.router)
@@ -139,5 +140,6 @@ def include_os_routers() -> APIRouter:
         api_router.include_router(push.router)
         api_router.include_router(ai.router)
         api_router.include_router(assistant.router)
+        api_router.include_router(work.router)
         _included = True
     return api_router
