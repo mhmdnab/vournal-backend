@@ -254,6 +254,26 @@ async def disambiguate(
     )
 
 
+# vournal OS fields on a person (the web's People). The person kept wins; its blanks are
+# filled from the merged one, and the birthday's "year known" flag travels with it.
+_OS_PERSON_FIELDS = ("relationship", "anniversary", "email", "phone", "notes", "avatarColor", "reminderDaysBefore")
+
+
+async def _carry_person_data(tx, src, dst, user_id: str) -> dict:
+    """Move what the web hangs on a person onto the one kept, before the merged one (and
+    everything that cascades from it) is deleted. Returns the blanks to fill on dst."""
+    for table in (tx.importantdate, tx.giftidea, tx.debt, tx.note):
+        await table.update_many(where={"personId": src.id}, data={"personId": dst.id})
+    for table in (tx.reminder, tx.notification):
+        await table.update_many(
+            where={"userId": user_id, "entityType": "PERSON", "entityId": src.id}, data={"entityId": dst.id}
+        )
+    fill = {f: getattr(src, f) for f in _OS_PERSON_FIELDS if getattr(dst, f) is None and getattr(src, f) is not None}
+    if dst.birthday is None and src.birthday is not None:
+        fill.update(birthday=src.birthday, birthdayHasYear=src.birthdayHasYear)
+    return fill
+
+
 @router.post("/{kind}/{thread_id}/merge")
 async def merge_thread(
     kind: ThreadKind,
@@ -263,6 +283,8 @@ async def merge_thread(
 ):
     """Absorb this thread INTO body.intoId: reassign every moment, fold the surface
     forms in as aliases, delete the now-empty source. Touches no entry."""
+    # (The docstring is build 8's published route description; keep it as it is. For
+    # people, the web's data moves across too: _carry_person_data.)
     if body.intoId == thread_id:
         raise HTTPException(status_code=400, detail={"code": "MERGE_INTO_SELF"})
     model, join, fk = _models(kind)
@@ -275,8 +297,12 @@ async def merge_thread(
             await join.create(data={"entryId": link.entryId, fk: dst.id})
             dst_entries.add(link.entryId)
 
-    await model.update(where={"id": dst.id}, data={"aliases": _folded_aliases(dst, src)})
-    await model.delete(where={"id": src.id})  # cascades any remaining src links
+    async with db.tx() as tx:
+        carried = await _carry_person_data(tx, src, dst, current.id) if kind == "people" else {}
+        await getattr(tx, _MODELS[kind][0]).update(
+            where={"id": dst.id}, data={"aliases": _folded_aliases(dst, src), **carried}
+        )
+        await getattr(tx, _MODELS[kind][0]).delete(where={"id": src.id})  # cascades any remaining src links
     return {"id": dst.id}
 
 
