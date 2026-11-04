@@ -138,3 +138,72 @@ def bool_rules(value, field: str) -> list[str]:
 
 def string_rules(value, field: str) -> list[str]:
     return [] if isinstance(value, str) else [f"{field} must be a string"]
+
+
+def color_rules(value, field: str) -> list[str]:
+    """@IsColor(): Matches(#rrggbb)."""
+    return [] if isinstance(value, str) and HEX_COLOR.match(value) else [f"{field} must be a hex color like #6366f1"]
+
+
+# validator.js isEmail with its defaults (UTF-8 local part, a domain with a TLD, no IP).
+_UTF8_LETTERS = r"¡-퟿豈-﷏ﷰ-￯"
+_EMAIL_LOCAL = re.compile(rf"^[a-z\d!#$%&'*+\-/=?^_`{{|}}~{_UTF8_LETTERS}]+\Z", re.I)
+_QUOTED_LOCAL = re.compile(
+    rf"^(?:[\s\x01-\x08\x0b\x0c\x0e-\x1f\x7f\x21\x23-\x5b\x5d-\x7e{_UTF8_LETTERS}]|\\[\x01-\x09\x0b\x0c\x0d-\x7f{_UTF8_LETTERS}])*\Z",
+    re.I,
+)
+_TLD = re.compile(r"^(?:[a-z¡-¨ª-퟿豈-﷏ﷰ-￯]{2,}|xn[a-z0-9-]{2,})\Z", re.I)
+# JavaScript's ¡-￿ takes both halves of a surrogate pair, so astral characters pass
+_LABEL = re.compile(r"^[a-z_¡-￿\U00010000-\U0010ffff0-9-]+\Z", re.I)
+_FULL_WIDTH = re.compile(r"[！-～]")
+
+
+def _utf16_length(text: str) -> int:
+    return len(text.encode("utf-16-le")) // 2
+
+
+def is_fqdn(domain: str) -> bool:
+    """validator.js isFQDN with require_tld (and no trailing dot, numeric TLD or underscore)."""
+    parts = domain.split(".")
+    tld = parts[-1]
+    if len(parts) < 2 or not _TLD.match(tld) or re.search(r"\s", tld) or re.fullmatch(r"\d+", tld):
+        return False
+    for part in parts:
+        if _utf16_length(part) > 63 or not _LABEL.match(part) or _FULL_WIDTH.search(part):
+            return False
+        if part.startswith("-") or part.endswith("-") or "_" in part:
+            return False
+    return True
+
+
+def is_email(text: str) -> bool:
+    if _utf16_length(text) > 254 or "@" not in text:
+        return False
+    user, _, domain = text.rpartition("@")
+    domain = domain.lower()
+    if len(user.encode()) > 64 or len(domain.encode()) > 254 or not is_fqdn(domain):
+        return False
+    if user.startswith('"') and user.endswith('"'):
+        return bool(_QUOTED_LOCAL.match(user[1:-1]))
+    return all(_EMAIL_LOCAL.match(part) for part in user.split("."))
+
+
+def email_rules(value, field: str, maximum: int) -> list[str]:
+    """@IsEmail() then @MaxLength(maximum): MaxLength's message first."""
+    if not isinstance(value, str):
+        return [f"{field} must be shorter than or equal to {maximum} characters", f"{field} must be an email"]
+    problems = [f"{field} must be shorter than or equal to {maximum} characters"] if _utf16_length(value) > maximum else []
+    return problems + ([] if is_email(value) else [f"{field} must be an email"])
+
+
+_HTTP = re.compile(r"^https?://", re.I)
+
+
+def url_rules(value, field: str, maximum: int) -> list[str]:
+    """@IsUrl({ require_protocol: true, protocols: ['http', 'https'] }) then @MaxLength."""
+    from app.os.recurring_payments import _URL  # validator.js isURL's shape
+
+    if not isinstance(value, str):
+        return [f"{field} must be shorter than or equal to {maximum} characters", f"{field} must be a URL address"]
+    problems = [f"{field} must be shorter than or equal to {maximum} characters"] if _utf16_length(value) > maximum else []
+    return problems + ([] if _HTTP.match(value) and _URL.match(value) else [f"{field} must be a URL address"])
