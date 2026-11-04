@@ -1,12 +1,15 @@
 """Deleting an account end to end (spec "Proving nothing broke"): an account with app data
 and OS data in every section is deleted from the web, and every row of every table that
-points at the user (userId, createdById, ...) is gone, along with every uploaded file. The
-columns are read from the schema's relations, so a table added later is covered too."""
+points at the user (userId, createdById, ...) is gone, with the files and recordings in R2 and
+the household it was alone in. The columns are read from the schema (relations to User, and
+plain userId / ...ById columns), so a new table with one of those is covered too; child
+tables without a user column go with their parent's cascade."""
 
 import re
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 from prisma import Json
 
@@ -76,13 +79,15 @@ class AccountDeletion(OsTestCase):
         await post("/wellness/water", {"addMl": 500})
         await post("/push/subscribe", {"endpoint": "https://push.example/sub/delete-me", "keys": {"p256dh": "k", "auth": "a"}})
         await post("/household", {"name": "Home"})
+        self.household = (await self.db.householdmember.find_unique(where={"userId": uid})).householdId
         await post("/household/invite", {"email": "someone@example.test"})
         upload = await client.post("/api/attachments", data={"entityType": "TASK", "entityId": task["id"]},
                                    files={"file": ("scan.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 64, "image/png")})
         self.assertEqual(upload.status_code, 201, upload.text)
         await client.post("/api/notifications/sync")
         # the app's own data and the chat (made directly: no model is called)
-        entry = await self.db.entry.create(data={"userId": uid, "rawTranscript": "Called Sara", "summary": "A call", "status": "DONE"})
+        entry = await self.db.entry.create(data={"userId": uid, "rawTranscript": "Called Sara", "summary": "A call", "status": "DONE",
+                                                 "audioUrl": f"audio/{uid}/call.m4a"})
         await self.db.todo.create(data={"entryId": entry.id, "userId": uid, "text": "Buy milk"})
         conversation = await self.db.assistantconversation.create(data={"userId": uid, "title": "Hi"})
         await self.db.assistantmessage.create(data={"conversationId": conversation.id, "role": "user", "content": Json([{"type": "text", "text": "hi"}])})
@@ -99,8 +104,14 @@ class AccountDeletion(OsTestCase):
         self.assertGreaterEqual(len(filled), 35, filled)  # the account really holds something almost everywhere
         self.assertEqual(len(self.objects), 1)
 
-        response = await client.request("DELETE", "/api/users/me", json={"password": PASSWORD})
+        import app.auth
+
+        with patch.object(app.auth, "delete_audio", AsyncMock()) as delete_audio:
+            response = await client.request("DELETE", "/api/users/me", json={"password": PASSWORD})
         self.assertEqual((response.status_code, response.json()), (200, {"ok": True}))
+        # the recordings in R2 (removed through delete_audio) and the household (no user column: its only member left)
+        self.assertEqual([c.args[0] for c in delete_audio.await_args_list], [f"audio/{uid}/call.m4a"])
+        self.assertIsNone(await self.db.household.find_unique(where={"id": self.household}))
 
         left = {f"{t}.{c}": n for t, c in columns if (n := await getattr(self.db, t).count(where={c: uid}))}
         self.assertEqual(left, {})
