@@ -42,6 +42,7 @@ def include_os_routers() -> APIRouter:
             notes,
             notifications,
             projects,
+            recipes,
             recurring_payments,
             reminders,
             settings,
@@ -76,5 +77,6 @@ def include_os_routers() -> APIRouter:
         api_router.include_router(habits.router)
         api_router.include_router(goals.router)
         api_router.include_router(shopping.router)
+        api_router.include_router(recipes.router)
         _included = True
     return api_router
