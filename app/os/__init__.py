@@ -75,6 +75,7 @@ def include_os_routers() -> APIRouter:
             reports,
             rituals,
             reminders,
+            search,
             settings,
             shopping,
             study,
@@ -125,5 +126,6 @@ def include_os_routers() -> APIRouter:
         api_router.include_router(reports.router)
         api_router.include_router(rituals.router)
         api_router.include_router(dashboard.router)
+        api_router.include_router(search.router)
         _included = True
     return api_router
