@@ -23,6 +23,14 @@ class Serialization(unittest.TestCase):
 
         self.assertEqual(to_json(Shape(name="x")), {"name": "x", "count": 0, "tags": []})
 
+    def test_database_rows_are_told_apart_by_prismas_base_class(self):
+        """to_json relies on prisma's private _PrismaModel: an upgrade that renames it fails here."""
+        from prisma import models
+        from prisma.bases import _PrismaModel
+
+        self.assertTrue(issubclass(models.Task, _PrismaModel))
+        self.assertFalse(issubclass(Shape, _PrismaModel))
+
     def test_nest_routes_refuse_a_response_model(self):
         from app.os.common.http import nest_router
 

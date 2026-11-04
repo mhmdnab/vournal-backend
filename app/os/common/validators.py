@@ -10,6 +10,19 @@ ICON_NAME = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*\Z")
 HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d\Z", re.ASCII)
 
 
+def int_problems(number: float, field: str, minimum: float | None = None, maximum: float | None = None) -> list[str]:
+    """@IsInt() @Min(minimum) @Max(maximum) on a number: every failing rule, in
+    class-validator's order (the last decorator first). NaN fails all of them."""
+    problems = []
+    if maximum is not None and not number <= maximum:
+        problems.append(f"{field} must not be greater than {maximum}")
+    if minimum is not None and not number >= minimum:
+        problems.append(f"{field} must not be less than {minimum}")
+    if not (math.isfinite(number) and number == int(number)):
+        problems.append(f"{field} must be an integer number")
+    return problems
+
+
 def length_message(field: str, text: str, low: int, high: int) -> str | None:
     """class-validator's Length(low, high) message for `text`, or None when it fits:
     it names only the bound that failed."""

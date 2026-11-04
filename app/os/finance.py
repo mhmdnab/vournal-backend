@@ -22,7 +22,7 @@ from app.os.common.defaults import SUPPORTED_CURRENCIES
 from app.os.common.deps import plus_user
 from app.os.common.http import nest_error, nest_router
 from app.os.common.jsparse import js_number, js_sum
-from app.os.common.query import unknown_params
+from app.os.common.query import _query_int, unknown_params
 from app.os.common.i18n import to_lang
 from app.os.finance_forecast import add_days, average_daily_spend, build_forecast
 from app.os.profile import ensure_os_profile
@@ -477,19 +477,8 @@ async def get_summary(request: Request, user=Depends(plus_user)):
 @router.get("/forecast")
 async def get_forecast(request: Request, user=Depends(plus_user)):
     """Projected balance for the next N days (7–365, default 60)."""
-    raw = request.query_params.get("days")
-    days = 60
     errors = unknown_params(request, ("days",))
-    if raw is not None:
-        n = js_number(raw)  # @Type(() => Number)
-        if not (math.isfinite(n) and n == int(n)):
-            errors.append("days must be an integer number")
-        if not n >= 7:
-            errors.append("days must not be less than 7")
-        if not n <= 365:
-            errors.append("days must not be greater than 365")
-        if not errors:
-            days = int(n)
+    days = _query_int(request, "days", errors, 365, minimum=7) or 60
     if errors:
         raise nest_error(400, errors)
     return await forecast(user, days)

@@ -23,7 +23,7 @@ _JS_SPACE = "\t\n\v\f\r \u00a0\u1680" + "".join(map(chr, range(0x2000, 0x200B)))
 ISO8601 = re.compile(
     r"^([\+-]?\d{4}(?!\d{2}\b))((-?)((0[1-9]|1[0-2])(\3([12]\d|0[1-9]|3[01]))?|W([0-4]\d|5[0-3])(-?[1-7])?|"
     r"(00[1-9]|0[1-9]\d|[12]\d{2}|3([0-5]\d|6[1-6])))([T" + re.escape(_JS_SPACE) + r"]((([01]\d|2[0-3])((:?)[0-5]\d)?|24:?00)"
-    r"([\.,]\d+(?!:))?)?(\17[0-5]\d([\.,]\d+)?)?([zZ]|([\+-])([01]\d|2[0-3]):?([0-5]\d)?)?)?)?\Z",
+    r"([\.,]\d+(?!:))?)?((?(17)\17)[0-5]\d([\.,]\d+)?)?([zZ]|([\+-])([01]\d|2[0-3]):?([0-5]\d)?)?)?)?\Z",
     re.ASCII,
 )
 
@@ -126,6 +126,8 @@ def js_to_string(value: float) -> str:
 def decimal_places(value) -> int | None:
     """class-validator's maxDecimalPlaces count: the characters after "." in toString()
     ("1.5e-7" → 4); None where class-validator throws (1e-7 has no ".")."""
+    if not math.isfinite(value):
+        return None
     if isinstance(value, int) or math.fmod(value, 1) == 0:
         return 0
     _, dot, frac = js_to_string(value).partition(".")

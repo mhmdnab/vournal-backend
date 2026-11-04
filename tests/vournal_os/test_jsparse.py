@@ -58,6 +58,18 @@ class Golden(unittest.TestCase):
                 self.assertEqual(accepted, case["decimals2"] is True)
 
 
+    def test_a_backreference_to_an_unmatched_group_is_empty_like_js(self):
+        from app.os.common.jsparse import is_iso8601
+
+        # validator.js accepts these (JS reads \\17 to an unmatched group as empty)
+        self.assertTrue(is_iso8601("2026-11-05T45"))
+        self.assertTrue(is_iso8601("2026-11-05T24:0030"))
+
+    def test_decimal_places_of_infinity(self):
+        from app.os.common.jsparse import decimal_places
+
+        self.assertIsNone(decimal_places(float("inf")))
+
     def test_titles_sort_like_locale_compare(self):
         from app.os.common.collation import locale_key
 
@@ -95,6 +107,15 @@ class Requests(OsTestCase):
             with self.subTest(path=path):
                 self.assertEqual((await client.get(path)).status_code, 400)
         self.assertEqual((await client.get("/api/transactions?page=0x2")).json()["page"], 2)
+
+    async def test_impossible_list_dates_are_400_not_500(self):
+        client = await self.signed_in()
+        for path in ("/api/transactions?from=0000-00-00", "/api/transactions?to=9999-12-32", "/api/transactions?from=0000-00-00&page=0"):
+            with self.subTest(path=path):
+                self.assertEqual((await client.get(path)).status_code, 400)
+        rate = await client.post("/api/debts", content=b'{"direction":"I_OWE","title":"x","principal":5,"counterparty":"a","interestRate":1e400}', headers={"content-type": "application/json"})
+        self.assertEqual(rate.status_code, 400)
+        self.assertNotIn("math domain error", str(rate.json()["message"]))
 
     async def test_same_day_names_sort_like_locale_compare(self):
         client = await self.signed_in()

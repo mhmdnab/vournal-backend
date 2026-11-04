@@ -527,6 +527,8 @@ async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
     nulls = pop_db_nulls(data)
     row = await db.event.update(where={"id": existing.id}, data=data, include=_INCLUDE)
     await set_db_null(db, "Event", existing.id, nulls)
+    if nulls:  # the row came back before the NULL was written
+        row = row.model_copy(update={column: None for column in nulls})
     await log_activity(user.id, "event.updated", entity_id=row.id, title=row.title)
     return event_view(row, tz, datetime.now(timezone.utc), lang)
 

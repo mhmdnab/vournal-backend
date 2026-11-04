@@ -24,31 +24,23 @@ class CalendarFixes(OsTestCase):
         reminder = await self.db.reminder.create(data={"userId": uid, "title": "Pray", "remindAt": "2026-11-20T04:00:00Z", "timeAnchor": ANCHOR})
         for path, table, id in (("/api/tasks", "Task", task.id), ("/api/events", "Event", event.id), ("/api/reminders", "Reminder", reminder.id)):
             with self.subTest(table=table):
+                before = (await self.db.query_raw(f'SELECT "updatedAt" AS u FROM "{table}" WHERE id = $1', id))[0]["u"]
                 response = await client.patch(f"{path}/{id}", json={"timeAnchor": None})
                 self.assertEqual(response.status_code, 200, response.text)
+                self.assertIsNone(response.json()["timeAnchor"])
                 self.assertTrue(await self._is_db_null(table, id), f"{table}.timeAnchor holds JSON null")
+                after = (await self.db.query_raw(f'SELECT "updatedAt" AS u FROM "{table}" WHERE id = $1', id))[0]["u"]
+                self.assertNotEqual(after, before, "updatedAt moves, as Prisma's @updatedAt did")
 
-    async def test_monthly_reminder_on_the_31st_keeps_the_month_end(self):
+    async def test_reminder_rules_are_stored_as_sent(self):
+        """No rewriting of a person's rule: the dashboard's "Every month" preset already
+        sends BYMONTHDAY, and a drag must not change it (NestJS kept rules as sent)."""
         client = await self.signed_in()
-        made = await client.post("/api/reminders", json={"title": "Rent", "remindAt": "2027-01-31T09:00:00.000Z", "rrule": "FREQ=MONTHLY"})
-        self.assertEqual(made.status_code, 201, made.text)
-        seen = []
-        for _ in range(3):
-            done = (await client.post(f"/api/reminders/{made.json()['id']}/done", json={})).json()
-            seen.append(done["remindAt"][:10])
-        # NestJS anchored on the current remindAt: 31 Jan → 28 Feb → 28 Mar → 28 Apr
-        self.assertEqual(seen, ["2027-02-28", "2027-03-31", "2027-04-30"])
-
-    async def test_moving_a_monthly_reminder_moves_its_day(self):
-        client = await self.signed_in()
-        made = (await client.post("/api/reminders", json={"title": "Bill", "remindAt": "2027-01-31T09:00:00.000Z", "rrule": "FREQ=MONTHLY"})).json()
-        moved = await client.patch(f"/api/reminders/{made['id']}", json={"remindAt": "2027-01-15T09:00:00.000Z"})
-        self.assertEqual(moved.status_code, 200, moved.text)
-        done = (await client.post(f"/api/reminders/{made['id']}/done", json={})).json()
-        self.assertEqual(done["remindAt"][:10], "2027-02-15")
-        own = (await client.post("/api/reminders", json={"title": "Own", "remindAt": "2027-01-10T09:00:00.000Z", "rrule": "FREQ=MONTHLY;BYMONTHDAY=20"})).json()
-        await client.patch(f"/api/reminders/{own['id']}", json={"remindAt": "2027-01-12T09:00:00.000Z"})
-        self.assertEqual((await self.db.reminder.find_unique(where={"id": own["id"]})).rrule, "FREQ=MONTHLY;BYMONTHDAY=20")
+        made = (await client.post("/api/reminders", json={"title": "Bill", "remindAt": "2027-01-20T09:00:00.000Z", "rrule": "FREQ=MONTHLY;BYMONTHDAY=20"})).json()
+        await client.patch(f"/api/reminders/{made['id']}", json={"remindAt": "2027-01-22T09:00:00.000Z"})
+        self.assertEqual((await self.db.reminder.find_unique(where={"id": made["id"]})).rrule, "FREQ=MONTHLY;BYMONTHDAY=20")
+        bare = (await client.post("/api/reminders", json={"title": "Rent", "remindAt": "2027-01-31T09:00:00.000Z", "rrule": "FREQ=MONTHLY"})).json()
+        self.assertEqual(bare["rrule"], "FREQ=MONTHLY")
 
     async def test_empty_strings_count_as_values(self):
         client = await self.signed_in()

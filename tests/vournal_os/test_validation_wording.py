@@ -57,10 +57,24 @@ class Wording(OsTestCase):
         self.assertEqual(len(response.json()["message"]), 2, response.json())
         self.assertEqual(await self.db.transaction.count(where={"userId": client.user.id}), before)
 
+    async def test_a_field_can_fail_several_rules_at_once(self):
+        client = await self.signed_in()
+        made = (await client.post("/api/reminders", json={"title": "Call", "remindAt": "2027-01-20T09:00:00.000Z"})).json()
+        response = await client.post(f"/api/reminders/{made['id']}/snooze", json={"minutes": "abc"})
+        self.assertEqual(response.json()["message"], [
+            "minutes must not be greater than 43200", "minutes must not be less than 1", "minutes must be an integer number",
+        ])
+
     async def test_reminder_entity_type_lists_its_values(self):
         from app.os.common.ownership import ENTITY_TYPE_MODEL
         from app.os.reminders import ENTITY_TYPES
 
+        # Prisma's EntityType in schema order (class-validator's IsEnum lists them so)
+        self.assertEqual(ENTITY_TYPES, (
+            "TASK", "EVENT", "PROJECT", "TRANSACTION", "RECURRING_PAYMENT", "BUDGET", "GOAL", "HABIT", "MAINTENANCE", "DOCUMENT",
+            "SHOPPING_LIST", "SHOPPING_ITEM", "MEAL", "RECIPE", "NOTE", "COURSE", "ASSESSMENT", "TRIP", "PERSON", "IMPORTANT_DATE",
+            "REMINDER", "DEBT",
+        ))
         self.assertEqual(set(ENTITY_TYPES), set(ENTITY_TYPE_MODEL))
         client = await self.signed_in()
         message = (await client.get("/api/reminders?entityType=PLANET")).json()["message"]

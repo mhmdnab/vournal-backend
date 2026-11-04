@@ -35,12 +35,7 @@ from app.os.profile import ensure_os_profile
 router = nest_router("/reminders")
 
 STATUSES = ("active", "upcoming", "overdue", "today", "done", "all")
-# Prisma's EntityType in schema order, as class-validator's IsEnum lists it
-ENTITY_TYPES = (
-    "TASK", "EVENT", "PROJECT", "TRANSACTION", "RECURRING_PAYMENT", "BUDGET", "GOAL", "HABIT", "MAINTENANCE", "DOCUMENT",
-    "SHOPPING_LIST", "SHOPPING_ITEM", "MEAL", "RECIPE", "NOTE", "COURSE", "ASSESSMENT", "TRIP", "PERSON", "IMPORTANT_DATE",
-    "REMINDER", "DEBT",
-)
+ENTITY_TYPES = tuple(ENTITY_TYPE_MODEL)  # schema order, as class-validator's IsEnum lists them
 EntityTypeName = Literal[tuple(ENTITY_TYPE_MODEL)]  # type: ignore[valid-type]
 DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE = 50, 200
 _ONE_MS = timedelta(milliseconds=1)
@@ -189,8 +184,8 @@ class SnoozeBody(BaseModel):
             return v
         # @Type(() => Number): "10" counts
         number = js_number(v) if isinstance(v, str) else v if isinstance(v, (int, float)) and not isinstance(v, bool) else math.nan
-        if not math.isfinite(number) or number != int(number) or not 1 <= number <= 43200:
-            raise ValueError("minutes must be an integer between 1 and 43200")
+        if problems := validators.int_problems(number, "minutes", 1, 43200):
+            raise ValueError("\n".join(problems))  # one 400 message per line
         return int(number)
 
     @field_validator("until")
@@ -221,16 +216,6 @@ async def _get(user_id: str, id: str, tz: str, lang: str) -> dict:
 def _norm_rrule(value):
     return (rrule.normalize_rrule(value) or None) if value else None
 
-
-def _local_day(moment, tz: str) -> int:
-    return int(dates.local_date_string(moment, tz)[8:10])
-
-
-def _pin_monthly(rule, remind_at, tz: str):
-    """A plain monthly repeat keeps its day of the month: on the 31st it stays on each
-    month's last day. NestJS anchored on the current remindAt, so after February a
-    reminder on the 31st drifted to the 28th for good."""
-    return rrule.pin_month_day(rule, _local_day(remind_at, tz)) if rule else rule
 
 
 def _resolve_remind_at(body, tz: str, existing: datetime | None) -> datetime:
@@ -376,7 +361,7 @@ async def create(body: CreateBody, user=Depends(plus_user)):
         "title": body.title,
         "notes": body.notes,
         "remindAt": remind_at,
-        "rrule": _pin_monthly(_norm_rrule(body.rrule), remind_at, tz),
+        "rrule": _norm_rrule(body.rrule),
         "isDeadline": bool(body.isDeadline),
         "entityType": body.entityType,
         "entityId": body.entityId if body.entityType else None,
@@ -424,12 +409,7 @@ async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
         raise invalid_data()
     data = {f: getattr(body, f) for f in ("title", "notes", "isDeadline", "isDone", "entityType") if f in sent}
     if "rrule" in sent:
-        rule = _norm_rrule(body.rrule)
-        data["rrule"] = rule if rule == existing.rrule else _pin_monthly(rule, resolved, tz)
-    elif existing.rrule and time_changed:
-        old_day, new_day = (_local_day(m, tz) for m in (existing.remindAt, resolved))
-        if old_day != new_day:
-            data["rrule"] = rrule.repin_month_day(existing.rrule, old_day, new_day)
+        data["rrule"] = _norm_rrule(body.rrule)
     if "entityType" in sent and body.entityType is None:
         data["entityId"] = None
     elif "entityId" in sent:

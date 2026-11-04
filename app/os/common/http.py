@@ -157,6 +157,15 @@ def _missing_words(annotation) -> str:
     return words.get(annotation if isinstance(annotation, type) else None, "should not be empty")
 
 
+def _validation_messages(error: dict, model=None) -> list[str]:
+    """A validator that reports several rules joins them with newlines (class-validator
+    lists every failing constraint); each line keeps the parent path."""
+    if error.get("type") != "value_error" or "\n" not in error.get("msg", ""):
+        return [_validation_message(error, model)]
+    lines = error["msg"].removeprefix("Value error, ").split("\n")
+    return [_validation_message({**error, "msg": line}, model) for line in lines]
+
+
 def _validation_message(error: dict, model=None) -> str:
     """One pydantic error in class-validator's words. NestJS's ValidationPipe prefixes a
     nested property's message with its parent path ("schedule.day must …")."""
@@ -206,7 +215,7 @@ async def _validation_error(request: Request, exc: RequestValidationError):
     if not _is_api(request):
         return await request_validation_exception_handler(request, exc)
     model = _body_model(request)
-    return _body(400, [_validation_message(e, model) for e in exc.errors()])
+    return _body(400, [message for e in exc.errors() for message in _validation_messages(e, model)])
 
 
 def _unique_message(exc: UniqueViolationError) -> str:
@@ -243,15 +252,17 @@ class EmptyJsonBody:
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http" or scope["method"] not in ("POST", "PUT", "PATCH") or not scope["path"].startswith("/api/"):
             return await self.app(scope, receive, send)
-        content_type = dict(scope["headers"]).get(b"content-type", b"")
-        if content_type and not content_type.startswith(b"application/json"):
-            return await self.app(scope, receive, send)
-        # the body may come in several messages (some an empty chunk); keep them until it's complete
+        headers = dict(scope["headers"])
+        content_type = headers.get(b"content-type", b"")
+        length = headers.get(b"content-length", b"").strip()
+        if (content_type and not content_type.startswith(b"application/json")) or (length and length != b"0"):
+            return await self.app(scope, receive, send)  # a body with a length: the size cap sees it untouched
+        # no length (or 0): read only until the first byte or the end; empty chunks may come first
         messages = []
         while True:
             message = await receive()
             messages.append(message)
-            if message["type"] != "http.request" or not message.get("more_body"):
+            if message["type"] != "http.request" or message.get("body") or not message.get("more_body"):
                 break
         if all(m["type"] == "http.request" and not m.get("body") for m in messages):
             messages = [{"type": "http.request", "body": b"{}", "more_body": False}]

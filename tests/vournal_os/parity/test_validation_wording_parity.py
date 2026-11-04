@@ -6,7 +6,10 @@ import unittest
 from vournal_os.parity.harness import ParityCase
 
 QUERIES = ("/tasks?bogus=1", "/tasks/focus?bogus=1&date=2026-11-05", "/transactions?bogus=1&page=2", "/debts?x=1&y=2",
-           "/finance/forecast?bogus=1", "/categories?bogus=1", "/reminders?entityType=PLANET")
+           "/finance/forecast?bogus=1", "/categories?bogus=1", "/reminders?entityType=PLANET",
+           "/transactions?sort=sideways&page=0", "/transactions?bogus=1&sort=sideways&pageSize=0",
+           "/transactions?page=abc", "/transactions?pageSize=abc", "/transactions?page=1.5", "/notifications?page=-3",
+           "/recurring-payments/summary?days=0", "/recurring-payments/summary?days=abc", "/finance/forecast?days=abc", "/finance/forecast?days=3")
 BODIES = (
     ("/debts", {"direction": "I_OWE", "title": "x" * 201, "principal": 5, "counterparty": "a"}),
     ("/debts", {"direction": "SIDEWAYS", "title": "x", "principal": 5, "counterparty": "a"}),

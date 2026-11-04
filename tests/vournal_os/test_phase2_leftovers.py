@@ -60,6 +60,35 @@ class Leftovers(OsTestCase):
         bare = await client.request("POST", "/api/exchange-rates/use-live", content=b"", headers={"content-type": "application/json"})
         self.assertEqual(bare.status_code, 200, bare.text)
 
+    async def test_a_body_with_a_length_is_never_buffered(self):
+        """The 30 MB cap must see a big upload first: the wrapper may only look at
+        bodies that are empty or arrive without a length, and never past one chunk."""
+        from app.os.common.http import EmptyJsonBody
+
+        seen = {}
+
+        async def inner(scope, receive, send):
+            seen["called"] = True
+
+        async def receive():
+            raise AssertionError("read the body of a request that declared its length")
+
+        scope = {"type": "http", "method": "POST", "path": "/api/tags", "headers": [(b"content-length", b"400000000"), (b"content-type", b"application/json")]}
+        await EmptyJsonBody(inner)(scope, receive, None)
+        self.assertTrue(seen.get("called"))
+        chunks = [{"type": "http.request", "body": b'{"a"', "more_body": True}, {"type": "http.request", "body": b":1}", "more_body": False}]
+        reads = []
+
+        async def chunked():
+            reads.append(1)
+            return chunks.pop(0)
+
+        async def reader(scope, receive, send):
+            seen["body"] = b"".join([(await receive())["body"], (await receive())["body"]])
+
+        await EmptyJsonBody(reader)({**scope, "headers": [(b"content-type", b"application/json")]}, chunked, None)
+        self.assertEqual(seen["body"], b'{"a":1}')
+
     async def test_market_rates_load_once_and_never_overwrite_a_refresh(self):
         from app.os import market_rates
 

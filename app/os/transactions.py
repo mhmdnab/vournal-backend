@@ -346,8 +346,10 @@ async def build_where(user_id: str, request: Request, tz: str, errors: list[str]
             errors.append(f"{name} must not be less than 0")
     if q.get("sort") is not None and q.get("sort") not in SORTS:
         errors.append(f"sort must be one of the following values: {', '.join(SORTS)}")
-    if errors and not collect:
-        raise nest_error(400, errors)
+    if errors:
+        if not collect:
+            raise nest_error(400, errors)
+        return {}  # the caller answers 400; bad values never reach the where clause
 
     and_: list[dict] = [{"userId": user_id}]
     if types:
@@ -410,10 +412,11 @@ _LIST_TRANSACTIONS_QUERY = (  # the NestJS query DTO's fields
 @router.get("")
 async def list_transactions(request: Request, user=Depends(plus_user)):
     errors = unknown_params(request, _LIST_TRANSACTIONS_QUERY)
-    page = _query_int(request, "page", errors)
-    page_size = _query_int(request, "pageSize", errors, MAX_PAGE_SIZE)
     settings, tz, lang = await _settings(user)
     where = await build_where(user.id, request, tz, errors)
+    # page and pageSize come from the inherited pagination DTO: class-validator lists them last
+    page = _query_int(request, "page", errors)
+    page_size = _query_int(request, "pageSize", errors, MAX_PAGE_SIZE)
     if errors:  # the whole query is checked before anything is written, as NestJS's pipe did
         raise nest_error(400, errors)
     await materialize_due(user.id)

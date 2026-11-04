@@ -7,6 +7,7 @@ always show. Within a day all-day items come first, then by start, then title.
 
 import asyncio
 import functools
+import weakref
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, Request
@@ -104,6 +105,15 @@ class Ctx:
 
 
 _SOURCE_CONCURRENCY = 4
+_gates: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Semaphore]" = weakref.WeakKeyDictionary()
+
+
+def _source_gate() -> asyncio.Semaphore:
+    """One limit for the whole process (per event loop), not per request."""
+    loop = asyncio.get_running_loop()
+    if loop not in _gates:
+        _gates[loop] = asyncio.Semaphore(_SOURCE_CONCURRENCY)
+    return _gates[loop]
 
 
 def _coalesce(*values):
@@ -661,8 +671,8 @@ async def feed_for(user, request: Request, include_completed: bool | None = None
         )
         if wanted_here
     ]
-    # at once, as NestJS's Promise.all; at most 4 at a time to spare the pool the iOS app shares
-    gate = asyncio.Semaphore(_SOURCE_CONCURRENCY)
+    # at once, as NestJS's Promise.all; at most 4 at a time across all requests, to spare the pool the iOS app shares
+    gate = _source_gate()
 
     async def run(source):
         async with gate:

@@ -7,6 +7,7 @@ from fastapi import Request
 
 from app.os.common import dates
 from app.os.common.jsparse import js_number
+from app.os.common.validators import int_problems
 
 
 def string_list(value) -> list[str] | None:
@@ -37,15 +38,16 @@ def _query_bool(request: Request, name: str, errors: list) -> bool | None:
     return None
 
 
-def _query_int(request: Request, name: str, errors: list, maximum: int | None = None) -> int | None:
+def _query_int(request: Request, name: str, errors: list, maximum: int | None = None, minimum: int = 1) -> int | None:
+    """@Type(() => Number) @IsInt() @Min(minimum) [@Max(maximum)]: every failing rule is
+    reported, in class-validator's order (the last decorator first)."""
     value = request.query_params.get(name)
     if value is None:
         return None
-    number = js_number(value)  # @Type(() => Number)
-    if not math.isfinite(number) or number != int(number) or number < 1 or (maximum and number > maximum):
-        errors.append(f"{name} must be an integer between 1 and {maximum or 'infinity'}")
-        return None
-    return int(number)
+    number = js_number(value)
+    problems = int_problems(number, name, minimum, maximum)
+    errors.extend(problems)
+    return None if problems else int(number)
 
 
 def _query_list(request: Request, name: str, allowed, errors: list) -> list[str] | None:

@@ -27,7 +27,7 @@ from app.os.common.defaults import SUPPORTED_CURRENCIES
 from app.os.common.deps import plus_user
 from app.os.common.http import nest_error, nest_router
 from app.os.common.i18n import to_lang
-from app.os.common.query import string_list, unknown_params
+from app.os.common.query import _query_int, string_list, unknown_params
 from app.os.profile import ensure_os_profile
 from app.os.transactions import as_decimal
 
@@ -401,14 +401,7 @@ async def summary(request: Request, user=Depends(plus_user)):
     """Totals of ACTIVE payments in the default currency, and what falls due in the next `days`."""
     errors = unknown_params(request, _SUMMARY_QUERY)
     kind = _kind_filters(request, errors)
-    raw_days = request.query_params.get("days")
-    days = 30
-    if raw_days is not None:
-        number = js_number(raw_days)  # @Type(() => Number)
-        if not math.isfinite(number) or number != int(number) or not 1 <= number <= 365:
-            errors.append("days must be an integer between 1 and 365")
-        else:
-            days = int(number)
+    days = _query_int(request, "days", errors, 365) or 30
     if errors:
         raise nest_error(400, errors)
     await auto_log_due(user.id)

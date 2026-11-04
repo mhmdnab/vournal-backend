@@ -18,5 +18,8 @@ def pop_db_nulls(data: dict) -> list[str]:
 
 
 async def set_db_null(client, table: str, id: str, columns: list[str]) -> None:
-    for column in columns:  # names come from our own code, never from a request
-        await client.execute_raw(f'UPDATE "{table}" SET "{column}" = NULL WHERE "id" = $1', id)
+    # names come from our own code, never from a request; updatedAt moves as Prisma's @updatedAt did
+    for column in columns:
+        await client.execute_raw(
+            f'UPDATE "{table}" SET "{column}" = NULL, "updatedAt" = (now() AT TIME ZONE \'UTC\') WHERE "id" = $1', id
+        )
