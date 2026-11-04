@@ -33,6 +33,7 @@ def include_os_routers() -> APIRouter:
             calendar,
             categories,
             debts,
+            documents,
             events,
             exchange_rates,
             finance,
@@ -68,5 +69,6 @@ def include_os_routers() -> APIRouter:
         api_router.include_router(attachments.router)
         api_router.include_router(notes.router)
         api_router.include_router(projects.router)
+        api_router.include_router(documents.router)
         _included = True
     return api_router
