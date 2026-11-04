@@ -1,0 +1,92 @@
+[
+ {
+  "md": "",
+  "excerpt": "",
+  "wordCount": 0
+ },
+ {
+  "md": "   ",
+  "excerpt": "",
+  "wordCount": 0
+ },
+ {
+  "md": "Plain text.",
+  "excerpt": "Plain text.",
+  "wordCount": 2
+ },
+ {
+  "md": "# Title\n\nSome **bold** and _italic_ and ~~gone~~ text.",
+  "excerpt": "Title Some bold and italic and gone text.",
+  "wordCount": 9
+ },
+ {
+  "md": "- [ ] todo one\n- [x] done two\n* bullet\n1. numbered\n> quote",
+  "excerpt": "todo one done two bullet numbered quote",
+  "wordCount": 15
+ },
+ {
+  "md": "Code: `inline` and\n```js\nconst x = 1;\n```\nafter",
+  "excerpt": "Code: inline and after",
+  "wordCount": 10
+ },
+ {
+  "md": "![alt text](http://x/y.png) and [a link](http://x)",
+  "excerpt": "alt text and a link",
+  "wordCount": 5
+ },
+ {
+  "md": "word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word ",
+  "excerpt": "word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word…",
+  "wordCount": 80
+ },
+ {
+  "md": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx 😀😀 tail",
+  "excerpt": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx…",
+  "wordCount": 3
+ },
+ {
+  "md": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé üüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüü",
+  "excerpt": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé üüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüüü…",
+  "wordCount": 2
+ },
+ {
+  "md": "tabs\tand nbsp em space",
+  "excerpt": "tabs and nbsp em space",
+  "wordCount": 5
+ },
+ {
+  "md": "   ### deep heading   \n  - indented item",
+  "excerpt": "deep heading indented item",
+  "wordCount": 6
+ },
+ {
+  "md": "**unclosed bold and __mixed_ marks*",
+  "excerpt": "unclosed bold and mixed marks",
+  "wordCount": 5
+ },
+ {
+  "md": "مرحبا **بالعالم** - قائمة\n- عنصر",
+  "excerpt": "مرحبا بالعالم - قائمة عنصر",
+  "wordCount": 6
+ },
+ {
+  "md": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  b",
+  "excerpt": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa b",
+  "wordCount": 2
+ },
+ {
+  "md": "line1\r\nline2\r\n\r\n",
+  "excerpt": "line1 line2",
+  "wordCount": 2
+ },
+ {
+  "md": "[ ] not a checkbox at start",
+  "excerpt": "not a checkbox at start",
+  "wordCount": 7
+ },
+ {
+  "md": " sep par",
+  "excerpt": "sep par",
+  "wordCount": 2
+ }
+]

@@ -16,6 +16,7 @@ from prisma import Json
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictFloat, StrictInt, StrictStr, field_validator
 
 from app.db import db
+from app.os import attachments
 from app.os.common import dates, rrule, validators
 from app.os.common.dbnull import DB_NULL, pop_db_nulls, set_db_null
 from app.os.common.activity import log_activity
@@ -832,7 +833,8 @@ async def remove(id: str, user=Depends(plus_user)):
     ids = [id, *(c.id for c in children)]
     async with db.tx() as tx:
         # Attachments are linked by (entityType, entityId) with no foreign key: remove them here.
-        await tx.attachment.delete_many(where={"userId": user.id, "entityType": "TASK", "entityId": {"in": ids}})
+        keys = await attachments.delete_rows(tx, user.id, "TASK", ids)
         await tx.task.delete(where={"id": existing.id})  # subtasks cascade
+    await attachments.delete_objects(keys)
     await log_activity(user.id, "task.deleted", entity_id=id, title=existing.title)
     return {"ok": True}

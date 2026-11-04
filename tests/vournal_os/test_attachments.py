@@ -62,6 +62,23 @@ class Attachments(OsTestCase):
         self.assertEqual((none.status_code, none.json()["message"]), (400, "File is required"))
         self.assertEqual(self.objects, {})
 
+    async def test_deleting_the_entity_removes_its_files(self):
+        """Where NestJS deleted attachment rows with their entity (tasks, projects), the
+        files go too: in NestJS the bytes were in those rows."""
+        client = await self.signed_in()
+        task = await self._task(client)
+        await self._upload(client, task)
+        project = (await client.post("/api/projects", json={"name": "Move"})).json()["id"]
+        await self._upload(client, project, entity_type="PROJECT")
+        project_task = (await client.post("/api/tasks", json={"title": "Pack", "projectId": project})).json()["id"]
+        await self._upload(client, project_task)
+        self.assertEqual(len(self.objects), 3)
+        self.assertEqual((await client.delete(f"/api/tasks/{task}")).status_code, 200)
+        self.assertEqual(len(self.objects), 2)
+        self.assertEqual((await client.delete(f"/api/projects/{project}?deleteTasks=true")).status_code, 200)
+        self.assertEqual(self.objects, {})
+        self.assertEqual(await self.db.attachment.count(where={"userId": client.user.id}), 0)
+
     async def test_account_deletion_removes_the_files(self):
         from app.auth import delete_account
 

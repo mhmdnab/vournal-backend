@@ -156,3 +156,20 @@ async def remove(id: str, user=Depends(plus_user)):
     await db.attachment.delete(where={"id": row.id})
     await storage.delete_object(row.storageKey)
     return {"id": row.id}
+
+
+async def delete_rows(client, user_id: str, entity_type: str, entity_ids: list[str]) -> list[str]:
+    """Delete the attachment rows of some entities (inside the caller's transaction) and
+    return their keys; after the commit, pass them to delete_objects. NestJS deleted only
+    the rows, which held the bytes."""
+    if not entity_ids:
+        return []
+    where = {"userId": user_id, "entityType": entity_type, "entityId": {"in": entity_ids}}
+    keys = [a.storageKey for a in await client.attachment.find_many(where=where)]
+    await client.attachment.delete_many(where=where)
+    return keys
+
+
+async def delete_objects(keys: list[str]) -> None:
+    for key in keys:
+        await storage.delete_object(key)  # best-effort, never raises
