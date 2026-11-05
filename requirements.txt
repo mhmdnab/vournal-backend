@@ -28,6 +28,7 @@ PyJWT>=2.8,<3.0
 slowapi>=0.1.9,<1.0
 
 # Local enhancement branch: authenticated encryption for authenticator secrets.
-cryptography>=43,<47
+# >=47: pywebpush 2.5 needs it. Tested on 50.x.
+cryptography>=47,<51
 # Apple In-App Purchase: verify StoreKit 2 signed transactions + server notifications.
 app-store-server-library>=3.1.2,<4
