@@ -7,7 +7,9 @@ datasource db {
 generator client {
   provider             = "prisma-client-py"
   interface            = "asyncio"
-  recursive_type_depth = 5
+  // 2, the minimum: at 5 the 71 models make a 20 MB types.py that can't start in 512 MB
+  // (tests/test_client_size.py). The types are static only; no code imports them.
+  recursive_type_depth = 2
   // Ship BOTH Linux OpenSSL engine variants alongside the local one. Render's
   // native Python host has a libssl that prisma-client-py's auto-detected target
   // (debian-openssl-3.0.x) couldn't execute; with both present, ensure() picks
