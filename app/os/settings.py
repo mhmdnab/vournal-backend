@@ -91,6 +91,7 @@ def settings_view(row) -> dict:
         "notificationPrefs": normalize_prefs(row.notificationPrefs),
         "onboardingCompleted": row.onboardingCompleted,
         "aiEnabled": row.aiEnabled,
+        "assistantMode": row.assistantMode,
         "updatedAt": row.updatedAt,
     }
 
@@ -142,6 +143,7 @@ class SettingsBody(_Strict):
     notificationPrefs: PrefsBody | None = None
     onboardingCompleted: StrictBool | None = None
     aiEnabled: StrictBool | None = None
+    assistantMode: Literal["manual", "auto"] | None = None
 
     @field_validator("timezone")
     @classmethod
@@ -218,6 +220,7 @@ async def update_settings(body: SettingsBody, user=Depends(plus_user)):
         "theme",
         "onboardingCompleted",
         "aiEnabled",
+        "assistantMode",
     ):
         if patch.get(key) is not None:
             data[key] = patch[key]
