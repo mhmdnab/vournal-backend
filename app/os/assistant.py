@@ -253,6 +253,7 @@ async def send(user, text: str, conversation_id: str | None = None) -> dict:
                 reply = {"content": kept, "text": _text_of(kept) or REPLY["failed"][lang]}
                 break
             results = []
+            ctx.round_deletes = sum(1 for use in uses if use["name"] == "delete_item")
             for use in uses:
                 out = await assistant_tools.run(use["name"], use.get("input"), ctx)
                 if out.get("action"):

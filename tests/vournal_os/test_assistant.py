@@ -72,6 +72,7 @@ class Chat(ChatBase):
         self.assertEqual((full["status"], full["messages"]), ("too_long", []))
         self.assertTrue((await self.client.get(f"/api/assistant/conversations/{conv}")).json()["full"])
 
+        await self.client.patch("/api/settings", json={"assistantMode": "manual"})  # Auto deletes one plain item at once
         task = (await self.client.post("/api/tasks", json={"title": "Old"})).json()
         fm.script(fm.tools(("delete_item", {"type": "task", "id": task["id"]})), fm.message(fm.text("Confirm below.")))
         pending = (await self.say("delete Old"))["messages"][1]["actions"][0]

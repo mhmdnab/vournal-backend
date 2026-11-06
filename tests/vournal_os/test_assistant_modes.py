@@ -155,6 +155,65 @@ class Manual(ChatBase):
         self.assertIn("Mode: manual", first)
 
 
+class AutoDeletes(ChatBase):
+    """Auto mode (ChatBase): one plain item goes at once, with an Undo; a delete that takes more
+    with it, a second delete in the same message, or anything with a file still asks."""
+
+    async def task(self, title="Old", **extra):
+        return (await self.client.post("/api/tasks", json={"title": title, **extra})).json()
+
+    def delete(self, t, title="Old"):
+        return ("delete_item", {"type": "task", "id": t["id"], "label": title})
+
+    async def exists(self, t):
+        return (await self.client.get(f"/api/tasks/{t['id']}")).status_code == 200
+
+    async def test_auto_deletes_a_single_plain_item_at_once_and_undo_restores_it(self):
+        t = await self.task()
+        fm.script(fm.tools(self.delete(t)), fm.message(fm.text("Deleted.")))
+        action = (await self.say("delete Old"))["messages"][1]["actions"][0]
+        self.assertEqual((action["kind"], action["status"], action["canUndo"]), ("delete", "done", True))
+        self.assertFalse(await self.exists(t))
+        result = fm.requests("python")[1]["body"]["messages"][-1]["content"][0]["content"]
+        self.assertEqual(result, 'Deleted "Old". The user can undo it.')
+        self.assertEqual((await self.client.post(f"/api/assistant/actions/{action['id']}/undo")).status_code, 200)
+        self.assertTrue(await self.exists(t))
+
+    async def test_auto_asks_when_the_delete_takes_children(self):
+        t = await self.task()
+        await self.task("Sub", parentId=t["id"])
+        debt = (await self.client.post("/api/debts", json={"direction": "OWED_TO_ME", "kind": "LOAN", "title": "Sami", "principal": 100})).json()
+        await self.client.post(f"/api/debts/{debt['id']}/payments", json={"amount": 10})
+        fm.script(fm.tools(self.delete(t)), fm.message(fm.text("Confirm below.")),
+                  fm.tools(("delete_item", {"type": "debt", "id": debt["id"], "label": "Sami"})), fm.message(fm.text("Confirm below.")))
+        self.assertEqual((await self.say("delete Old"))["messages"][1]["actions"][0]["status"], "pending")
+        self.assertEqual((await self.say("delete Sami's debt"))["messages"][1]["actions"][0]["status"], "pending")
+        self.assertTrue(await self.exists(t))
+        self.assertEqual((await self.client.get(f"/api/debts/{debt['id']}")).status_code, 200)
+
+    async def test_auto_asks_for_both_when_one_round_deletes_two(self):
+        a, b = await self.task("A"), await self.task("B")
+        fm.script(fm.tools(self.delete(a, "A"), self.delete(b, "B")), fm.message(fm.text("Confirm below.")))
+        actions = (await self.say("delete A and B"))["messages"][1]["actions"]
+        self.assertEqual([x["status"] for x in actions], ["pending", "pending"])
+        self.assertTrue(await self.exists(a) and await self.exists(b))
+
+    async def test_auto_asks_for_a_second_delete_in_a_later_round(self):
+        a, b = await self.task("A"), await self.task("B")
+        fm.script(fm.tools(self.delete(a, "A")), fm.tools(self.delete(b, "B")), fm.message(fm.text("One done, one to confirm.")))
+        actions = (await self.say("delete A, then B"))["messages"][1]["actions"]
+        self.assertEqual([x["status"] for x in actions], ["done", "pending"])
+        self.assertEqual((await self.exists(a), await self.exists(b)), (False, True))
+
+    async def test_auto_asks_for_anything_with_a_file(self):
+        t = await self.task()
+        await self.db.attachment.create(data={"userId": self.client.user.id, "entityType": "TASK", "entityId": t["id"], "fileName": "a.pdf",
+                                              "mimeType": "application/pdf", "size": 3, "storageKey": "k/a.pdf"})
+        fm.script(fm.tools(self.delete(t)), fm.message(fm.text("Confirm below.")))
+        self.assertEqual((await self.say("delete Old"))["messages"][1]["actions"][0]["status"], "pending")
+        self.assertTrue(await self.exists(t))
+
+
 class NoToolTouchesTheMode(unittest.TestCase):
     def test_no_tool_mentions_settings_or_the_mode(self):
         text = (BACKEND / "app/os/data/assistant.json").read_text()

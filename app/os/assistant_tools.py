@@ -48,6 +48,7 @@ class Ctx:
         self.mode = mode  # "manual": writes wait for the user's approval; "auto": they run at once
         self.pending: dict[str, dict] = {}  # this message's waiting cards, by action id
         self.deletes_this_message = 0
+        self.round_deletes = 0  # delete_item calls in the round being run
 
 
 # ----- results ---------------------------------------------------------------------------
@@ -870,6 +871,16 @@ async def _delete_item(i: dict, ctx: Ctx) -> dict:
     kind = i.get("type")
     id = _req_str(i.get("id"), "id")
     found = await describe(ctx, kind, id)
+    ctx.deletes_this_message += 1
+    if ctx.mode == "auto" and ctx.round_deletes == 1 and ctx.deletes_this_message == 1:
+        # Auto deletes one plain item at once (with Undo); anything bigger still asks
+        from app.os import assistant_snapshot
+
+        copy = await assistant_snapshot.take(assistant_snapshot.MODELS[kind], id, ctx.user_id)
+        if copy["count"] == 1 and not copy["has_file"]:
+            undo = await remove(ctx.user, kind, id)
+            return {"content": f'Deleted "{found["label"]}". The user can undo it.',
+                    "action": {"kind": "delete", "entityType": kind, "entityId": id, "label": found["label"], "link": None, "undo": undo, "status": "done"}}
     return {"content": f'Waiting for the user to confirm deleting "{found["label"]}". It is not deleted yet — ask them to confirm with the button below your reply.',
             "action": {"kind": "delete", "entityType": kind, "entityId": id, "label": found["label"], "link": found["link"], "undo": None, "status": "pending"}}
 
