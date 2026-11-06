@@ -26,10 +26,13 @@ OpenAI whisper-1 ~= $0.006/min; OpenAI gpt-4o-mini-transcribe ~= $0.003/min.
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any, Optional
 
 from openai import AsyncOpenAI
+
+log = logging.getLogger("vournal.transcription")
 
 # Formats accepted across the supported providers. m4a is primary (Expo records m4a).
 SUPPORTED_FORMATS = {"m4a", "mp3", "wav", "webm", "mp4", "mpga", "mpeg", "flac", "ogg"}
@@ -152,7 +155,7 @@ _SPEECHMATICS_TERMINAL = {"done", "rejected", "deleted", "expired"}
 
 
 async def _transcribe_speechmatics(
-    audio_path: str, model: str, region: str, api_key: str
+    audio_path: str, model: str, region: str, api_key: str, delete_job: bool = False
 ) -> dict[str, Any]:
     """Batch transcription via Speechmatics: submit -> poll -> fetch.
 
@@ -160,8 +163,10 @@ async def _transcribe_speechmatics(
     OpenAI-compatible path. `language` is the set of languages Melia actually
     labelled (e.g. "en, ar" for a code-switched clip), which is the signal we
     care about for the benchmark.
+
+    `delete_job`: delete the job afterwards (audio and transcript at Speechmatics), also when
+    fetching fails. The chat's voice-to-text asks for it; journal recordings don't yet.
     """
-    import asyncio
     import json
 
     import httpx
@@ -188,54 +193,68 @@ async def _transcribe_speechmatics(
             )
         submit.raise_for_status()
         job_id = submit.json()["id"]
+        try:
+            return await _speechmatics_result(client, base, headers, job_id)
+        finally:
+            if delete_job:
+                try:
+                    gone = await client.delete(f"{base}/jobs/{job_id}", headers=headers)
+                    gone.raise_for_status()
+                except Exception as exc:  # noqa: BLE001 — never fail a transcription over it
+                    log.warning("Speechmatics job %s not deleted: %r", job_id, exc)
 
-        # Poll (batch jobs are usually seconds for short clips).
-        status: Optional[str] = None
-        duration: Optional[float] = None
-        for _ in range(150):  # ~5 min ceiling at 2s
-            await asyncio.sleep(2)
-            poll = await client.get(f"{base}/jobs/{job_id}", headers=headers)
-            poll.raise_for_status()
-            job = poll.json().get("job", {})
-            status = job.get("status")
-            if job.get("duration") is not None:
-                duration = float(job["duration"])
-            if status in _SPEECHMATICS_TERMINAL:
-                break
-        if status != "done":
-            raise RuntimeError(
-                f"Speechmatics job {job_id} ended with status '{status}'."
-            )
 
-        # Plain-text transcript for reading.
-        txt = await client.get(
-            f"{base}/jobs/{job_id}/transcript",
-            headers=headers,
-            params={"format": "txt"},
+async def _speechmatics_result(client, base: str, headers: dict, job_id: str) -> dict[str, Any]:
+    """Poll a submitted job, then fetch its text, languages and duration."""
+    import asyncio
+
+    # Poll (batch jobs are usually seconds for short clips).
+    status: Optional[str] = None
+    duration: Optional[float] = None
+    for _ in range(150):  # ~5 min ceiling at 2s
+        await asyncio.sleep(2)
+        poll = await client.get(f"{base}/jobs/{job_id}", headers=headers)
+        poll.raise_for_status()
+        job = poll.json().get("job", {})
+        status = job.get("status")
+        if job.get("duration") is not None:
+            duration = float(job["duration"])
+        if status in _SPEECHMATICS_TERMINAL:
+            break
+    if status != "done":
+        raise RuntimeError(
+            f"Speechmatics job {job_id} ended with status '{status}'."
         )
-        txt.raise_for_status()
-        text = (txt.text or "").strip()
 
-        # json-v2 for the per-word language labels (the code-switch signal).
-        language: Optional[str] = None
-        detail = await client.get(
-            f"{base}/jobs/{job_id}/transcript",
-            headers=headers,
-            params={"format": "json-v2"},
-        )
-        if detail.status_code == 200:
-            data = detail.json()
-            langs: list[str] = []
-            for item in data.get("results", []):
-                alt = (item.get("alternatives") or [{}])[0]
-                lang = alt.get("language")
-                if lang and lang not in langs:
-                    langs.append(lang)
-            if langs:
-                language = ", ".join(langs)
-            if duration is None:
-                dur = (data.get("job") or {}).get("duration")
-                duration = float(dur) if dur is not None else None
+    # Plain-text transcript for reading.
+    txt = await client.get(
+        f"{base}/jobs/{job_id}/transcript",
+        headers=headers,
+        params={"format": "txt"},
+    )
+    txt.raise_for_status()
+    text = (txt.text or "").strip()
+
+    # json-v2 for the per-word language labels (the code-switch signal).
+    language: Optional[str] = None
+    detail = await client.get(
+        f"{base}/jobs/{job_id}/transcript",
+        headers=headers,
+        params={"format": "json-v2"},
+    )
+    if detail.status_code == 200:
+        data = detail.json()
+        langs: list[str] = []
+        for item in data.get("results", []):
+            alt = (item.get("alternatives") or [{}])[0]
+            lang = alt.get("language")
+            if lang and lang not in langs:
+                langs.append(lang)
+        if langs:
+            language = ", ".join(langs)
+        if duration is None:
+            dur = (data.get("job") or {}).get("duration")
+            duration = float(dur) if dur is not None else None
 
     return {"text": text, "language": language, "durationSec": duration}
 
@@ -270,6 +289,7 @@ async def transcribe(
     prompt: Optional[str] = None,
     provider: Optional[str] = None,
     model: Optional[str] = None,
+    delete_job: bool = False,
 ) -> dict[str, Any]:
     """Transcribe an audio file to text.
 
@@ -283,6 +303,7 @@ async def transcribe(
         provider: override STT_PROVIDER for this call (the benchmark passes both
             "groq" and "speechmatics"). Defaults to the env / DEFAULT_PROVIDER.
         model: override the model for this call. Defaults per provider.
+        delete_job: Speechmatics only: delete the provider's copy once the text is back.
 
     Returns:
         {"text": str, "language": str | None, "durationSec": float | None}
@@ -318,7 +339,7 @@ async def transcribe(
         # explicit arg, else the Melia default.
         sm_model = model or SPEECHMATICS_DEFAULT_MODEL
         region = os.environ.get("SPEECHMATICS_REGION") or SPEECHMATICS_DEFAULT_REGION
-        return await _transcribe_speechmatics(audio_path, sm_model, region, api_key)
+        return await _transcribe_speechmatics(audio_path, sm_model, region, api_key, delete_job)
 
     cfg = PROVIDER_CONFIG.get(provider)
     if cfg is None:

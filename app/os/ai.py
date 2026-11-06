@@ -44,6 +44,9 @@ MONTHLY_LIMIT = int(os.environ.get("AI_MONTHLY_LIMIT", "").strip() or 3000)
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 STRUCTURED_BETA = "structured-outputs-2025-12-15"  # the TS SDK's parse() always added it
 CAPTURE, FOOD, CHAT = "ai.capture", "ai.food", "ai.chat"
+# the chat's voice-to-text: its own monthly minutes, apart from the AI allowance (design 2026-11-06)
+VOICE = "ai.voice"
+VOICE_MONTHLY_SECONDS = 60 * int(os.environ.get("AI_VOICE_MONTHLY_MINUTES", "").strip() or 60)
 WEEKDAYS = ("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
 
 # the SDK reads ANTHROPIC_API_KEY (and ANTHROPIC_BASE_URL) from the environment; tests swap this
@@ -84,9 +87,17 @@ async def spend(user_id: str, tz: str, action: str) -> int | None:
         return MONTHLY_LIMIT - used - 1
 
 
+async def voice_seconds_left(user_id: str, tz: str) -> int:
+    """This month's voice seconds left: one activity-log row per recording, with its seconds."""
+    rows = await db.activitylog.find_many(where={"userId": user_id, "action": VOICE, "createdAt": {"gte": _month_start(tz)}})
+    used = sum(int((r.metadata or {}).get("seconds", 0)) for r in rows if isinstance(r.metadata, dict))
+    return max(0, VOICE_MONTHLY_SECONDS - used)
+
+
 async def status(user) -> dict:
     s = await ensure_os_profile(user)
-    return {"configured": _client is not None, "enabled": s.aiEnabled, "monthlyLimit": MONTHLY_LIMIT, "remainingThisMonth": await remaining(user.id, s.timezone)}
+    return {"configured": _client is not None, "enabled": s.aiEnabled, "monthlyLimit": MONTHLY_LIMIT, "remainingThisMonth": await remaining(user.id, s.timezone),
+            "voiceSecondsLeftThisMonth": await voice_seconds_left(user.id, s.timezone)}
 
 
 # ----- normalizing what the model returns -------------------------------------------------

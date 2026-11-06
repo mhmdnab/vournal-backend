@@ -78,7 +78,8 @@ class Capture(OsTestCase):
     async def test_without_a_key_or_with_ai_off(self):
         with patch.object(self.ai, "_client", None):
             self.assertEqual((await self.client.get("/api/ai/status")).json(),
-                             {"configured": False, "enabled": True, "monthlyLimit": 3000, "remainingThisMonth": 3000})
+                             {"configured": False, "enabled": True, "monthlyLimit": 3000, "remainingThisMonth": 3000,
+                              "voiceSecondsLeftThisMonth": 3600})
             self.assertEqual(await self.capture(), {"status": "not_configured", "draft": None, "remainingThisMonth": 3000})
         fake = self.model()
         await self.client.patch("/api/settings", json={"aiEnabled": False})
