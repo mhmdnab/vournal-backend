@@ -96,7 +96,7 @@ def _expired(a) -> bool:
 def action_view(a) -> dict:
     status = "expired" if a.status == "pending" and _expired(a) else a.status
     return {"id": a.id, "kind": a.kind, "entityType": a.entityType, "entityId": a.entityId, "label": a.label, "link": a.link,
-            "status": status, "error": a.error, "canUndo": a.status == "done" and a.undo is not None}
+            "status": status, "error": a.error, "canUndo": a.status == "done" and a.undo is not None and not _expired(a)}
 
 
 def _view(m, actions) -> dict:
@@ -393,7 +393,7 @@ async def cancel(id: str, user=Depends(plus_user)):
 @router.post("/actions/{id}/undo")
 async def undo(id: str, user=Depends(plus_user)):
     a = await _owned_action(user.id, id)
-    if a.status != "done" or not a.undo:
+    if a.status != "done" or not a.undo or _expired(a):
         raise nest_error(400, "This cannot be undone")
     try:
         await assistant_tools.reverse(user, a.undo, await _tool_ctx(user))

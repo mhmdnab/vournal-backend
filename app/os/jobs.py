@@ -3,6 +3,7 @@
 - notifications-tick, every minute: reminders, task and event reminders, habits, the digest;
 - notifications-sweep, every 15 minutes: bills, debts, documents, maintenance, people, budgets;
 - notifications-cleanup, at 03:00: read notifications older than 90 days;
+- assistant-undo-cleanup, at 03:05: the chat's undo copies older than 24 hours;
 - finance-recurring-transactions and finance-recurring-autolog, hourly;
 - market-rates, at minute 17 every 6 hours.
 
@@ -80,6 +81,12 @@ async def notifications_cleanup() -> None:
     await notification_sync.cleanup()
 
 
+async def assistant_undo_cleanup() -> None:
+    from app.os import assistant_snapshot
+
+    await assistant_snapshot.clear_old(datetime.now(timezone.utc) - timedelta(hours=24))
+
+
 async def finance_repeat() -> None:
     heads = await db.transaction.find_many(where={"rrule": {"not": None}, "date": {"lte": datetime.now(timezone.utc)}}, distinct=["userId"])
     await _each("finance-recurring-transactions", await _plus_users({t.userId for t in heads}), lambda u: transactions.materialize_due(u.id))
@@ -109,6 +116,7 @@ JOBS = (
     Job("notifications-tick", lambda t: True, notifications_tick, lane="tick", timeout=timedelta(minutes=5)),
     Job("notifications-sweep", lambda t: t.minute % 15 == 0, notifications_sweep),
     Job("notifications-cleanup", lambda t: (t.hour, t.minute) == (3, 0), notifications_cleanup),
+    Job("assistant-undo-cleanup", lambda t: (t.hour, t.minute) == (3, 5), assistant_undo_cleanup),
     Job("market-rates", lambda t: t.minute == 17 and t.hour % 6 == 0, refresh_market_rates),
     Job("finance-recurring-transactions", lambda t: t.minute == 0, finance_repeat),
     Job("finance-recurring-autolog", lambda t: t.minute == 0, finance_autolog),

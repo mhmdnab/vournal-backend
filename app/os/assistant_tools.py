@@ -969,17 +969,27 @@ WRITE_TOOLS = frozenset(_TOOLS) - READ_TOOLS
 # ----- deleting (after the user confirms) and undoing ------------------------------------
 
 
-async def remove(user, kind: str, id: str) -> None:
-    """Deletes a confirmed item (only ids that belong to the user)."""
+async def remove(user, kind: str, id: str) -> dict | None:
+    """Deletes a confirmed item (only ids that belong to the user). Returns how to undo it: a
+    copy of everything the delete removes, taken just before."""
+    from app.os import assistant_snapshot
+
     handlers = {"task": tasks.remove, "event": events.remove, "reminder": reminders.remove, "transaction": transactions.remove, "debt": debts.remove,
                 "note": notes.remove, "shopping_item": shopping.remove_item, "food_log": wellness.remove_food, "weight": wellness.remove_weight}
-    if kind in handlers:
-        await handlers[kind](id, user=user)
+    if kind not in handlers:
+        return None
+    snapshot = await assistant_snapshot.take(assistant_snapshot.MODELS[kind], id, user.id)
+    await handlers[kind](id, user=user)
+    return {"op": "restore_snapshot", "snapshot": snapshot}
 
 
 async def reverse(user, undo: dict, ctx: Ctx | None = None) -> None:
     if undo["op"] == "restore_fields":
         await _restore_fields(undo, ctx)
+    elif undo["op"] == "restore_snapshot":
+        from app.os import assistant_snapshot
+
+        await assistant_snapshot.restore(undo["snapshot"])
     elif undo["op"] == "remove_water":
         await wellness.add_water(_check(wellness.WaterBody, {"addMl": -undo["ml"], "date": undo["date"]}), user=user)
     elif undo["op"] == "delete":
