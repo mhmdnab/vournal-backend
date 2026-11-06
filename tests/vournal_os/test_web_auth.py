@@ -246,6 +246,55 @@ class WebAuth(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(await self.db.externalidentity.count(), identities)
 
+    async def _google(self, user, *, verified=True, authoritative=True, email=None):
+        from app.oauth import GOOGLE_ISSUERS, VerifiedIdentity
+
+        identity = VerifiedIdentity(GOOGLE_ISSUERS[0], f"sub-{uuid.uuid4().hex}", email or user.email, verified, authoritative)
+        with patch("app.oauth.verify_identity", return_value=identity):
+            response = await self.client.post("/api/auth/oauth/google", json={"idToken": "t", "nonce": "n"}, headers=CSRF)
+        return response, identity
+
+    async def test_google_with_the_confirmed_email_links_and_signs_in(self):
+        # Gmail through Google, on an account whose email was confirmed in the app: the same
+        # proof the app accepts, so the web links it too (and the app sees the link).
+        user = await self._user(emailVerifiedAt=datetime.now(timezone.utc))
+        response, identity = await self._google(user, email=user.email.upper())
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["user"]["email"], user.email)
+        _cookie(response, "life_at")
+        linked = await self.db.externalidentity.find_many(where={"userId": user.id})
+        self.assertEqual([(i.issuer, i.subject) for i in linked], [(identity.issuer, identity.subject)])
+        again, _ = await self._google(user)  # a second Google account with the same address is a separate identity
+        self.assertEqual(again.status_code, 200, again.text)
+
+    async def test_google_never_links_an_unconfirmed_account(self):
+        # whoever set this account's password never proved the address
+        user = await self._user()
+        response, _ = await self._google(user)
+        self.assertEqual((response.status_code, response.json()["code"]), (403, "link_in_app"))
+        self.assertEqual(await self.db.externalidentity.count(where={"userId": user.id}), 0)
+
+    async def test_google_links_only_what_it_vouches_for(self):
+        user = await self._user(emailVerifiedAt=datetime.now(timezone.utc))
+        for kwargs in ({"authoritative": False}, {"verified": False}):
+            response, _ = await self._google(user, **kwargs)
+            self.assertEqual((response.status_code, response.json()["code"]), (403, "link_in_app"), kwargs)
+        self.assertEqual(await self.db.externalidentity.count(where={"userId": user.id}), 0)
+
+    async def test_google_linked_to_someone_else_stays_theirs(self):
+        owner = await self._user(emailVerifiedAt=datetime.now(timezone.utc))
+        other = await self._user(emailVerifiedAt=datetime.now(timezone.utc))
+        response, identity = await self._google(owner)
+        self.assertEqual(response.status_code, 200)
+        # the same Google identity now carries the other account's address: it signs into its own account
+        from app.oauth import VerifiedIdentity
+
+        moved = VerifiedIdentity(identity.issuer, identity.subject, other.email, True, True)
+        with patch("app.oauth.verify_identity", return_value=moved):
+            again = await self.client.post("/api/auth/oauth/google", json={"idToken": "t", "nonce": "n"}, headers=CSRF)
+        self.assertEqual(again.json()["user"]["email"], owner.email)
+        self.assertEqual(await self.db.externalidentity.count(where={"userId": other.id}), 0)
+
     async def test_linked_oauth_identity_signs_in(self):
         from app.oauth import APPLE_ISSUER, VerifiedIdentity
 
