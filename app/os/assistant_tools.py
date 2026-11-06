@@ -933,12 +933,15 @@ async def _get_dashboard(i: dict, ctx: Ctx) -> dict:
     from app.os.common.defaults import ALWAYS_ON_SECTIONS, SECTION_KEYS
 
     now = await _layout_now(ctx)
+    focus = await _focus_now(ctx)
     return _json({
         "shown": [w["id"] for w in now["dashboardWidgets"] if w["visible"]],
         "hidden": [w["id"] for w in now["dashboardWidgets"] if not w["visible"]],
         "enabledSections": now["enabledSections"],
         "widgets": [{"id": wid, "shows": d, "needsSection": s} for wid, (d, s) in WIDGETS.items()],
         "sections": [k for k in SECTION_KEYS if k not in ALWAYS_ON_SECTIONS],
+        "focusModes": [{"name": m["name"], "sections": m["sections"], "widgets": m["widgets"]} for m in focus["focusModes"]],
+        "activeFocus": next((m["name"] for m in focus["focusModes"] if m["id"] == focus["activeFocusModeId"]), None),
     })
 
 
@@ -1104,6 +1107,85 @@ async def _create_workout_plan(i: dict, ctx: Ctx) -> dict:
                  {"id": p["id"], "name": p["name"], "days": [{"name": d["name"], "weekday": d["weekday"], "exercises": len(d["exercises"])} for d in p["days"]]})
 
 
+async def _focus_now(ctx: Ctx) -> dict:
+    from app.os import settings as os_settings
+    from app.os.profile import ensure_os_profile
+
+    s = await ensure_os_profile(ctx.user)
+    return {"focusModes": os_settings.normalize_focus_modes(s.focusModes), "activeFocusModeId": os_settings.active_focus_id(s)}
+
+
+async def _save_focus_mode(i: dict, ctx: Ctx) -> dict:
+    """Create or replace (by name) a focus mode: the sections, widgets, projects and tasks it keeps."""
+    import uuid
+
+    from app.os import settings as os_settings
+    from app.os.common.defaults import DASHBOARD_WIDGET_IDS, SECTION_KEYS
+
+    name = _req_str(i.get("name"), "name")
+    sections = _str_list(i.get("sections"), "sections")
+    widgets = _str_list(i.get("widgets"), "widgets")
+    bad = [x for x in sections if x not in SECTION_KEYS] + [w for w in widgets if w not in DASHBOARD_WIDGET_IDS]
+    if bad:
+        raise ToolError(f"Unknown section or widget {', '.join(bad)}")
+    for w in widgets:  # a widget brings its section along
+        section = WIDGETS.get(w, (None, None))[1]
+        if section and section not in sections:
+            sections.append(section)
+    project_ids: list[str] = []
+    names = _str_list(i.get("project_names"), "project_names")
+    if names:
+        mine = {p.name.strip().lower(): p.id for p in await db.project.find_many(where={"userId": ctx.user_id})}
+        missing = [n for n in names if n.strip().lower() not in mine]
+        if missing:
+            raise ToolError(f"No project named {', '.join(missing)}")
+        project_ids = [mine[n.strip().lower()] for n in names]
+    task_ids = _str_list(i.get("task_ids"), "task_ids")
+    if task_ids and await db.task.count(where={"id": {"in": task_ids}, "userId": ctx.user_id}) != len(task_ids):
+        raise ToolError("Task not found")
+    before = await _focus_now(ctx)
+    modes = before["focusModes"]
+    same = next((m for m in modes if m["name"].strip().lower() == name.lower()), None)
+    mode = {"id": same["id"] if same else uuid.uuid4().hex[:12], "name": name, "icon": i.get("icon") if isinstance(i.get("icon"), str) else (same or {}).get("icon"),
+            "color": (same or {}).get("color"), "sections": sections, "widgets": widgets, "projectIds": project_ids, "taskIds": task_ids}
+    modes = [mode if m is same else m for m in modes] if same else [*modes, mode]
+    patch: dict = {"focusModes": modes}
+    if i.get("turn_on") is True:
+        patch["activeFocusModeId"] = mode["id"]
+    try:
+        await os_settings.update_settings(_check(os_settings.SettingsBody, patch), user=ctx.user)
+    except ToolError as exc:
+        if "icon" in str(exc):  # not a lucide icon name: keep the mode, drop the icon
+            mode["icon"] = None
+            await os_settings.update_settings(_check(os_settings.SettingsBody, patch), user=ctx.user)
+        else:
+            raise
+    return _done({"kind": "update" if same else "create", "entityType": "focus_mode", "entityId": mode["id"], "label": name, "link": "/settings/focus",
+                  "undo": {"op": "restore_settings", "before": before}},
+                 {"id": mode["id"], "name": name, "sections": sections, "widgets": widgets, "projects": len(project_ids), "on": i.get("turn_on") is True})
+
+
+async def _set_focus(i: dict, ctx: Ctx) -> dict:
+    """Turn a focus mode on by name, or off (name null)."""
+    from app.os import settings as os_settings
+
+    before = await _focus_now(ctx)
+    wanted = i.get("name")
+    if wanted is None:
+        target, label = None, "Focus off"
+    else:
+        name = _req_str(wanted, "name")
+        mode = next((m for m in before["focusModes"] if m["name"].strip().lower() == name.lower()), None)
+        if mode is None:
+            known = ", ".join(m["name"] for m in before["focusModes"]) or "none yet"
+            raise ToolError(f'No focus mode named "{name}" (the user has: {known})')
+        target, label = mode["id"], mode["name"]
+    await os_settings.update_settings(_check(os_settings.SettingsBody, {"activeFocusModeId": target}), user=ctx.user)
+    return _done({"kind": "update", "entityType": "focus_mode", "entityId": target or ctx.user_id, "label": label, "link": "/settings/focus",
+                  "undo": {"op": "restore_settings", "before": {"activeFocusModeId": before["activeFocusModeId"]}}},
+                 {"on": label if target else None})
+
+
 async def _remove_created(user, undo: dict) -> None:
     """Undo of a create: removes it (and, for a challenge, the habits it made that were never checked)."""
     kind, id = undo["type"], undo["id"]
@@ -1128,7 +1210,7 @@ async def _restore_settings(user, undo: dict) -> None:
 
 _TOOLS = {
     "get_dashboard": _get_dashboard, "set_dashboard_layout": _set_dashboard_layout, "create_habit": _create_habit,
-    "create_challenge": _create_challenge, "create_workout_plan": _create_workout_plan,
+    "create_challenge": _create_challenge, "create_workout_plan": _create_workout_plan, "save_focus_mode": _save_focus_mode, "set_focus": _set_focus,
     "get_options": _get_options, "search": _search, "get_agenda": _get_agenda, "list_tasks": _list_tasks, "get_money": _get_money,
     "list_transactions": _list_transactions, "list_debts": _list_debts, "get_health": _get_health, "update_health_profile": _update_health_profile,
     "get_prayer_times": _get_prayer_times, "create_task": _create_task, "update_task": _update_task, "create_event": _create_event,

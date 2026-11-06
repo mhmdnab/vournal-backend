@@ -691,6 +691,10 @@ model UserSettings {
   aiEnabled           Boolean         @default(false)
   // the chat's mode: "manual" (every change waits for approval) | "auto" (acts at once, with Undo)
   assistantMode       String          @default("manual")
+  // focus modes (like iOS Focus): [{ "id", "name", "icon", "color", "sections": [...], "widgets": [...], "projectIds": [...], "taskIds": [...] }]
+  focusModes          Json?
+  // the focus mode on now (one of focusModes' ids), or null
+  activeFocusModeId   String?
   // spending plan: { "savingsMode": "none" | "percent" | "amount", "savingsValue": 10, "periodMode": "auto" | "month" }
   spendingPlan        Json?
   // prayer times: { "cityId": "beirut", "lat": 33.89, "lng": 35.50, "method": "MuslimWorldLeague", "madhab": "shafi" }

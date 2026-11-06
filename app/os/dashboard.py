@@ -20,6 +20,7 @@ from app.os.insight_habits import count_on, current_streak, done_in_week, index_
 from app.os.insight_text import enum_label, js_round, shared
 from app.os.insight_time import add_days_key, date_only_key, day_key, days_in_month, diff_days_key, key_to_date, pct_change, round2
 from app.os.insights import insights_for
+from app.os.settings import active_focus
 
 router = nest_router("/dashboard")
 
@@ -249,6 +250,22 @@ def _summary(c: dict, ctx) -> str:
     return fmt(M["summary"], list=join_list(lang, parts)) if parts else M["summaryEmpty"]
 
 
+def _scoped_tasks(tasks: dict, project_ids: set[str], task_ids: set[str]) -> dict:
+    """A focus mode limited to some projects / tasks: the home screen's task lists keep only those."""
+    def keep(t: dict) -> bool:
+        project = t.get("project") or {}
+        return t["id"] in task_ids or project.get("id") in project_ids
+
+    today = [t for t in tasks["todayTasks"]["items"] if keep(t)]
+    overdue = [t for t in tasks["overdue"]["items"] if keep(t)]
+    top = tasks["topPriorities"]
+    return {
+        "todayTasks": {"items": today, "total": len(today), "completed": sum(1 for t in today if t["status"] == "COMPLETED")},
+        "overdue": {"count": len(overdue), "items": overdue},
+        "topPriorities": {**top, "items": [t for t in top["items"] if keep(t)], "suggestions": [t for t in top["suggestions"] if keep(t)]},
+    }
+
+
 async def _challenges(user) -> dict | None:
     """Active (and upcoming) challenges; None when there are none, so the widget stays away."""
     from app.os import challenges as challenge_routes
@@ -291,6 +308,9 @@ async def get_dashboard(user=Depends(plus_user)):
     goals = await life.goals(ctx) if on("goals") else None
     habits = await _habits(ctx) if on("habits") else None
     deadlines = await _deadlines(ctx)
+    focus = active_focus(ctx.settings)
+    if tasks and focus and (focus["projectIds"] or focus["taskIds"]):
+        tasks = _scoped_tasks(tasks, set(focus["projectIds"]), set(focus["taskIds"]))
     try:
         challenges = await _challenges(user) if on("habits") else None
         workouts = await _workouts(user) if on("health") else None

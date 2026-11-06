@@ -27,6 +27,7 @@ ENTITY = {
     "create_debt": "debt", "add_debt_payment": "debt_payment", "add_note": "note", "add_shopping_item": "shopping_item",
     "log_food": "food_log", "log_water": "water", "log_weight": "weight", "update_health_profile": "health_profile",
     "set_dashboard_layout": "dashboard", "create_habit": "habit", "create_challenge": "challenge", "create_workout_plan": "workout_plan",
+    "save_focus_mode": "focus_mode", "set_focus": "focus_mode",
 }
 # the item an edit or payment points at: (input field, kind for describe)
 _TARGET = {"update_task": ("id", "task"), "update_event": ("id", "event"), "update_transaction": ("id", "transaction"),
@@ -97,6 +98,8 @@ async def _describe_target(name: str, i: dict, ctx: Ctx) -> dict:
         return {"label": "Health plan", "link": "/health"}
     if name == "set_dashboard_layout":
         return {"label": "Dashboard layout", "link": "/dashboard"}
+    if name == "set_focus":
+        return {"label": i["name"] if isinstance(i.get("name"), str) and i["name"].strip() else "Focus off", "link": "/settings/focus"}
     if name in _TARGET:
         field, kind = _TARGET[name]
         target = i.get(field)
