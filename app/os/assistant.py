@@ -97,7 +97,12 @@ INTERRUPTED = "Interrupted — ask again"
 
 
 def _expired(a) -> bool:
-    return datetime.now(timezone.utc) - a.createdAt > PENDING_TTL
+    """A waiting card lasts 24 hours, except one from an app recording, which waits as long as
+    its entry does; an Undo lasts 24 hours from when the change ran."""
+    if a.status == "pending" and a.entryId:
+        return False
+    since = (a.resolvedAt or a.createdAt) if a.status == "done" else a.createdAt
+    return datetime.now(timezone.utc) - since > PENDING_TTL
 
 
 def _stuck(a) -> bool:
@@ -134,7 +139,7 @@ _IN_ORDER = [{"createdAt": "asc"}, {"id": "asc"}]
 
 
 async def _owned(user_id: str, id: str):
-    c = await db.assistantconversation.find_first(where={"id": id, "userId": user_id})
+    c = await db.assistantconversation.find_first(where={"id": id, "userId": user_id, "entryId": None})
     if c is None:
         raise nest_error(404, "Conversation not found")
     return c
@@ -149,7 +154,8 @@ async def _owned_action(user_id: str, id: str):
 
 @router.get("/conversations")
 async def list_conversations(user=Depends(plus_user)):
-    rows = await db.assistantconversation.find_many(where={"userId": user.id}, order={"lastMessageAt": "desc"}, take=100)
+    # an app recording's AI actions keep their own conversation, shown only on its review card
+    rows = await db.assistantconversation.find_many(where={"userId": user.id, "entryId": None}, order={"lastMessageAt": "desc"}, take=100)
     items = [{"id": c.id, "title": c.title, "channel": c.channel, "lastMessageAt": c.lastMessageAt, "createdAt": c.createdAt} for c in rows]
     return {"items": items, "total": len(items)}
 
@@ -191,7 +197,7 @@ def _log_error(exc: Exception) -> None:
         log.warning("Assistant failed: %s", exc)
 
 
-async def _call(client, round_: int, messages: list, effort: str) -> dict:
+async def _call(client, round_: int, messages: list, effort: str, system: str = SYSTEM, tools: list = TOOLS) -> dict:
     """One round, as the API returned it (stored and replayed unchanged)."""
     raw = await client.beta.messages.with_raw_response.create(
         model=ai.MODEL,
@@ -199,8 +205,8 @@ async def _call(client, round_: int, messages: list, effort: str) -> dict:
         betas=[ai.FALLBACK_BETA],
         fallbacks="default",
         cache_control={"type": "ephemeral"},
-        system=SYSTEM,
-        tools=TOOLS,
+        system=system,
+        tools=tools,
         **({"tool_choice": {"type": "none"}} if round_ == MAX_ROUNDS else {}),
         thinking={"type": "adaptive"},
         output_config={"effort": effort},
@@ -304,15 +310,19 @@ async def send(user, text: str, conversation_id: str | None = None) -> dict:
     }
 
 
-async def _save_actions(user_id: str, conversation_id: str, message_id: str, drafts: list[dict]) -> list:
-    if not drafts:
+async def _save_actions(user_id: str, conversation_id: str, message_id: str, drafts: list[dict], entry_id: str | None = None) -> list:
+    """An app recording's set (entry_id) replaces what was waiting for that entry before."""
+    if not drafts and not entry_id:
         return []
     async with db.tx() as tx:
+        if entry_id:
+            await tx.assistantaction.update_many(where={"entryId": entry_id, "status": "pending"},
+                                                 data={"status": "cancelled", "resolvedAt": datetime.now(timezone.utc)})
         rows = []
         for d in drafts:
             data = {"id": d["id"], "conversationId": conversation_id, "userId": user_id, "messageId": message_id, "kind": d["kind"],
                     "entityType": d["entityType"], "entityId": d["entityId"], "label": js_slice(d["label"], 300), "link": d["link"],
-                    "status": d["status"], "position": d.get("position", 0)}
+                    "status": d["status"], "position": d.get("position", 0), **({"entryId": entry_id} if entry_id else {})}
             if d.get("undo"):
                 data["undo"] = Json(d["undo"])
             if d.get("call"):

@@ -16,6 +16,7 @@ from app.os import assistant_tools as tools
 from app.os.assistant_tools import Ctx, ToolError
 
 PLACEHOLDER = "pending:"
+PERSON_PLACEHOLDER = "proposal-person:"  # a person an app recording found, created when the user saves it
 SCHEMAS = {t["name"]: t["input_schema"] for t in json.loads((Path(__file__).parent / "data" / "assistant.json").read_text())["tools"]}
 
 _JSON_TYPES = {"string": str, "boolean": bool, "object": dict, "array": list}
@@ -103,11 +104,19 @@ async def _describe_target(name: str, i: dict, ctx: Ctx) -> dict:
         target = i.get(field)
         if isinstance(target, str) and target.startswith(PLACEHOLDER):
             return {"label": await _waiting_label(ctx, target), "link": None}
+        if isinstance(target, str) and target.startswith(PERSON_PLACEHOLDER):
+            if target not in ctx.entry_people:
+                raise ToolError(f"Unknown id {target}")
+            found = {"label": ctx.entry_people[target], "link": None}
+        else:
+            found = None
         if name == "update_task":
             todo = await tools._app_todo(ctx, target) if isinstance(target, str) else None
             if todo is not None:
                 return {"label": todo.text, "link": f"/tasks?id={todo.id}"}
-        found = await tools.describe(ctx, kind, target)
+        found = found or await tools.describe(ctx, kind, target)
+        if name == "add_gift":
+            return {"label": f"{pending_label(name, i)} → {found['label']}", "link": found["link"]}
         if name == "add_debt_payment":
             return {"label": f"{pending_label(name, i)} → {found['label']}", "link": found["link"]}
         return found

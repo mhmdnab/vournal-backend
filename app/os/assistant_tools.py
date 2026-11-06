@@ -50,6 +50,7 @@ class Ctx:
         self.pending: dict[str, dict] = {}  # this message's waiting cards, by action id
         self.deletes_this_message = 0
         self.round_deletes = 0  # delete_item calls in the round being run
+        self.entry_people: dict[str, str] = {}  # an app recording's new people: "proposal-person:<i>" → name
 
 
 # ----- results ---------------------------------------------------------------------------
