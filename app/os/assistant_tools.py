@@ -8,6 +8,7 @@ worded as the route would answer ("Error: Task not found")."""
 import json
 import re
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from urllib.parse import urlencode
 
 from fastapi import HTTPException
@@ -518,9 +519,11 @@ async def _update_health_profile(i: dict, ctx: Ctx) -> dict:
             patch[dst] = i[src]
     if not patch:
         raise ToolError("Nothing to change")
+    before = await fields_now("health_profile", ctx.user_id, patch, ctx)
     p = await wellness.update_profile(_check(wellness.ProfileBody, patch), user=ctx.user)
     pr = p["profile"]
-    return _done({"kind": "update", "entityType": "health_profile", "entityId": ctx.user_id, "label": "Health plan", "link": "/health", "undo": None},
+    undo = await _fields_undo("health_profile", ctx.user_id, before, ctx)
+    return _done({"kind": "update", "entityType": "health_profile", "entityId": ctx.user_id, "label": "Health plan", "link": "/health", "undo": undo},
                  {"goal": pr["goal"], "targetWeightKg": pr["targetWeightKg"], "weeklyRateKg": pr["weeklyRateKg"], "activityLevel": pr["activityLevel"],
                   "heightCm": pr["heightCm"], "targets": p["targets"], "weeksToGoal": p["weeksToGoal"]})
 
@@ -613,8 +616,10 @@ async def _update_task(i: dict, ctx: Ctx) -> dict:
         # moving to another day keeps the time it had
         keep = local_time(current["dueAt"], ctx.tz) if current.get("dueAt") and current.get("hasDueTime") else None
         patch.update(_due(base, at or keep, ctx))
+    before = await fields_now("task", id, patch, ctx) if patch else None
     t = await tasks.update(id, _check(tasks.UpdateBody, patch), user=ctx.user) if patch else await tasks.get(id, user=ctx.user)
-    return _done({"kind": "update", "entityType": "task", "entityId": id, "label": t["title"], "link": link, "undo": None},
+    undo = await _fields_undo("task", id, before, ctx) if before else None
+    return _done({"kind": "update", "entityType": "task", "entityId": id, "label": t["title"], "link": link, "undo": undo},
                  {"id": id, "title": t["title"], "status": t["status"], "due": _due_text(t, ctx.tz), "repeats": t.get("rrule")})
 
 
@@ -680,8 +685,10 @@ async def _update_event(i: dict, ctx: Ctx) -> dict:
             patch.update({"startAt": _iso(start), "endAt": _iso(start + timedelta(minutes=minutes)), "allDay": False})
         else:
             patch.update({"date": date, "allDay": True})
+    before = await fields_now("event", id, patch, ctx) if patch else None
     e = await events.update(id, _check(events.UpdateBody, patch), user=ctx.user) if patch else cur
-    return _done({"kind": "update", "entityType": "event", "entityId": id, "label": e["title"], "link": _event_link(id, e["startAt"], ctx.tz), "undo": None},
+    undo = await _fields_undo("event", id, before, ctx) if before else None
+    return _done({"kind": "update", "entityType": "event", "entityId": id, "label": e["title"], "link": _event_link(id, e["startAt"], ctx.tz), "undo": undo},
                  {"id": id, "title": e["title"], "start": _event_start(e, ctx.tz), "repeats": e.get("rrule")})
 
 
@@ -749,8 +756,10 @@ async def _update_transaction(i: dict, ctx: Ctx) -> dict:
             plain[dst] = i[src]
     if date:
         plain["date"] = date
+    before = await fields_now("transaction", id, plain, ctx) if plain else None
     t = await transactions.update(id, _check(transactions.UpdateBody, plain), user=ctx.user)
-    return _done({"kind": "update", "entityType": "transaction", "entityId": id, "label": _money_label(t), "link": f"/finance/transactions?id={id}", "undo": None},
+    undo = await _fields_undo("transaction", id, before, ctx) if before else None
+    return _done({"kind": "update", "entityType": "transaction", "entityId": id, "label": _money_label(t), "link": f"/finance/transactions?id={id}", "undo": undo},
                  {"id": id, "amount": _decimal(t["amount"]), "currency": t["currency"], "date": local_day(t["date"], ctx.tz), "title": t["title"],
                   "category": (t.get("category") or {}).get("name")})
 
@@ -837,7 +846,8 @@ async def _log_water(i: dict, ctx: Ctx) -> dict:
     date = opt_date(i.get("date"))
     await wellness.add_water(_check(wellness.WaterBody, {"addMl": ml, **({"date": date} if date else {})}), user=ctx.user)
     d = await wellness._day(ctx.user, date or ctx.today)
-    return _done({"kind": "create", "entityType": "water", "entityId": d["date"], "label": f"{ml} ml", "link": f"/health?date={d['date']}", "undo": None},
+    return _done({"kind": "create", "entityType": "water", "entityId": d["date"], "label": f"{ml} ml", "link": f"/health?date={d['date']}",
+                  "undo": {"op": "remove_water", "date": d["date"], "ml": ml}},
                  {"addedMl": ml, "totalMl": d["water"]["ml"], "goalMl": d["water"]["goalMl"]})
 
 
@@ -874,6 +884,83 @@ _TOOLS = {
 }
 
 
+# ----- undoing an edit: the changed fields' old values, unless the item changed since ----------
+
+_EVENT_TIME = ("startAt", "endAt", "allDay", "date")
+_TASK_DUE = ("dueAt", "hasDueTime")
+
+
+def _norm(value):
+    """One form for comparing a field now with what the edit left."""
+    if isinstance(value, bool) or value is None:
+        return value
+    if isinstance(value, (int, float, Decimal)):
+        return float(value)
+    return value
+
+
+async def fields_now(kind: str, id: str, keys, ctx: Ctx) -> dict:
+    """The item's current values for `keys`, in the route's update body's own form. A time is
+    taken as a whole (an event's start/end/all-day, a task's due day and time)."""
+    keys = set(keys)
+    out: dict = {}
+    if kind == "task":
+        t = await tasks.get(id, user=ctx.user)
+        if keys & set(_TASK_DUE):
+            keys -= set(_TASK_DUE)
+            if not t.get("dueAt"):
+                out.update(dueAt=None, hasDueTime=False)
+            elif t.get("hasDueTime"):
+                out.update(dueAt=_iso(_instant(t["dueAt"])), hasDueTime=True)
+            else:
+                out.update(dueAt=local_day(t["dueAt"], ctx.tz), hasDueTime=False)
+        for k in keys:
+            out[k] = to_json(t.get(k))[:10] if k == "recurrenceEndAt" and t.get(k) else t.get(k)
+    elif kind == "event":
+        e = await events.get(id, user=ctx.user)
+        if keys & set(_EVENT_TIME):
+            keys -= set(_EVENT_TIME)
+            if e["allDay"]:
+                out.update(date=local_day(e["startAt"], ctx.tz), allDay=True)
+            else:
+                out.update(startAt=_iso(_instant(e["startAt"])), endAt=_iso(_instant(e["endAt"])) if e.get("endAt") else None, allDay=False)
+        for k in keys:
+            out[k] = to_json(e.get(k))[:10] if k == "recurrenceEndAt" and e.get(k) else e.get(k)
+    elif kind == "transaction":
+        t = await transactions.get(id, user=ctx.user)
+        for k in keys:
+            out[k] = local_day(t["date"], ctx.tz) if k == "date" else float(t["amount"]) if k == "amount" else t.get(k)
+    elif kind == "health_profile":
+        p = (await wellness._profile(ctx.user))["profile"]
+        out = {k: p.get(k) for k in keys}
+    return out
+
+
+async def _fields_undo(kind: str, id: str, before: dict, ctx: Ctx) -> dict:
+    return {"op": "restore_fields", "type": kind, "id": id, "before": before, "after": await fields_now(kind, id, before, ctx)}
+
+
+async def _restore_fields(undo: dict, ctx: Ctx) -> None:
+    kind, id = undo["type"], undo["id"]
+    try:
+        now = await fields_now(kind, id, undo["after"], ctx)
+    except HTTPException as exc:
+        if exc.status_code == 404:
+            raise ToolError("It was deleted since — nothing to undo") from exc
+        raise
+    if any(_norm(now.get(k)) != _norm(v) for k, v in undo["after"].items()):
+        raise ToolError("It was changed since — not undone")
+    before = undo["before"]
+    if kind == "task":
+        await tasks.update(id, _check(tasks.UpdateBody, before), user=ctx.user)
+    elif kind == "event":
+        await events.update(id, _check(events.UpdateBody, before), user=ctx.user)
+    elif kind == "transaction":
+        await transactions.update(id, _check(transactions.UpdateBody, before), user=ctx.user)
+    elif kind == "health_profile":
+        await wellness.update_profile(_check(wellness.ProfileBody, before), user=ctx.user)
+
+
 READ_TOOLS = frozenset({"get_options", "search", "get_agenda", "list_tasks", "get_money", "list_transactions", "list_debts", "get_health",
                         "get_prayer_times"})
 WRITE_TOOLS = frozenset(_TOOLS) - READ_TOOLS
@@ -890,8 +977,12 @@ async def remove(user, kind: str, id: str) -> None:
         await handlers[kind](id, user=user)
 
 
-async def reverse(user, undo: dict) -> None:
-    if undo["op"] == "delete":
+async def reverse(user, undo: dict, ctx: Ctx | None = None) -> None:
+    if undo["op"] == "restore_fields":
+        await _restore_fields(undo, ctx)
+    elif undo["op"] == "remove_water":
+        await wellness.add_water(_check(wellness.WaterBody, {"addMl": -undo["ml"], "date": undo["date"]}), user=user)
+    elif undo["op"] == "delete":
         await remove(user, undo["type"], undo["id"])
     elif undo["op"] == "reopen_task":
         await tasks.reopen(undo["id"], user=user)

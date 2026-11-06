@@ -395,8 +395,11 @@ async def undo(id: str, user=Depends(plus_user)):
     a = await _owned_action(user.id, id)
     if a.status != "done" or not a.undo:
         raise nest_error(400, "This cannot be undone")
-    await assistant_tools.reverse(user, a.undo)
-    done = await _resolve(a.id, "undone")
+    try:
+        await assistant_tools.reverse(user, a.undo, await _tool_ctx(user))
+    except assistant_tools.ToolError as exc:  # changed or deleted since: say so, change nothing
+        raise nest_error(400, str(exc)) from exc
+    done = await _resolve(a.id, "undone", ("done",))
     await _note(a.conversationId, f'[The user pressed Undo: "{a.label}" ({a.kind}) was reversed.]')
     return action_view(done)
 
