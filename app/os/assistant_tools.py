@@ -991,7 +991,8 @@ async def remove(user, kind: str, id: str) -> dict | None:
         return None
     snapshot = await assistant_snapshot.take(assistant_snapshot.MODELS[kind], id, user.id)
     await handlers[kind](id, user=user)
-    return {"op": "restore_snapshot", "snapshot": snapshot}
+    # attached files are deleted from storage with it and can't come back: no Undo then
+    return None if snapshot["has_file"] else {"op": "restore_snapshot", "snapshot": snapshot}
 
 
 async def reverse(user, undo: dict, ctx: Ctx | None = None) -> None:

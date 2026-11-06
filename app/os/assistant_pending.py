@@ -7,6 +7,7 @@ A later step can refer to a waiting item by its placeholder id, "pending:<action
 swaps in the real id, in the order the changes were made."""
 
 import json
+import re
 import uuid
 from pathlib import Path
 
@@ -156,6 +157,7 @@ async def run_approved(action, ctx: Ctx) -> dict:
     except Exception as exc:  # noqa: BLE001 — the card shows why
         return {"error": tools.error_text(exc).removeprefix("Error: ")}
     out = await tools.run(call["name"], i, ctx)
-    if out.get("isError"):
-        return {"error": str(out["content"]).removeprefix("Error: ")}
-    return {"action": out.get("action") or {"entityId": action.entityId, "label": action.label, "link": action.link, "undo": None}}
+    if out.get("isError") or not out.get("action"):
+        # an error, or a tool that changed nothing (e.g. the app already has that to-do)
+        return {"error": re.sub(r" \(id [^)]*\)", "", str(out["content"]).removeprefix("Error: ")).split(" Use ")[0]}
+    return {"action": out["action"]}

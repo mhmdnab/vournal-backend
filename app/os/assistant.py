@@ -92,14 +92,33 @@ def _text_of(content: list[dict]) -> str:
     return "\n".join(b.get("text", "") for b in content if b.get("type") == "text").strip(_JS_SPACE)
 
 
+RUNNING_TTL = timedelta(minutes=5)  # an approval still "running" after this was cut off
+INTERRUPTED = "Interrupted — ask again"
+
+
 def _expired(a) -> bool:
     return datetime.now(timezone.utc) - a.createdAt > PENDING_TTL
 
 
+def _stuck(a) -> bool:
+    return a.status == "running" and datetime.now(timezone.utc) - (a.resolvedAt or a.createdAt) > RUNNING_TTL
+
+
+def _details(a) -> dict | None:
+    """What a waiting change will set, from its stored call (ids left out), so the user sees
+    the change itself and not only the model's words about it."""
+    call = a.call if isinstance(a.call, dict) else json.loads(a.call) if a.call else None
+    if a.status != "pending" or not call:
+        return None
+    return {k: v for k, v in (call.get("input") or {}).items()
+            if k not in ("id", "label") and not k.endswith("_id") and isinstance(v, (str, int, float, bool)) and v != ""}
+
+
 def action_view(a) -> dict:
-    status = "expired" if a.status == "pending" and _expired(a) else a.status
+    status = "expired" if a.status == "pending" and _expired(a) else "failed" if _stuck(a) else a.status
     return {"id": a.id, "kind": a.kind, "entityType": a.entityType, "entityId": a.entityId, "label": a.label, "link": a.link,
-            "status": status, "error": a.error, "canUndo": a.status == "done" and a.undo is not None and not _expired(a)}
+            "status": status, "error": INTERRUPTED if _stuck(a) else a.error, "details": _details(a),
+            "canUndo": a.status == "done" and a.undo is not None and not _expired(a)}
 
 
 def _view(m, actions) -> dict:
@@ -336,7 +355,11 @@ async def _approve(user, a, ctx) -> dict:
     if _expired(a):
         raise nest_error(400, EXPIRED)
     await _resolve(a.id, "running", ("pending",))
-    out = await assistant_pending.run_approved(a, ctx)
+    try:
+        out = await assistant_pending.run_approved(a, ctx)
+    except Exception as exc:  # noqa: BLE001 — never leave a card running
+        log.warning("Approving %s failed: %r", a.id, exc)
+        out = {"error": "Something went wrong while doing that"}
     if "error" in out:
         data = {"status": "failed", "error": js_slice(out["error"], 300)}
         note = f'[The user approved "{a.label}" but it failed: {out["error"]}]'
@@ -385,11 +408,11 @@ async def approve_all(message_id: str, user=Depends(plus_user)):
 @router.post("/actions/{id}/cancel")
 async def cancel(id: str, user=Depends(plus_user)):
     a = await _owned_action(user.id, id)
-    if a.status != "pending":
+    if a.status != "pending" and not _stuck(a):
         raise nest_error(400, "Nothing to cancel")
-    if _expired(a):
+    if a.status == "pending" and _expired(a):
         raise nest_error(400, EXPIRED)
-    done = await _resolve(a.id, "cancelled", ("pending",))
+    done = await _resolve(a.id, "cancelled", ("pending", "running"))
     await _note(a.conversationId, f'[The user cancelled deleting "{a.label}". It was kept.]')
     return action_view(done)
 

@@ -7,6 +7,7 @@ import json
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
 
 from vournal_os.parity import fake_model as fm
 from vournal_os.support import OsTestCase
@@ -153,6 +154,63 @@ class Manual(ChatBase):
         await self.say("hi")
         first = fm.requests("python")[0]["body"]["messages"][-1]["content"][0]["text"]
         self.assertIn("Mode: manual", first)
+
+
+class ReviewFixes(ChatBase):
+    """Final review (2026-11-06): no false "done", no card stuck running, no Undo that can't
+    bring a file back, and Manual cards that show what will change."""
+
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        await self.client.patch("/api/settings", json={"assistantMode": "manual"})
+
+    async def pending(self, *uses, message="do it"):
+        fm.script(fm.tools(*uses), fm.message(fm.text("Approve below.")))
+        return (await self.say(message))["messages"][1]
+
+    async def test_an_approval_that_adds_nothing_is_not_done(self):
+        entry = await self.db.entry.create(data={"userId": self.client.user.id, "rawTranscript": "x"})
+        await self.db.todo.create(data={"entryId": entry.id, "userId": self.client.user.id, "text": "Gym"})
+        card = (await self.pending(("create_task", {"title": "Gym"})))["actions"][0]
+        done = (await self.client.post(f"/api/assistant/actions/{card['id']}/approve")).json()
+        self.assertEqual(done["status"], "failed")
+        self.assertIn("already exists", done["error"])
+
+    async def test_a_crash_while_approving_fails_the_card(self):
+        from app.os import assistant_pending
+
+        card = (await self.pending(("create_task", {"title": "Gym"})))["actions"][0]
+        with patch.object(assistant_pending, "run_approved", AsyncMock(side_effect=RuntimeError("boom"))):
+            done = await self.client.post(f"/api/assistant/actions/{card['id']}/approve")
+        self.assertEqual((done.status_code, done.json()["status"]), (200, "failed"))
+
+    async def test_a_card_left_running_shows_failed_and_can_be_cancelled(self):
+        sent = await self.pending(("create_task", {"title": "Gym"}))
+        card = sent["actions"][0]
+        await self.db.assistantaction.update(where={"id": card["id"]}, data={"status": "running",
+                                                                           "resolvedAt": datetime.now(timezone.utc) - timedelta(minutes=10)})
+        conversation = (await self.db.assistantaction.find_unique(where={"id": card["id"]})).conversationId
+        shown = (await self.client.get(f"/api/assistant/conversations/{conversation}")).json()
+        self.assertEqual(shown["messages"][1]["actions"][0]["status"], "failed")
+        self.assertEqual((await self.client.post(f"/api/assistant/actions/{card['id']}/cancel")).status_code, 200)
+
+    async def test_a_delete_that_takes_files_offers_no_undo(self):
+        task = (await self.client.post("/api/tasks", json={"title": "Old"})).json()
+        await self.db.attachment.create(data={"userId": self.client.user.id, "entityType": "TASK", "entityId": task["id"], "fileName": "a.pdf",
+                                              "mimeType": "application/pdf", "size": 3, "storageKey": "k/a.pdf"})
+        card = (await self.pending(("delete_item", {"type": "task", "id": task["id"], "label": "Old"})))["actions"][0]
+        with patch("app.os.attachments.delete_objects", AsyncMock()):
+            done = (await self.client.post(f"/api/assistant/actions/{card['id']}/approve")).json()
+        self.assertEqual((done["status"], done["canUndo"]), ("done", False))
+
+    async def test_manual_cards_show_what_will_change(self):
+        card = (await self.pending(("create_task", {"title": "Gym", "date": "2026-11-12", "time": "07:00", "priority": "HIGH"})))["actions"][0]
+        self.assertEqual(card["details"], {"title": "Gym", "date": "2026-11-12", "time": "07:00", "priority": "HIGH"})
+        task = (await self.client.post("/api/tasks", json={"title": "Run"})).json()
+        update = (await self.pending(("update_task", {"id": task["id"], "date": "2026-11-13"})))["actions"][0]
+        self.assertEqual(update["details"], {"date": "2026-11-13"})  # ids are left out
+        done = (await self.client.post(f"/api/assistant/actions/{card['id']}/approve")).json()
+        self.assertIsNone(done["details"])
 
 
 class AutoDeletes(ChatBase):
