@@ -122,11 +122,16 @@ async def provider_sign_in(provider: oauth.Provider, body: ProviderBody, respons
         raise nest_error(503, "This sign-in option isn't available yet.")
     user, identity = await oauth.identity_user(provider, body.idToken, body.nonce)
     if user is None:
-        if identity.email and await db.user.find_unique(where={"email": identity.email.lower()}):
-            # The account exists; linking it to this sign-in happens in the app,
-            # which can prove the email first.
+        existing = await db.user.find_unique(where={"email": identity.email.lower()}) if identity.email else None
+        if existing is None:
+            raise nest_error(403, CREATE_IN_APP, code="create_in_app")
+        # The app's own rule: the account proved this address, and the provider runs it (Gmail
+        # through Google, iCloud through Apple) and says it's verified. Anything less is linked
+        # in the app, which can email a code first.
+        if not (existing.emailVerifiedAt is not None and identity.authoritative and identity.email_verified):
             raise nest_error(403, LINK_IN_APP, code="link_in_app")
-        raise nest_error(403, CREATE_IN_APP, code="create_in_app")
+        await oauth.link_identity(existing.id, identity.issuer, identity.subject)
+        user = existing
     return await _signed_in(user, response)
 
 
