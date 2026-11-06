@@ -65,6 +65,21 @@ class OsTestCase(unittest.IsolatedAsyncioTestCase):
         fields.update(data)
         return await self.db.user.create(data=fields)
 
+    async def mobile(self, user=None) -> httpx.AsyncClient:
+        """A client like the iOS app: the root routes, with a bearer access token."""
+        from app.auth import _issue_tokens
+        from app.main import app
+
+        user = user or await self.make_user()
+        tokens = await _issue_tokens(user.id, user.sessionGeneration)
+        client = httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="https://api.test",
+            headers={"Authorization": f"Bearer {tokens.accessToken}"},
+        )
+        self.addAsyncCleanup(client.aclose)
+        client.user = user
+        return client
+
     async def signed_in(self, user=None) -> httpx.AsyncClient:
         """A client signed in through /api/auth/login (a Plus user unless given one)."""
         from app.main import app
