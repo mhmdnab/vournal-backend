@@ -44,6 +44,7 @@ MONTHLY_LIMIT = int(os.environ.get("AI_MONTHLY_LIMIT", "").strip() or 3000)
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 STRUCTURED_BETA = "structured-outputs-2025-12-15"  # the TS SDK's parse() always added it
 CAPTURE, FOOD, CHAT = "ai.capture", "ai.food", "ai.chat"
+ENTRY = "ai.entry"  # an app recording's AI actions step (design 2026-11-06), from the same allowance
 # the chat's voice-to-text: its own monthly minutes, apart from the AI allowance (design 2026-11-06)
 VOICE = "ai.voice"
 VOICE_MONTHLY_SECONDS = 60 * int(os.environ.get("AI_VOICE_MONTHLY_MINUTES", "").strip() or 60)
@@ -68,7 +69,7 @@ def _month_start(tz: str):
 
 
 async def _used(db_or_tx, user_id: str, tz: str) -> int:
-    return await db_or_tx.activitylog.count(where={"userId": user_id, "action": {"in": [CAPTURE, FOOD, CHAT]}, "createdAt": {"gte": _month_start(tz)}})
+    return await db_or_tx.activitylog.count(where={"userId": user_id, "action": {"in": [CAPTURE, FOOD, CHAT, ENTRY]}, "createdAt": {"gte": _month_start(tz)}})
 
 
 async def remaining(user_id: str, tz: str) -> int:

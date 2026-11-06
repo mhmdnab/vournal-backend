@@ -16,6 +16,7 @@ from app.os import assistant_tools as tools
 from app.os.assistant_tools import Ctx, ToolError
 
 PLACEHOLDER = "pending:"
+PERSON_PLACEHOLDER = "proposal-person:"  # a person an app recording found, created when the user saves it
 SCHEMAS = {t["name"]: t["input_schema"] for t in json.loads((Path(__file__).parent / "data" / "assistant.json").read_text())["tools"]}
 
 _JSON_TYPES = {"string": str, "boolean": bool, "object": dict, "array": list}
@@ -26,10 +27,14 @@ ENTITY = {
     "create_reminder": "reminder", "add_transaction": "transaction", "update_transaction": "transaction",
     "create_debt": "debt", "add_debt_payment": "debt_payment", "add_note": "note", "add_shopping_item": "shopping_item",
     "log_food": "food_log", "log_water": "water", "log_weight": "weight", "update_health_profile": "health_profile",
+    "create_habit": "habit", "update_habit": "habit", "log_habit": "habit_log", "create_project": "project", "update_project": "project",
+    "update_person": "person", "add_gift": "gift", "add_important_date": "important_date", "create_goal": "goal", "update_goal": "goal",
 }
 # the item an edit or payment points at: (input field, kind for describe)
 _TARGET = {"update_task": ("id", "task"), "update_event": ("id", "event"), "update_transaction": ("id", "transaction"),
-           "add_debt_payment": ("debt_id", "debt")}
+           "add_debt_payment": ("debt_id", "debt"), "update_habit": ("id", "habit"), "log_habit": ("id", "habit"),
+           "update_project": ("id", "project"), "update_person": ("id", "person"), "add_gift": ("person_id", "person"),
+           "update_goal": ("id", "goal")}
 
 
 def check_input(schema: dict, value: dict) -> str | None:
@@ -99,15 +104,49 @@ async def _describe_target(name: str, i: dict, ctx: Ctx) -> dict:
         target = i.get(field)
         if isinstance(target, str) and target.startswith(PLACEHOLDER):
             return {"label": await _waiting_label(ctx, target), "link": None}
+        if isinstance(target, str) and target.startswith(PERSON_PLACEHOLDER):
+            if target not in ctx.entry_people:
+                raise ToolError(f"Unknown id {target}")
+            found = {"label": ctx.entry_people[target], "link": None}
+        else:
+            found = None
         if name == "update_task":
             todo = await tools._app_todo(ctx, target) if isinstance(target, str) else None
             if todo is not None:
                 return {"label": todo.text, "link": f"/tasks?id={todo.id}"}
-        found = await tools.describe(ctx, kind, target)
+        found = found or await tools.describe(ctx, kind, target)
+        if name == "add_gift":
+            return {"label": f"{pending_label(name, i)} → {found['label']}", "link": found["link"]}
         if name == "add_debt_payment":
             return {"label": f"{pending_label(name, i)} → {found['label']}", "link": found["link"]}
         return found
     return {"label": pending_label(name, i), "link": None}
+
+
+# what an edit changes, as (kind for fields_now, {tool input field: route field}), so its card can
+# show the value it replaces ("old → new", design 2026-11-06)
+_BEFORE = {
+    "update_transaction": ("transaction", {"amount": "amount", "title": "title", "date": "date"}),
+    "update_habit": ("habit", {"name": "name", "target_per_day": "targetPerDay", "archived": "isArchived"}),
+    "update_project": ("project", {"name": "name", "status": "status", "deadline": "deadline", "description": "description"}),
+    "update_person": ("person", {"relationship": "relationship", "birthday": "birthday", "notes": "notes"}),
+    "update_goal": ("goal", {"name": "name", "status": "status", "deadline": "deadline", "current_value": "currentValue"}),
+}
+
+
+async def _before(name: str, i: dict, ctx: Ctx) -> dict | None:
+    """The current values of the fields an edit changes, keyed like its input; None when unknown."""
+    if name not in _BEFORE or not isinstance(i.get("id"), str) or i["id"].startswith((PLACEHOLDER, PERSON_PLACEHOLDER)):
+        return None
+    kind, fields = _BEFORE[name]
+    changed = {key: route for key, route in fields.items() if key in i}
+    if not changed:
+        return None
+    try:
+        now = await tools.fields_now(kind, i["id"], changed.values(), ctx)
+    except Exception:  # noqa: BLE001 — the card still shows the new value
+        return None
+    return {key: now.get(route) for key, route in changed.items()}
 
 
 async def defer(name: str, i: dict, ctx: Ctx) -> dict:
@@ -121,6 +160,9 @@ async def defer(name: str, i: dict, ctx: Ctx) -> dict:
     entity_id = i.get(target) if name in _TARGET and isinstance(i.get(target), str) else ""
     draft = {"id": aid, "kind": pending_kind(name, i), "entityType": ENTITY[name], "entityId": entity_id, "label": found["label"],
              "link": found["link"], "undo": None, "status": "pending", "call": {"name": name, "input": i}}
+    before = await _before(name, i, ctx)
+    if before:
+        draft["call"]["before"] = before
     ctx.pending[aid] = draft
     placeholder = f"{PLACEHOLDER}{aid}"
     result = {"ok": False, "pending": True, "id": placeholder,

@@ -137,13 +137,13 @@ async def ambiguous_norm_sets(db, user_id: str) -> dict[str, set[str]]:
     return out
 
 
-async def link_person(db, user_id: str, entry_id: str, display_name: str) -> None:
-    """Upsert a person by its normalized key (Layer 1) and link it to the entry.
-    Keeps the existing display name on a match — the canonical form is whatever was
-    stored first (or the form the model echoes back from the known list)."""
+async def link_person(db, user_id: str, entry_id: str, display_name: str) -> str | None:
+    """Upsert a person by its normalized key (Layer 1) and link it to the entry; returns the
+    person's id. Keeps the existing display name on a match — the canonical form is whatever
+    was stored first (or the form the model echoes back from the known list)."""
     norm = normalize_name(display_name)
     if not norm:
-        return
+        return None
     person = await db.person.upsert(
         where={"userId_normalizedName": {"userId": user_id, "normalizedName": norm}},
         data={
@@ -159,6 +159,7 @@ async def link_person(db, user_id: str, entry_id: str, display_name: str) -> Non
         await db.entryperson.create(data={"entryId": entry_id, "personId": person.id})
     except UniqueViolationError:
         pass  # two spellings in one entry folded to the same person — already linked
+    return person.id
 
 
 async def link_topic(db, user_id: str, entry_id: str, display_name: str) -> None:

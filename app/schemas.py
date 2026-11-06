@@ -184,6 +184,8 @@ class CreateEntryRequest(BaseModel):
     source: Optional[Literal["TEXT", "VOICE"]] = None
     audioUrl: Optional[str] = None
     durationSec: Optional[int] = None
+    # the review card (design 2026-11-06): new apps ask for it; older ones never send it
+    review: bool = False
 
 
 class UpdateTodoRequest(BaseModel):
@@ -341,6 +343,10 @@ class EntryOut(BaseModel):
     processedAt: Optional[datetime] = None
     error: Optional[str] = None
     createdAt: datetime
+    # the review card (design 2026-11-06); older apps ignore these
+    reviewState: Optional[str] = None
+    inJournal: bool = True
+    review: Optional[dict] = None
 
 
 # ---- Insights ----------------------------------------------------------------

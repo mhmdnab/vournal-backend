@@ -278,3 +278,31 @@ class HeldOutFixes(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ActionFlags(unittest.TestCase):
+    """The review card (design 2026-11-06): extraction says whether a Plus entry needs the AI
+    actions step, and whether it reads as a journal entry at all."""
+
+    def _norm(self, **flags):
+        from app.extraction import _normalize
+
+        return _normalize({"summary": "I paid 20 for lunch.", **flags})
+
+    def test_flags_default_when_missing(self):
+        out = self._norm()
+        self.assertEqual((out["wantsActions"], out["journalSuggested"]), (False, True))
+
+    def test_flags_kept_when_bools(self):
+        out = self._norm(wantsActions=True, journalSuggested=False)
+        self.assertEqual((out["wantsActions"], out["journalSuggested"]), (True, False))
+
+    def test_flags_coerced_when_strings(self):
+        out = self._norm(wantsActions="true", journalSuggested="false")
+        self.assertEqual((out["wantsActions"], out["journalSuggested"]), (False, True))
+
+    def test_prompt_describes_both_flags(self):
+        from app.extraction import SYSTEM_PROMPT
+
+        self.assertIn('"wantsActions": boolean', SYSTEM_PROMPT)
+        self.assertIn('"journalSuggested": boolean', SYSTEM_PROMPT)

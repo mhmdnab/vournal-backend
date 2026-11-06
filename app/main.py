@@ -10,9 +10,10 @@ import os
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any, List, Optional
+from typing import Any, List, Literal, Optional
 
 from dotenv import load_dotenv
+from prisma import Json
 from fastapi import (
     BackgroundTasks,
     Depends,
@@ -50,6 +51,8 @@ from app.quota import (
     reserve_entry_quota,
 )
 from app.os import include_os_routers
+from app.review_routes import entry_out, router as review_router
+from app.review import IN_JOURNAL
 from app.os.common.http import EmptyJsonBody, TrailingSlash, install_nest_errors
 from app.rate_limit import limiter
 from app.storage import (
@@ -214,6 +217,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(oauth_router)
 app.include_router(threads_router)
+app.include_router(review_router)  # before /entries/{entry_id}: it owns /entries/actions/recent
 app.include_router(billing_apple_router)
 app.include_router(billing_paddle_router)
 
@@ -312,6 +316,8 @@ def _to_entry_out(entry: Any, ambiguous: dict[str, set[str]] | None = None) -> E
         processedAt=entry.processedAt,
         error=entry.error,
         createdAt=entry.createdAt,
+        reviewState=entry.reviewState,
+        inJournal=entry.inJournal,
     )
 
 
@@ -319,14 +325,15 @@ def _to_entry_out(entry: Any, ambiguous: dict[str, set[str]] | None = None) -> E
 
 
 async def process_transcript(
-    entry_id: str, transcript: str, use_merged: bool = False
+    entry_id: str, transcript: str, use_merged: bool = False, review: bool = False
 ) -> None:
     """Run extraction on a transcript and persist the results onto an entry.
 
     Shared by the text endpoint (synchronous) and the audio background task.
     Sets the entry to DONE on success, or FAILED + stored error on any failure,
     so an entry is never left stuck mid-processing. Idempotent enough for our
-    needs: it's called once per entry.
+    needs: it's called once per entry. DONE is written last, once everything the
+    entry shows exists, so a poller never sees DONE with its to-dos still missing.
 
     `use_merged` selects the extraction path (Step 10):
       - False (text): plain extraction on Haiku. Typed words have no speech-to-text
@@ -335,6 +342,10 @@ async def process_transcript(
         dialect mistranscriptions (جدّد->جدة) AND extracts, replacing the old
         two-call repair->extract. rawTranscript is still stored exactly as heard;
         the correction happens only inside extraction.
+
+    `review` (the app's review card, design 2026-11-06): nothing is created yet. What
+    extraction found is kept as the entry's proposal until the user saves it, and a Plus
+    entry's AI actions are proposed alongside (app.entry_actions).
     """
     entry = await db.entry.find_unique(where={"id": entry_id})
     if entry is None:
@@ -381,14 +392,69 @@ async def process_transcript(
             "emotions": result["mood"]["emotions"],
             "llmInTokens": usage["inTokens"] if usage else None,
             "llmOutTokens": usage["outTokens"] if usage else None,
-            "status": "DONE",
-            "processedAt": _now(),
         },
     )
 
+    if review:
+        proposal = {
+            "result": result,
+            "now": now.isoformat(),
+            "useMerged": use_merged,
+            "journalSuggested": result.get("journalSuggested", True) is not False,
+        }
+        await db.entry.update(
+            where={"id": entry_id},
+            data={"proposal": Json(proposal), "reviewState": "needs_review"},
+        )
+        from app import entry_actions
+
+        if hasattr(entry_actions, "after_extraction"):
+            try:
+                await entry_actions.after_extraction(entry_id)
+            except Exception:  # noqa: BLE001 — the entry and its to-dos still reach the card
+                log.exception("AI actions step failed for entry %s", entry_id)
+    else:
+        try:
+            await apply_extraction(entry_id, result, transcript, use_merged=use_merged, now=now)
+        except Exception:  # noqa: BLE001 — what was made stays; the entry is never left processing
+            log.exception("Saving extracted items failed for entry %s", entry_id)
+
+    await db.entry.update(
+        where={"id": entry_id}, data={"status": "DONE", "processedAt": _now()}
+    )
+
+
+async def apply_extraction(
+    entry_id: str,
+    result: dict,
+    transcript: str,
+    *,
+    use_merged: bool,
+    now: datetime,
+    keep: dict | None = None,
+) -> dict[int, str]:
+    """Create an entry's to-dos and its topic/person/place links from extraction.
+
+    `keep` (the review card's Save) limits it to what the user kept:
+    {"todos": {index: edited text or None}, "people": {index...}, "topics": ..., "places": ...};
+    None keeps everything. Returns {person index: person id} for the people it linked.
+    """
+    entry = await db.entry.find_unique(where={"id": entry_id})
+    user_id = entry.userId
+    tz = now.tzinfo or timezone.utc
+    known = await known_names(db, user_id) if use_merged else {}
+
+    def kept(kind: str, index: int) -> bool:
+        return keep is None or index in keep.get(kind, ())
+
     # Persist todos. startAt is composed from dueDate + a spoken time (if any);
     # untimed todos keep startAt = null.
-    for todo in result["todos"]:
+    for index, todo in enumerate(result["todos"]):
+        if not kept("todos", index):
+            continue
+        edited = keep["todos"].get(index) if keep is not None else None
+        if isinstance(edited, str) and edited.strip():
+            todo = {**todo, "text": edited.strip()}
         due, time = verified_day(todo, transcript, now.date())
         try:
             meta = normalize_metadata(todo, transcript, tz)
@@ -416,17 +482,24 @@ async def process_transcript(
     # Upsert topics/people by their NORMALIZED key (Step 17, Layer 1) and link them
     # to this entry. Normalization folds case/whitespace/Arabic variants so the same
     # surface form can't fragment into two rows.
-    for name in result["topics"]:
-        await link_topic(db, user_id, entry_id, name)
+    for index, name in enumerate(result["topics"]):
+        if kept("topics", index):
+            await link_topic(db, user_id, entry_id, name)
 
-    for name in result["people"]:
-        await link_person(db, user_id, entry_id, name)
+    people: dict[int, str] = {}
+    for index, name in enumerate(result["people"]):
+        if kept("people", index):
+            person_id = await link_person(db, user_id, entry_id, name)
+            if person_id:
+                people[index] = person_id
 
-    for name in result.get("places", []):
-        await link_place(db, user_id, entry_id, name)
+    for index, name in enumerate(result.get("places", [])):
+        if kept("places", index):
+            await link_place(db, user_id, entry_id, name)
+    return people
 
 
-async def process_audio_entry(entry_id: str) -> None:
+async def process_audio_entry(entry_id: str, review: bool = False) -> None:
     """Background task: transcribe a saved audio file, then run the pipeline.
 
     PENDING -> PROCESSING -> transcribe -> save transcript -> process_transcript
@@ -502,14 +575,14 @@ async def process_audio_entry(entry_id: str) -> None:
     # and extracts in one call — replacing the old two-call repair->extract. The
     # stored rawTranscript above is untouched: the record stays exactly as heard,
     # and only the derived structure benefits from the correction.
-    await process_transcript(entry_id, transcript, use_merged=True)
+    await process_transcript(entry_id, transcript, use_merged=True, review=review)
 
 
 # ---- Entries -----------------------------------------------------------------
 
 
 @app.post("/entries", response_model=EntryOut)
-async def create_entry(body: CreateEntryRequest, current=Depends(get_current_user)):
+async def create_entry(body: CreateEntryRequest, background: BackgroundTasks, current=Depends(get_current_user)):
     # Meter against the monthly limit (text entries cost an extraction call too).
     await reserve_entry_quota(db, current)
     # Owner is the authenticated user — never client-supplied.
@@ -525,12 +598,15 @@ async def create_entry(body: CreateEntryRequest, current=Depends(get_current_use
     )
 
     # NOTE: the text path runs extraction synchronously for easy testing. The
-    # audio path (POST /entries/audio) runs it in the background instead.
-    await process_transcript(entry.id, body.transcript)
+    # audio path (POST /entries/audio) runs it in the background instead, and so does
+    # a review-mode entry: a Plus entry's AI actions step can take a while, so the app
+    # polls for it as it does for a recording.
+    if body.review:
+        background.add_task(process_transcript, entry.id, body.transcript, review=True)
+    else:
+        await process_transcript(entry.id, body.transcript)
 
-    return _to_entry_out(
-        await _load_entry(entry.id), await ambiguous_norm_sets(db, current.id)
-    )
+    return await entry_out(entry.id, current.id)
 
 
 @app.post("/entries/audio", response_model=EntryOut)
@@ -538,6 +614,7 @@ async def create_audio_entry(
     background: BackgroundTasks,
     file: UploadFile = File(...),
     durationSec: Optional[float] = Form(None),
+    review: bool = Form(False),
     current=Depends(get_current_user),
 ):
     """Ingest an audio recording. Returns a PENDING entry immediately; the
@@ -587,18 +664,25 @@ async def create_audio_entry(
     await db.entry.update(where={"id": entry.id}, data={"audioUrl": audio_url})
 
     # Schedule transcription + extraction; return the PENDING entry immediately.
-    background.add_task(process_audio_entry, entry.id)
+    background.add_task(process_audio_entry, entry.id, review)
 
     return _to_entry_out(await _load_entry(entry.id))
 
 
 @app.get("/entries", response_model=List[EntryOut])
-async def list_entries(limit: int = 20, current=Depends(get_current_user)):
+async def list_entries(
+    limit: int = 20,
+    review: Optional[Literal["pending"]] = None,
+    current=Depends(get_current_user),
+):
+    """The journal, newest first. `?review=pending`: the entries waiting on the review card."""
     entries = await db.entry.find_many(
         where={
             "userId": current.id,
             # Silence (see process_audio_entry): a real failure keeps its audio.
             "NOT": {"status": "FAILED", "rawTranscript": "", "audioUrl": None},
+            # waiting on the card once its reading is done (a save cut off part-way included)
+            **({"reviewState": {"in": ["needs_review", "saving"]}, "status": "DONE"} if review == "pending" else IN_JOURNAL),
         },
         order={"createdAt": "desc"},
         take=limit,
@@ -610,7 +694,7 @@ async def list_entries(limit: int = 20, current=Depends(get_current_user)):
 @app.get("/entries/{entry_id}", response_model=EntryOut)
 async def get_entry(entry_id: str, current=Depends(get_current_user)):
     entry = await _owned_entry_or_404(entry_id, current.id)
-    return _to_entry_out(entry, await ambiguous_norm_sets(db, current.id))
+    return await entry_out(entry.id, current.id)
 
 
 @app.delete("/entries/{entry_id}", status_code=204)
@@ -737,7 +821,7 @@ async def insights(days: int = 14, current=Depends(get_current_user)):
     since = _now() - timedelta(days=days)
 
     entries = await db.entry.find_many(
-        where={"userId": user_id, "createdAt": {"gte": since}},
+        where={"userId": user_id, "createdAt": {"gte": since}, **IN_JOURNAL},
         include={
             "topics": {"include": {"topic": True}},
             "people": {"include": {"person": True}},

@@ -6,6 +6,7 @@ through a short-lived signed link. The storage path itself is never sent; `hasAu
 from fastapi import Depends, HTTPException, Request
 
 from app.db import db
+from app.review import IN_JOURNAL
 from app.os.common import dates
 from app.os.common.deps import plus_user
 from app.os.common.http import nest_error, nest_router
@@ -19,7 +20,7 @@ def _iso(moment) -> str:
 
 
 def _entry(out) -> dict:
-    data = out.model_dump()
+    data = out.model_dump(exclude={"reviewState", "inJournal", "review"})  # the app's review card only
     data["hasAudio"] = bool(data.pop("audioUrl", None))
     return data
 
@@ -50,6 +51,7 @@ async def list_entries(request: Request, user=Depends(plus_user)):
         "userId": user.id,
         # a silent recording that failed is hidden, as in the app; a real failure keeps its audio
         "NOT": {"status": "FAILED", "rawTranscript": "", "audioUrl": None},
+        **IN_JOURNAL,
         **({"createdAt": {"lt": dates.parse_instant(before)}} if before else {}),
     }
     rows = await db.entry.find_many(where=where, order={"createdAt": "desc"}, take=limit + 1, include=main._ENTRY_INCLUDE)
