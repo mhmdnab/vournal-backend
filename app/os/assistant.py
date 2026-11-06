@@ -24,6 +24,7 @@ from prisma import Json
 
 from app.db import db
 from app.os import ai, assistant_tools
+from app.os.assistant_effort import escalate, pick_effort
 from app.os.common import dates, validators
 from app.os.common.body import RuleBody
 from app.os.common.deps import plus_user
@@ -67,6 +68,13 @@ def for_replay(content: list[dict]) -> list[dict]:
         return content
     boundary = len(kinds) - 1 - kinds[::-1].index("fallback")
     return [b for n, b in enumerate(content) if n >= boundary or b.get("type") not in ("thinking", "redacted_thinking", "tool_use")]
+
+
+def _last_reply_failed(history: list) -> bool:
+    """Whether a tool call failed while answering the previous message (the rows after its
+    visible user row)."""
+    start = max((n for n, h in enumerate(history) if h.role == "user" and not h.hidden), default=len(history))
+    return any(b.get("type") == "tool_result" and b.get("is_error") for h in history[start + 1:] for b in (h.content or []) if isinstance(b, dict))
 
 
 def _text_of(content: list[dict]) -> str:
@@ -148,7 +156,7 @@ def _log_error(exc: Exception) -> None:
         log.warning("Assistant failed: %s", exc)
 
 
-async def _call(client, round_: int, messages: list) -> dict:
+async def _call(client, round_: int, messages: list, effort: str) -> dict:
     """One round, as the API returned it (stored and replayed unchanged)."""
     raw = await client.beta.messages.with_raw_response.create(
         model=ai.MODEL,
@@ -160,7 +168,7 @@ async def _call(client, round_: int, messages: list) -> dict:
         tools=TOOLS,
         **({"tool_choice": {"type": "none"}} if round_ == MAX_ROUNDS else {}),
         thinking={"type": "adaptive"},
-        output_config={"effort": "medium"},
+        output_config={"effort": effort},
         messages=messages,
         timeout=120,
     )
@@ -213,9 +221,10 @@ async def send(user, text: str, conversation_id: str | None = None) -> dict:
     drafts: list[dict] = []
     reply = None
     failed = False
+    effort = pick_effort(text, _last_reply_failed(history))
     try:
         for round_ in range(1, MAX_ROUNDS + 1):
-            res = await _call(client, round_, messages)
+            res = await _call(client, round_, messages, effort)
             if res.get("stop_reason") == "refusal":
                 reply = {"content": [{"type": "text", "text": REPLY["refused"][lang]}], "text": REPLY["refused"][lang]}
                 break
@@ -240,6 +249,7 @@ async def send(user, text: str, conversation_id: str | None = None) -> dict:
                 await _append(conv["id"], "assistant", content, None, True, tx)
                 await _append(conv["id"], "user", results, None, True, tx)
             messages += [{"role": "assistant", "content": content}, {"role": "user", "content": results}]
+            effort = escalate(effort, len(uses), any(r.get("is_error") for r in results))
     except Exception as exc:  # noqa: BLE001 — the user gets a short reply; the history stays valid
         _log_error(exc)
         failed = True
