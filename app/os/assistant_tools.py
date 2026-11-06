@@ -18,6 +18,7 @@ from starlette.requests import Request
 from app.db import db
 from app import todo_rules
 from app.os import accounts, app_todos, calendar, debts, events, notes, reminders, search, shopping, spending_plan, tasks, transactions, wellness
+from app.os import goals, habits, important_dates, people, projects
 from app.os.ai import _round
 from app.os.calendar_utils import local_date_time
 from app.os.common import prayer
@@ -885,6 +886,178 @@ async def _delete_item(i: dict, ctx: Ctx) -> dict:
             "action": {"kind": "delete", "entityType": kind, "entityId": id, "label": found["label"], "link": found["link"], "undo": None, "status": "pending"}}
 
 
+# ----- habits, projects, people, gifts, important dates, goals (design 2026-11-06) --------------
+
+_HABIT_FREQ = {"daily": "DAILY", "weekly": "WEEKLY", "custom": "CUSTOM"}
+_PROJECT_STATUS = {"planning": "PLANNING", "active": "ACTIVE", "on_hold": "ON_HOLD", "completed": "COMPLETED", "cancelled": "CANCELLED"}
+_GOAL_STATUS = {"active": "ACTIVE", "completed": "COMPLETED", "paused": "PAUSED", "abandoned": "ABANDONED"}
+
+
+def _text(i: dict, key: str) -> str | None:
+    return i[key].strip() if isinstance(i.get(key), str) and i[key].strip() else None
+
+
+async def _create_habit(i: dict, ctx: Ctx) -> dict:
+    plain = {"name": js_slice(_req_str(i.get("name"), "name"), 120)}
+    if i.get("frequency") in _HABIT_FREQ:
+        plain["frequency"] = _HABIT_FREQ[i["frequency"]]
+    if isinstance(i.get("days_of_week"), list):
+        plain["daysOfWeek"] = i["days_of_week"]
+    for src, dst in (("times_per_week", "timesPerWeek"), ("target_per_day", "targetPerDay")):
+        if _number(i.get(src)):
+            plain[dst] = int(i[src])
+    if _text(i, "unit"):
+        plain["unit"] = _text(i, "unit")
+    h = await habits.create(_check(habits.CreateBody, plain), user=ctx.user)
+    return _done({"kind": "create", "entityType": "habit", "entityId": h["id"], "label": h["name"], "link": f"/habits?id={h['id']}",
+                  "undo": {"op": "delete", "type": "habit", "id": h["id"]}}, {"id": h["id"], "name": h["name"]})
+
+
+async def _update_habit(i: dict, ctx: Ctx) -> dict:
+    id = _req_str(i.get("id"), "id")
+    plain = {}
+    if _text(i, "name"):
+        plain["name"] = js_slice(_text(i, "name"), 120)
+    if _number(i.get("target_per_day")):
+        plain["targetPerDay"] = int(i["target_per_day"])
+    if isinstance(i.get("archived"), bool):
+        plain["isArchived"] = i["archived"]
+    if not plain:
+        raise ToolError("Nothing to change")
+    before = await fields_now("habit", id, plain, ctx)
+    h = await habits._update(ctx.user, id, _check(habits.UpdateBody, plain))
+    return _done({"kind": "update", "entityType": "habit", "entityId": id, "label": h["name"], "link": f"/habits?id={id}",
+                  "undo": await _fields_undo("habit", id, before, ctx)}, {"id": id, "name": h["name"], "archived": h.get("isArchived")})
+
+
+async def _log_habit(i: dict, ctx: Ctx) -> dict:
+    from app.os.calendar_utils import date_only_value
+
+    id = _req_str(i.get("id"), "id")
+    day = opt_date(i.get("date")) or ctx.today
+    habit = await habits._owned(ctx.user_id, id)
+    before = await db.habitlog.find_unique(where={"habitId_date": {"habitId": habit.id, "date": date_only_value(day)}})
+    body = {"date": day, **({"count": int(i["count"])} if _number(i.get("count")) and i["count"] > 0 else {})}
+    await habits.check(id, _check(habits.CheckBody, body), user=ctx.user)
+    log = await db.habitlog.find_unique(where={"habitId_date": {"habitId": habit.id, "date": date_only_value(day)}})
+    return _done({"kind": "create", "entityType": "habit_log", "entityId": log.id, "label": f"{habit.name} · {day}", "link": f"/habits?id={id}",
+                  "undo": {"op": "restore_habit_log", "id": id, "date": day, "count": before.count if before else 0}},
+                 {"habitId": id, "date": day, "count": log.count, "target": habit.targetPerDay})
+
+
+async def _create_project(i: dict, ctx: Ctx) -> dict:
+    plain = {"name": js_slice(_req_str(i.get("name"), "name"), 120)}
+    if _text(i, "description"):
+        plain["description"] = _text(i, "description")
+    if opt_date(i.get("deadline")):
+        plain["deadline"] = opt_date(i["deadline"])
+    if _number(i.get("budget")) and i["budget"] >= 0:
+        plain["budget"] = i["budget"]
+    if _text(i, "currency"):
+        plain["currency"] = _text(i, "currency").upper()
+    p = await projects.create(_check(projects.CreateBody, plain), user=ctx.user)
+    return _done({"kind": "create", "entityType": "project", "entityId": p["id"], "label": p["name"], "link": f"/projects?id={p['id']}",
+                  "undo": {"op": "delete", "type": "project", "id": p["id"]}}, {"id": p["id"], "name": p["name"]})
+
+
+async def _update_project(i: dict, ctx: Ctx) -> dict:
+    id = _req_str(i.get("id"), "id")
+    plain = {}
+    if _text(i, "name"):
+        plain["name"] = js_slice(_text(i, "name"), 120)
+    if i.get("status") in _PROJECT_STATUS:
+        plain["status"] = _PROJECT_STATUS[i["status"]]
+    if opt_date(i.get("deadline")):
+        plain["deadline"] = opt_date(i["deadline"])
+    if isinstance(i.get("description"), str):
+        plain["description"] = i["description"].strip() or None
+    if not plain:
+        raise ToolError("Nothing to change")
+    before = await fields_now("project", id, plain, ctx)
+    p = await projects.update(id, _check(projects.UpdateBody, plain), user=ctx.user)
+    return _done({"kind": "complete" if plain.get("status") == "COMPLETED" else "update", "entityType": "project", "entityId": id,
+                  "label": p["name"], "link": f"/projects?id={id}", "undo": await _fields_undo("project", id, before, ctx)},
+                 {"id": id, "name": p["name"], "status": p["status"]})
+
+
+async def _update_person(i: dict, ctx: Ctx) -> dict:
+    id = _req_str(i.get("id"), "id")
+    plain = {}
+    for key in ("relationship", "notes"):
+        if isinstance(i.get(key), str):
+            plain[key] = i[key].strip() or None
+    if opt_date(i.get("birthday")):
+        plain["birthday"] = opt_date(i["birthday"])
+    if not plain:
+        raise ToolError("Nothing to change")
+    before = await fields_now("person", id, plain, ctx)
+    p = await people.update(id, _check(people.PersonUpdateBody, plain), user=ctx.user)
+    return _done({"kind": "update", "entityType": "person", "entityId": id, "label": p["name"], "link": f"/people?id={id}",
+                  "undo": await _fields_undo("person", id, before, ctx)}, {"id": id, "name": p["name"]})
+
+
+async def _add_gift(i: dict, ctx: Ctx) -> dict:
+    person_id = _req_str(i.get("person_id"), "person_id")
+    plain = {"title": js_slice(_req_str(i.get("title"), "title"), 200)}
+    if _number(i.get("price")) and i["price"] >= 0:
+        plain["price"] = i["price"]
+    if _text(i, "currency"):
+        plain["currency"] = _text(i, "currency").upper()
+    if _text(i, "occasion"):
+        plain["occasion"] = js_slice(_text(i, "occasion"), 80)
+    if isinstance(i.get("given"), bool):
+        plain["isPurchased"] = i["given"]
+    if _text(i, "notes"):
+        plain["notes"] = _text(i, "notes")
+    g = await people.create_gift(person_id, _check(people.GiftBody, plain), user=ctx.user)
+    person = await db.person.find_unique(where={"id": person_id})
+    return _done({"kind": "create", "entityType": "gift", "entityId": g["id"], "label": f"{g['title']} → {person.name}", "link": f"/people?id={person_id}",
+                  "undo": {"op": "delete", "type": "gift", "id": g["id"]}}, {"id": g["id"], "title": g["title"], "person": person.name})
+
+
+async def _add_important_date(i: dict, ctx: Ctx) -> dict:
+    plain = {"title": js_slice(_req_str(i.get("title"), "title"), 120), "date": _req_date(i.get("date"), "date")}
+    if isinstance(i.get("person_id"), str):
+        plain["personId"] = i["person_id"]
+    if isinstance(i.get("repeats_yearly"), bool):
+        plain["repeatsYearly"] = i["repeats_yearly"]
+    d = await important_dates.create(_check(important_dates.CreateBody, plain), user=ctx.user)
+    return _done({"kind": "create", "entityType": "important_date", "entityId": d["id"], "label": f"{d['title']} · {plain['date']}",
+                  "link": f"/people?id={plain['personId']}" if plain.get("personId") else "/people",
+                  "undo": {"op": "delete", "type": "important_date", "id": d["id"]}}, {"id": d["id"], "title": d["title"]})
+
+
+async def _create_goal(i: dict, ctx: Ctx) -> dict:
+    plain = {"name": js_slice(_req_str(i.get("name"), "name"), 120)}
+    if _text(i, "description"):
+        plain["description"] = _text(i, "description")
+    if opt_date(i.get("deadline")):
+        plain["deadline"] = opt_date(i["deadline"])
+    g = await goals.create(_check(goals.CreateBody, plain), user=ctx.user)
+    return _done({"kind": "create", "entityType": "goal", "entityId": g["id"], "label": g["name"], "link": f"/goals?id={g['id']}",
+                  "undo": {"op": "delete", "type": "goal", "id": g["id"]}}, {"id": g["id"], "name": g["name"]})
+
+
+async def _update_goal(i: dict, ctx: Ctx) -> dict:
+    id = _req_str(i.get("id"), "id")
+    plain = {}
+    if _text(i, "name"):
+        plain["name"] = js_slice(_text(i, "name"), 120)
+    if i.get("status") in _GOAL_STATUS:
+        plain["status"] = _GOAL_STATUS[i["status"]]
+    if opt_date(i.get("deadline")):
+        plain["deadline"] = opt_date(i["deadline"])
+    if _number(i.get("current_value")) and i["current_value"] >= 0:
+        plain["currentValue"] = i["current_value"]
+    if not plain:
+        raise ToolError("Nothing to change")
+    before = await fields_now("goal", id, plain, ctx)
+    g = await goals.update(id, _check(goals.UpdateBody, plain), user=ctx.user)
+    return _done({"kind": "complete" if plain.get("status") == "COMPLETED" else "update", "entityType": "goal", "entityId": id,
+                  "label": g["name"], "link": f"/goals?id={id}", "undo": await _fields_undo("goal", id, before, ctx)},
+                 {"id": id, "name": g["name"], "status": g["status"]})
+
+
 _TOOLS = {
     "get_options": _get_options, "search": _search, "get_agenda": _get_agenda, "list_tasks": _list_tasks, "get_money": _get_money,
     "list_transactions": _list_transactions, "list_debts": _list_debts, "get_health": _get_health, "update_health_profile": _update_health_profile,
@@ -892,6 +1065,9 @@ _TOOLS = {
     "update_event": _update_event, "create_reminder": _create_reminder, "add_transaction": _add_transaction, "update_transaction": _update_transaction,
     "create_debt": _create_debt, "add_debt_payment": _add_debt_payment, "add_note": _add_note, "add_shopping_item": _add_shopping_item,
     "log_food": _log_food, "log_water": _log_water, "log_weight": _log_weight, "delete_item": _delete_item,
+    "create_habit": _create_habit, "update_habit": _update_habit, "log_habit": _log_habit, "create_project": _create_project,
+    "update_project": _update_project, "update_person": _update_person, "add_gift": _add_gift, "add_important_date": _add_important_date,
+    "create_goal": _create_goal, "update_goal": _update_goal,
 }
 
 
@@ -944,7 +1120,22 @@ async def fields_now(kind: str, id: str, keys, ctx: Ctx) -> dict:
     elif kind == "health_profile":
         p = (await wellness._profile(ctx.user))["profile"]
         out = {k: p.get(k) for k in keys}
+    elif kind in _ROW_KINDS:
+        model, finder = _ROW_KINDS[kind]
+        row = await finder(ctx.user_id, id)
+        for k in keys:
+            v = getattr(row, k)
+            out[k] = to_json(v)[:10] if isinstance(v, datetime) else float(v) if isinstance(v, Decimal) else v
     return out
+
+
+async def _person_row(user_id: str, id: str):
+    return await people._find(user_id, id)
+
+
+# kinds read straight from their row: (model, owned-row finder raising the route's 404)
+_ROW_KINDS = {"habit": ("Habit", habits._owned), "project": ("Project", projects._owned), "person": ("Person", _person_row),
+              "goal": ("Goal", goals._owned)}
 
 
 async def _fields_undo(kind: str, id: str, before: dict, ctx: Ctx) -> dict:
@@ -970,6 +1161,14 @@ async def _restore_fields(undo: dict, ctx: Ctx) -> None:
         await transactions.update(id, _check(transactions.UpdateBody, before), user=ctx.user)
     elif kind == "health_profile":
         await wellness.update_profile(_check(wellness.ProfileBody, before), user=ctx.user)
+    elif kind == "habit":
+        await habits._update(ctx.user, id, _check(habits.UpdateBody, before))
+    elif kind == "project":
+        await projects.update(id, _check(projects.UpdateBody, before), user=ctx.user)
+    elif kind == "person":
+        await people.update(id, _check(people.PersonUpdateBody, before), user=ctx.user)
+    elif kind == "goal":
+        await goals.update(id, _check(goals.UpdateBody, before), user=ctx.user)
 
 
 READ_TOOLS = frozenset({"get_options", "search", "get_agenda", "list_tasks", "get_money", "list_transactions", "list_debts", "get_health",
@@ -985,8 +1184,19 @@ async def remove(user, kind: str, id: str) -> dict | None:
     copy of everything the delete removes, taken just before."""
     from app.os import assistant_snapshot
 
+    async def remove_project(id: str, user):
+        return await projects.remove(id, _req({}), user=user)
+
+    async def remove_gift(id: str, user):
+        gift = await db.giftidea.find_first(where={"id": id, "person": {"is": {"userId": user.id}}})
+        if gift is None:
+            raise ToolError("Gift not found")
+        return await people.remove_gift(gift.personId, id, user=user)
+
     handlers = {"task": tasks.remove, "event": events.remove, "reminder": reminders.remove, "transaction": transactions.remove, "debt": debts.remove,
-                "note": notes.remove, "shopping_item": shopping.remove_item, "food_log": wellness.remove_food, "weight": wellness.remove_weight}
+                "note": notes.remove, "shopping_item": shopping.remove_item, "food_log": wellness.remove_food, "weight": wellness.remove_weight,
+                "habit": habits.remove, "project": remove_project, "gift": remove_gift, "goal": goals.remove,
+                "important_date": important_dates.remove}
     if kind not in handlers:
         return None
     snapshot = await assistant_snapshot.take(assistant_snapshot.MODELS[kind], id, user.id)
@@ -1010,6 +1220,8 @@ async def reverse(user, undo: dict, ctx: Ctx | None = None) -> None:
         await tasks.reopen(undo["id"], user=user)
         if undo.get("nextId"):
             await tasks.remove(undo["nextId"], user=user)
+    elif undo["op"] == "restore_habit_log":
+        await habits.check(undo["id"], _check(habits.CheckBody, {"date": undo["date"], "count": undo["count"]}), user=user)
     elif undo["op"] == "restore_weight":
         await db.weightlog.update_many(where={"id": undo["id"], "userId": user.id}, data={"weightKg": undo["previousKg"]})
     elif undo["op"] == "reopen_app_todo":
@@ -1053,4 +1265,24 @@ async def describe(ctx: Ctx, kind, id: str) -> dict:
         if f is None:
             raise ToolError("Food entry not found")
         return {"label": f"{f.name or '—'} · {f.calories} kcal", "link": f"/health?date={to_json(f.date)[:10]}"}
+    if kind == "person":
+        p = await people._find(ctx.user_id, id)
+        return {"label": p.name, "link": f"/people?id={id}"}
+    if kind == "habit":
+        h = await habits._owned(ctx.user_id, id)
+        return {"label": h.name, "link": f"/habits?id={id}"}
+    if kind == "project":
+        p = await projects._owned(ctx.user_id, id)
+        return {"label": p.name, "link": f"/projects?id={id}"}
+    if kind == "goal":
+        g = await goals._owned(ctx.user_id, id)
+        return {"label": g.name, "link": f"/goals?id={id}"}
+    if kind == "gift":
+        g = await db.giftidea.find_first(where={"id": id, "person": {"is": {"userId": ctx.user_id}}}, include={"person": True})
+        if g is None:
+            raise ToolError("Gift not found")
+        return {"label": f"{g.title} → {g.person.name}", "link": f"/people?id={g.personId}"}
+    if kind == "important_date":
+        d = await important_dates._find(ctx.user_id, id)
+        return {"label": d.title, "link": f"/people?id={d.personId}" if d.personId else "/people"}
     raise ToolError(f'Cannot delete a "{_js_str(kind)}"')
