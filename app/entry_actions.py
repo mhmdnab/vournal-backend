@@ -33,11 +33,13 @@ log = logging.getLogger("vournal.entries")
 _DATA = json.loads((Path(__file__).parent / "os" / "data" / "entry_actions.json").read_text())
 SYSTEM = _DATA["system"]
 ASK_USER = _DATA["ask_user"]
+WITHDRAW = _DATA["withdraw_proposal"]
 EXCLUDED = frozenset({"create_task", "create_event", "create_reminder"})
-TOOLS_FOR_ENTRY = [t for t in assistant.TOOLS if t["name"] not in EXCLUDED] + [ASK_USER]
+TOOLS_FOR_ENTRY = [t for t in assistant.TOOLS if t["name"] not in EXCLUDED] + [ASK_USER, WITHDRAW]
 MAX_ANSWERS = 3
 ASK_AGAIN_AFTER = timedelta(days=7)  # "Not now" on the consent sheet: offered again a week later
 ASKED = "Asked the user. Stop now; their answer comes back as the next message."
+WITHDRAWN = "Withdrawn: it is off the card."
 
 
 async def _set_proposal(entry_id: str, **changes) -> dict:
@@ -96,13 +98,19 @@ def _merged(messages: list[dict]) -> list[dict]:
     return out
 
 
+def _same(call: dict) -> str:
+    """What makes two proposals the same change: the tool and its input."""
+    return json.dumps({"name": call.get("name"), "input": call.get("input")}, sort_keys=True)
+
+
 def _answer_text(answer: dict) -> str:
     return (answer.get("choice") or answer.get("text") or "").strip()
 
 
 async def run_step(entry, *, spend: bool, answer: dict | None = None) -> None:
-    """Proposes the entry's actions (again, with the user's answer). A run that finishes replaces
-    the entry's waiting actions with its own; a run that fails leaves them as they were."""
+    """Proposes the entry's actions (again, with the user's answer). A run that finishes adds its
+    proposals to the card and takes off only the earlier ones it withdrew; a run that fails leaves
+    the card as it was."""
     user = await db.user.find_unique(where={"id": entry.userId})
     s = await ensure_os_profile(user)
     client = ai.client()
@@ -137,6 +145,8 @@ async def run_step(entry, *, spend: bool, answer: dict | None = None) -> None:
     messages = _merged([{"role": h.role, "content": h.content} for h in history] + [{"role": r["role"], "content": r["content"]} for r in new_rows])
 
     drafts: list[dict] = []
+    first_position = await db.assistantaction.count(where={"entryId": entry.id})  # after what the card already has
+    withdrawn: set[str] = set()
     question = None
     last_row = None
     effort = pick_effort(entry.rawTranscript or "", False)
@@ -152,6 +162,11 @@ async def run_step(entry, *, spend: bool, answer: dict | None = None) -> None:
             results = []
             ctx.round_deletes = sum(1 for use in uses if use["name"] == "delete_item")
             for use in uses:
+                if use["name"] == "withdraw_proposal":
+                    target = str((use.get("input") or {}).get("id") or "").removeprefix("pending:")
+                    withdrawn.add(target)
+                    results.append({"type": "tool_result", "tool_use_id": use["id"], "content": WITHDRAWN})
+                    continue
                 if use["name"] == "ask_user":
                     i = use.get("input") if isinstance(use.get("input"), dict) else {}
                     choices = [c.strip() for c in i.get("choices") or [] if isinstance(c, str) and c.strip()][:4]
@@ -161,7 +176,7 @@ async def run_step(entry, *, spend: bool, answer: dict | None = None) -> None:
                     continue
                 out = await assistant_tools.run(use["name"], use.get("input"), ctx)
                 if out.get("action"):
-                    drafts.append({"id": out["action"].get("id") or uuid.uuid4().hex, **out["action"], "position": len(drafts)})
+                    drafts.append({"id": out["action"].get("id") or uuid.uuid4().hex, **out["action"], "position": first_position + len(drafts)})
                 results.append({"type": "tool_result", "tool_use_id": use["id"], "content": out["content"], **({"is_error": True} if out.get("isError") else {})})
             async with db.tx() as tx:
                 await assistant._append(conversation.id, "assistant", content, None, True, tx)
@@ -177,7 +192,11 @@ async def run_step(entry, *, spend: bool, answer: dict | None = None) -> None:
             await _set_proposal(entry.id, skipped="unavailable")
         return
 
-    await assistant._save_actions(user.id, conversation.id, last_row.id, drafts, entry_id=entry.id)
+    # the same change proposed again (same tool, same input) isn't added twice
+    waiting = await db.assistantaction.find_many(where={"entryId": entry.id, "status": "pending"})
+    kept = {_same(a.call) for a in waiting if a.call and a.id not in withdrawn}
+    drafts = [d for d in drafts if not d.get("call") or _same(d["call"]) not in kept]
+    await assistant._save_actions(user.id, conversation.id, last_row.id, drafts, entry_id=entry.id, withdrawn=withdrawn)
     answers = (entry.proposal or {}).get("answers", 0) + (1 if answer else 0)
     await _set_proposal(entry.id, question=question, answers=answers or None, skipped=None)
     await db.assistantconversation.update(where={"id": conversation.id}, data={"lastMessageAt": datetime.now(timezone.utc)})

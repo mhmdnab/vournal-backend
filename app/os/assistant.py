@@ -311,13 +311,14 @@ async def send(user, text: str, conversation_id: str | None = None) -> dict:
     }
 
 
-async def _save_actions(user_id: str, conversation_id: str, message_id: str, drafts: list[dict], entry_id: str | None = None) -> list:
-    """An app recording's set (entry_id) replaces what was waiting for that entry before."""
-    if not drafts and not entry_id:
+async def _save_actions(user_id: str, conversation_id: str, message_id: str, drafts: list[dict], entry_id: str | None = None,
+                        withdrawn: set[str] | None = None) -> list:
+    """An app recording's run (entry_id) also takes off the earlier proposals it withdrew."""
+    if not drafts and not withdrawn:
         return []
     async with db.tx() as tx:
-        if entry_id:
-            await tx.assistantaction.update_many(where={"entryId": entry_id, "status": "pending"},
+        if entry_id and withdrawn:
+            await tx.assistantaction.update_many(where={"entryId": entry_id, "status": "pending", "id": {"in": list(withdrawn)}},
                                                  data={"status": "cancelled", "resolvedAt": datetime.now(timezone.utc)})
         rows = []
         for d in drafts:

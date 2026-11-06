@@ -32,7 +32,8 @@ class ReviewBase(OsTestCase):
     async def entry(self, review=True, transcript="call mom, lunch with Ali"):
         r = await self.app.post("/entries", json={"transcript": transcript, **({"review": True} if review else {})})
         self.assertEqual(r.status_code, 200, r.text)
-        return r.json()
+        # a review entry is read and acted on in the background, like a recording
+        return (await self.app.get(f"/entries/{r.json()['id']}")).json() if review else r.json()
 
 
 class ReviewMode(ReviewBase):
@@ -81,6 +82,21 @@ class ReviewMode(ReviewBase):
         web = await self.signed_in(self.user)
         item = (await web.get("/api/journal")).json()["items"][0]
         self.assertFalse({"reviewState", "inJournal", "review"} & set(item))
+
+
+class ReviewFixes(ReviewBase):
+    async def test_review_text_entry_returns_before_the_ai_finishes(self):
+        r = await self.app.post("/entries", json={"transcript": "call mom", "review": True})
+        self.assertEqual(r.json()["status"], "PROCESSING")
+        e = (await self.app.get(f"/entries/{r.json()['id']}")).json()
+        self.assertEqual((e["status"], e["reviewState"]), ("DONE", "needs_review"))
+
+    async def test_old_path_entry_is_never_left_processing(self):
+        from app import main
+
+        with patch.object(main, "apply_extraction", AsyncMock(side_effect=RuntimeError("boom"))):
+            e = await self.entry(review=False)
+        self.assertEqual(e["status"], "DONE")
 
 
 class StaleReviews(ReviewBase):

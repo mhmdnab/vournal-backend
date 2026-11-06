@@ -414,7 +414,10 @@ async def process_transcript(
             except Exception:  # noqa: BLE001 — the entry and its to-dos still reach the card
                 log.exception("AI actions step failed for entry %s", entry_id)
     else:
-        await apply_extraction(entry_id, result, transcript, use_merged=use_merged, now=now)
+        try:
+            await apply_extraction(entry_id, result, transcript, use_merged=use_merged, now=now)
+        except Exception:  # noqa: BLE001 — what was made stays; the entry is never left processing
+            log.exception("Saving extracted items failed for entry %s", entry_id)
 
     await db.entry.update(
         where={"id": entry_id}, data={"status": "DONE", "processedAt": _now()}
@@ -579,7 +582,7 @@ async def process_audio_entry(entry_id: str, review: bool = False) -> None:
 
 
 @app.post("/entries", response_model=EntryOut)
-async def create_entry(body: CreateEntryRequest, current=Depends(get_current_user)):
+async def create_entry(body: CreateEntryRequest, background: BackgroundTasks, current=Depends(get_current_user)):
     # Meter against the monthly limit (text entries cost an extraction call too).
     await reserve_entry_quota(db, current)
     # Owner is the authenticated user — never client-supplied.
@@ -595,8 +598,13 @@ async def create_entry(body: CreateEntryRequest, current=Depends(get_current_use
     )
 
     # NOTE: the text path runs extraction synchronously for easy testing. The
-    # audio path (POST /entries/audio) runs it in the background instead.
-    await process_transcript(entry.id, body.transcript, review=body.review)
+    # audio path (POST /entries/audio) runs it in the background instead, and so does
+    # a review-mode entry: a Plus entry's AI actions step can take a while, so the app
+    # polls for it as it does for a recording.
+    if body.review:
+        background.add_task(process_transcript, entry.id, body.transcript, review=True)
+    else:
+        await process_transcript(entry.id, body.transcript)
 
     return await entry_out(entry.id, current.id)
 
@@ -673,7 +681,8 @@ async def list_entries(
             "userId": current.id,
             # Silence (see process_audio_entry): a real failure keeps its audio.
             "NOT": {"status": "FAILED", "rawTranscript": "", "audioUrl": None},
-            **({"reviewState": "needs_review"} if review == "pending" else IN_JOURNAL),
+            # waiting on the card once its reading is done (a save cut off part-way included)
+            **({"reviewState": {"in": ["needs_review", "saving"]}, "status": "DONE"} if review == "pending" else IN_JOURNAL),
         },
         order={"createdAt": "desc"},
         take=limit,

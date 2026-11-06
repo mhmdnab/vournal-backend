@@ -3,6 +3,9 @@ kept, once), Discard, answering the AI's question, Undo, the last day's AI actio
 actions consent. Models patched / fake (no paid calls)."""
 
 from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock, patch
+
+from prisma import Json
 
 from vournal_os.parity import fake_model as fm
 from vournal_os.test_entry_actions import RESULT, EntryActionsBase
@@ -16,7 +19,7 @@ class ReviewRoutes(EntryActionsBase):
         fm.script(fm.tools(*uses), fm.message(fm.text("ok"))) if uses else fm.script(fm.message(fm.text("ok")))
         r = await self.app.post("/entries", json={"transcript": "paid 20 for lunch with Ali, gave him a book", "review": True})
         self.assertEqual(r.status_code, 200, r.text)
-        return r.json()
+        return (await self.app.get(f"/entries/{r.json()['id']}")).json()
 
     def body(self, e, **over):
         review = e["review"]
@@ -182,7 +185,7 @@ class ReviewRoutes(EntryActionsBase):
     async def test_answer_runs_without_spending_and_stops_after_three(self):
         fm.script(fm.tools(("ask_user", {"question": "Cash or card?", "choices": ["Cash", "Card"]})))
         r = await self.app.post("/entries", json={"transcript": "paid 20", "review": True})
-        e = r.json()
+        e = (await self.app.get(f"/entries/{r.json()['id']}")).json()
         self.assertEqual(e["review"]["question"]["question"], "Cash or card?")
         before = await self.remaining()
         for left in (2, 1, 0):
@@ -192,3 +195,48 @@ class ReviewRoutes(EntryActionsBase):
         self.assertEqual(await self.remaining(), before)
         r = await self.app.post(f"/entries/{e['id']}/propose", json={"answer": {"choice": "Card"}})
         self.assertEqual(r.status_code, 400)
+
+
+class ReviewFixes(ReviewRoutes):
+    async def test_pending_list_and_buttons_wait_for_the_ai_step(self):
+        e = await self.card(LUNCH)
+        await self.db.entry.update(where={"id": e["id"]}, data={"status": "PROCESSING"})
+        self.assertEqual((await self.app.get("/entries?review=pending")).json(), [])
+        self.assertEqual((await self.app.post(f"/entries/{e['id']}/save", json=self.body(e))).status_code, 409)
+        self.assertEqual((await self.app.post(f"/entries/{e['id']}/discard")).status_code, 409)
+
+    async def test_save_after_a_failure_part_way_does_not_repeat_todos(self):
+        from app.os import assistant
+
+        e = await self.card(LUNCH)
+        with patch.object(assistant, "_approve", AsyncMock(side_effect=RuntimeError("crash"))):
+            with self.assertRaises(RuntimeError):
+                await self.app.post(f"/entries/{e['id']}/save", json=self.body(e))
+        self.assertEqual(await self.db.todo.count(where={"entryId": e["id"]}), 1)
+        saved = await self.save(e)
+        self.assertEqual(saved["reviewState"], "saved")
+        self.assertEqual(await self.db.todo.count(where={"entryId": e["id"]}), 1)
+        self.assertEqual(await self.db.transaction.count(where={"userId": self.user.id}), 1)
+
+    async def _saving_since(self, e, minutes):
+        row = await self.db.entry.find_unique(where={"id": e["id"]})
+        since = (datetime.now(timezone.utc) - timedelta(minutes=minutes)).isoformat()
+        await self.db.entry.update(where={"id": e["id"]}, data={"reviewState": "saving", "proposal": Json({**row.proposal, "savingAt": since})})
+
+    async def test_a_save_cut_off_part_way_can_be_saved_later(self):
+        e = await self.card(LUNCH)
+        await self._saving_since(e, 10)
+        self.assertEqual([x["id"] for x in (await self.app.get("/entries?review=pending")).json()], [e["id"]])
+        self.assertEqual((await self.save(e))["reviewState"], "saved")
+
+    async def test_a_save_in_progress_still_answers_409(self):
+        e = await self.card(LUNCH)
+        await self._saving_since(e, 0)
+        self.assertEqual((await self.app.post(f"/entries/{e['id']}/save", json=self.body(e))).status_code, 409)
+
+    async def test_an_edit_card_shows_the_old_value(self):
+        web = await self.signed_in(self.user)
+        t = (await web.post("/api/transactions", json={"type": "EXPENSE", "amount": 20, "title": "Lunch"})).json()
+        e = await self.card(("update_transaction", {"id": t["id"], "amount": 25}))
+        (a,) = e["review"]["actions"]
+        self.assertEqual((a["kind"], a["details"]["amount"], a["before"]["amount"]), ("update", 25, 20.0))

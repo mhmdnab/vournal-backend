@@ -28,6 +28,8 @@ router = APIRouter()
 
 _PERSON = re.compile(rf"^{re.escape(PERSON_PLACEHOLDER)}(\d+)$")
 UNDO_WINDOW = timedelta(hours=24)
+SAVE_TIMEOUT = timedelta(minutes=5)  # a Save still "saving" after this was cut off (a restart): it can run again
+STILL_WORKING = "Still working on this entry."
 
 
 # ----- what the card shows -------------------------------------------------------------------
@@ -51,7 +53,8 @@ def review_action(a) -> dict:
     name = call["name"] if call else "delete_item" if a.kind == "delete" else None
     field = assistant_pending._TARGET.get(name, (None,))[0] if name else None
     target = (call.get("input") or {}).get(field) if call and field else a.entityId if a.kind == "delete" else None
-    return {**assistant.action_view(a), "tool": name, "target": target,
+    before = call.get("before") if call and a.status == "pending" else None
+    return {**assistant.action_view(a), "tool": name, "target": target, "before": before,
             "dependsOnPeople": sorted(_people_in(call.get("input")) if call else ()), "entryId": a.entryId}
 
 
@@ -62,7 +65,7 @@ async def review_block(entry) -> Optional[dict]:
     if entry.reviewState is None and not proposal:
         return None
     result = proposal.get("result") or {}
-    waiting = entry.reviewState == "needs_review"
+    waiting = entry.reviewState in ("needs_review", "saving")
     statuses = ["pending"] if waiting else ["done", "failed", "undone", "running"]
     rows = await db.assistantaction.find_many(where={"entryId": entry.id, "status": {"in": statuses}}, order=[{"position": "asc"}, {"createdAt": "asc"}])
     return {
@@ -134,6 +137,8 @@ async def propose(entry_id: str, body: ProposeBody, current=Depends(get_current_
     entry = await _owned(entry_id, current.id)
     if entry.reviewState != "needs_review":
         raise HTTPException(status_code=409, detail="This entry was already saved.")
+    if entry.status != "DONE":
+        raise HTTPException(status_code=409, detail=STILL_WORKING)
     if not (await ensure_os_profile(current)).aiEnabled:
         raise HTTPException(status_code=400, detail="Turn on AI actions first.")
     proposal = entry.proposal or {}
@@ -204,8 +209,15 @@ async def save(entry_id: str, body: SaveBody, current=Depends(get_current_user))
     entry = await _owned(entry_id, current.id)
     if entry.reviewState == "saved":
         return await entry_out(entry_id, current.id)  # a repeated Save: the result it already had
+    if entry.status != "DONE":
+        raise HTTPException(status_code=409, detail=STILL_WORKING)
     if entry.reviewState == "saving":
-        raise HTTPException(status_code=409, detail="Still saving")
+        started = (entry.proposal or {}).get("savingAt")
+        if started and datetime.now(timezone.utc) - datetime.fromisoformat(started) < SAVE_TIMEOUT:
+            raise HTTPException(status_code=409, detail="Still saving")
+        # cut off part-way: it can run again (what it already made isn't made twice)
+        await db.entry.update_many(where={"id": entry.id, "reviewState": "saving"}, data={"reviewState": "needs_review"})
+        entry = await _owned(entry_id, current.id)
     if entry.reviewState != "needs_review":
         raise HTTPException(status_code=409, detail="This entry has nothing to review.")
 
@@ -225,7 +237,10 @@ async def save(entry_id: str, body: SaveBody, current=Depends(get_current_user))
             call = {**call, "input": merged}
         calls[a.id] = call
 
-    claimed = await db.entry.update_many(where={"id": entry.id, "reviewState": "needs_review"}, data={"reviewState": "saving"})
+    claimed = await db.entry.update_many(
+        where={"id": entry.id, "reviewState": "needs_review"},
+        data={"reviewState": "saving", "proposal": Json({**(entry.proposal or {}), "savingAt": datetime.now(timezone.utc).isoformat()})},
+    )
     if claimed != 1:
         again = await _owned(entry_id, current.id)
         if again.reviewState == "saved":
@@ -236,8 +251,10 @@ async def save(entry_id: str, body: SaveBody, current=Depends(get_current_user))
         proposal = entry.proposal or {}
         result = proposal.get("result") or {"todos": [], "topics": [], "people": [], "places": []}
         edited = {t.index: t.text for t in body.todos if t.keep and t.text}
+        # a Save that ran part-way before already made the to-dos (links are made once anyway)
+        made = await db.todo.count(where={"entryId": entry.id})
         keep = {
-            "todos": {n: edited.get(n) for n in _keep(body.todos, len(result.get("todos", [])))},
+            "todos": {} if made else {n: edited.get(n) for n in _keep(body.todos, len(result.get("todos", [])))},
             "people": _keep(body.people, len(result.get("people", []))),
             "topics": _keep(body.topics, len(result.get("topics", []))),
             "places": _keep(body.places, len(result.get("places", []))),
@@ -270,7 +287,7 @@ async def save(entry_id: str, body: SaveBody, current=Depends(get_current_user))
 
     await db.entry.update(where={"id": entry.id}, data={
         "reviewState": "saved", "inJournal": body.inJournal,
-        "proposal": Json({**proposal, "saveResult": outcome}),
+        "proposal": Json({**{k: v for k, v in proposal.items() if k != "savingAt"}, "saveResult": outcome}),
     })
     return await entry_out(entry_id, current.id)
 
@@ -284,6 +301,8 @@ async def discard(entry_id: str, current=Depends(get_current_user)):
     entry = await _owned(entry_id, current.id)
     if entry.reviewState != "needs_review":
         raise HTTPException(status_code=409, detail="Only an unsaved entry can be discarded.")
+    if entry.status != "DONE":
+        raise HTTPException(status_code=409, detail=STILL_WORKING)
     if entry.audioUrl:
         await delete_audio(entry.audioUrl)
     await db.entry.delete(where={"id": entry.id})

@@ -22,6 +22,9 @@ RESULT = {
 }
 
 
+GIFT_FOR_ALI = ("add_gift", {"person_id": "proposal-person:0", "title": "A book", "given": True})
+
+
 class EntryActionsBase(OsTestCase):
     result = RESULT
 
@@ -119,7 +122,7 @@ class TheStep(EntryActionsBase):
         await self.record()
         names = {t["name"] for t in fm.requests("python")[0]["body"]["tools"]}
         self.assertFalse(names & {"create_task", "create_event", "create_reminder"})
-        self.assertTrue({"ask_user", "add_transaction", "add_gift", "log_habit", "search"} <= names)
+        self.assertTrue({"ask_user", "withdraw_proposal", "add_transaction", "add_gift", "log_habit", "search"} <= names)
 
     async def test_new_person_placeholder_is_offered(self):
         fm.script(fm.message(fm.text("ok")))
@@ -150,7 +153,7 @@ class TheStep(EntryActionsBase):
         self.assertTrue(q["id"])
         self.assertEqual(len(fm.requests("python")), 1)
 
-    async def test_answer_rerun_replaces_pending_actions_without_spending(self):
+    async def test_answer_rerun_replaces_what_it_withdraws_without_spending(self):
         from app import entry_actions
 
         fm.script(fm.tools(("add_transaction", {"type": "expense", "amount": 20, "title": "Lunch"}),
@@ -158,7 +161,8 @@ class TheStep(EntryActionsBase):
         before = await self.remaining()
         entry = await self.record()
         (first,) = await self.pending(entry.id)
-        fm.script(fm.tools(("add_transaction", {"type": "expense", "amount": 20, "title": "Lunch (card)"})), fm.message(fm.text("ok")))
+        fm.script(fm.tools(("withdraw_proposal", {"id": f"pending:{first.id}"}),
+                           ("add_transaction", {"type": "expense", "amount": 20, "title": "Lunch (card)"})), fm.message(fm.text("ok")))
         await entry_actions.run_step(entry, spend=False, answer={"choice": "Card"})
         rows = await self.pending(entry.id)
         self.assertEqual({(a.id == first.id, a.status) for a in rows}, {(True, "cancelled"), (False, "pending")})
@@ -167,6 +171,28 @@ class TheStep(EntryActionsBase):
         self.assertEqual((entry.proposal["answers"], entry.proposal.get("question")), (1, None))
         sent = fm.requests("python")[-2]["body"]["messages"]
         self.assertIn("Card", json.dumps(sent[-1], ensure_ascii=False))
+
+    async def test_answer_rerun_keeps_actions_it_does_not_repeat(self):
+        from app import entry_actions
+
+        fm.script(fm.tools(("add_transaction", {"type": "expense", "amount": 20, "title": "Lunch"}),
+                           ("ask_user", {"question": "What was the gift?", "allowText": True})))
+        entry = await self.record()
+        (lunch,) = await self.pending(entry.id)
+        fm.script(fm.tools(GIFT_FOR_ALI), fm.message(fm.text("ok")))
+        await entry_actions.run_step(entry, spend=False, answer={"text": "a book"})
+        rows = {a.call["name"]: a.status for a in await self.pending(entry.id)}
+        self.assertEqual(rows, {"add_transaction": "pending", "add_gift": "pending"})
+
+    async def test_answer_rerun_that_proposes_nothing_keeps_everything(self):
+        from app import entry_actions
+
+        fm.script(fm.tools(("add_transaction", {"type": "expense", "amount": 20, "title": "Lunch"}),
+                           ("ask_user", {"question": "Cash or card?", "choices": ["Cash", "Card"]})))
+        entry = await self.record()
+        fm.script(fm.message(fm.text("Got it.")))
+        await entry_actions.run_step(entry, spend=False, answer={"choice": "Cash"})
+        self.assertEqual([a.status for a in await self.pending(entry.id)], ["pending"])
 
     async def test_failed_rerun_keeps_previous_actions(self):
         from app import entry_actions

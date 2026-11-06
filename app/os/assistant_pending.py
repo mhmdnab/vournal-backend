@@ -123,6 +123,32 @@ async def _describe_target(name: str, i: dict, ctx: Ctx) -> dict:
     return {"label": pending_label(name, i), "link": None}
 
 
+# what an edit changes, as (kind for fields_now, {tool input field: route field}), so its card can
+# show the value it replaces ("old → new", design 2026-11-06)
+_BEFORE = {
+    "update_transaction": ("transaction", {"amount": "amount", "title": "title", "date": "date"}),
+    "update_habit": ("habit", {"name": "name", "target_per_day": "targetPerDay", "archived": "isArchived"}),
+    "update_project": ("project", {"name": "name", "status": "status", "deadline": "deadline", "description": "description"}),
+    "update_person": ("person", {"relationship": "relationship", "birthday": "birthday", "notes": "notes"}),
+    "update_goal": ("goal", {"name": "name", "status": "status", "deadline": "deadline", "current_value": "currentValue"}),
+}
+
+
+async def _before(name: str, i: dict, ctx: Ctx) -> dict | None:
+    """The current values of the fields an edit changes, keyed like its input; None when unknown."""
+    if name not in _BEFORE or not isinstance(i.get("id"), str) or i["id"].startswith((PLACEHOLDER, PERSON_PLACEHOLDER)):
+        return None
+    kind, fields = _BEFORE[name]
+    changed = {key: route for key, route in fields.items() if key in i}
+    if not changed:
+        return None
+    try:
+        now = await tools.fields_now(kind, i["id"], changed.values(), ctx)
+    except Exception:  # noqa: BLE001 — the card still shows the new value
+        return None
+    return {key: now.get(route) for key, route in changed.items()}
+
+
 async def defer(name: str, i: dict, ctx: Ctx) -> dict:
     """A write in Manual mode: checked, described and saved as a waiting card, not run."""
     problem = check_input(SCHEMAS[name], i)
@@ -134,6 +160,9 @@ async def defer(name: str, i: dict, ctx: Ctx) -> dict:
     entity_id = i.get(target) if name in _TARGET and isinstance(i.get(target), str) else ""
     draft = {"id": aid, "kind": pending_kind(name, i), "entityType": ENTITY[name], "entityId": entity_id, "label": found["label"],
              "link": found["link"], "undo": None, "status": "pending", "call": {"name": name, "input": i}}
+    before = await _before(name, i, ctx)
+    if before:
+        draft["call"]["before"] = before
     ctx.pending[aid] = draft
     placeholder = f"{PLACEHOLDER}{aid}"
     result = {"ok": False, "pending": True, "id": placeholder,
