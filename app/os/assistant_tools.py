@@ -41,9 +41,12 @@ class ToolError(Exception):
 
 
 class Ctx:
-    def __init__(self, user, tz: str, today: str):
+    def __init__(self, user, tz: str, today: str, mode: str = "auto"):
         self.user, self.user_id, self.tz, self.today = user, user.id, tz, today
         self.twins_named: set[str] = set()  # titles create_task already pointed to an app to-do this message
+        self.mode = mode  # "manual": writes wait for the user's approval; "auto": they run at once
+        self.pending: dict[str, dict] = {}  # this message's waiting cards, by action id
+        self.deletes_this_message = 0
 
 
 # ----- results ---------------------------------------------------------------------------
@@ -283,6 +286,10 @@ async def run(name: str, raw_input, ctx: Ctx) -> dict:
         tool = _TOOLS.get(name)
         if tool is None:
             return {"content": f"Unknown tool {name}", "isError": True}
+        if ctx.mode == "manual" and name in WRITE_TOOLS and name != "delete_item":
+            from app.os.assistant_pending import defer
+
+            return await defer(name, i, ctx)
         return await tool(i, ctx)
     except Exception as exc:  # noqa: BLE001 — the model reads the error and recovers
         return {"content": error_text(exc), "isError": True}
@@ -865,6 +872,11 @@ _TOOLS = {
     "create_debt": _create_debt, "add_debt_payment": _add_debt_payment, "add_note": _add_note, "add_shopping_item": _add_shopping_item,
     "log_food": _log_food, "log_water": _log_water, "log_weight": _log_weight, "delete_item": _delete_item,
 }
+
+
+READ_TOOLS = frozenset({"get_options", "search", "get_agenda", "list_tasks", "get_money", "list_transactions", "list_debts", "get_health",
+                        "get_prayer_times"})
+WRITE_TOOLS = frozenset(_TOOLS) - READ_TOOLS
 
 
 # ----- deleting (after the user confirms) and undoing ------------------------------------

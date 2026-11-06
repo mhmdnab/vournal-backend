@@ -42,7 +42,8 @@ class ChatBase(OsTestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
         self.client = await self.signed_in()
-        await self.client.patch("/api/settings", json={"timezone": "Asia/Beirut", "aiEnabled": True})
+        # Auto: these tests are about what the tools do; test_assistant_modes covers Manual
+        await self.client.patch("/api/settings", json={"timezone": "Asia/Beirut", "aiEnabled": True, "assistantMode": "auto"})
 
     async def say(self, message, conversation=None):
         response = await self.client.post("/api/assistant/chat", json={"message": message, **({"conversationId": conversation} if conversation else {})})
