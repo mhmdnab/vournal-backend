@@ -1,13 +1,16 @@
 """/api/assistant: the chatbot (port of vournalOS AssistantService and its controller). Off
 unless the server has ANTHROPIC_API_KEY and the user turned AI on. Each message is one
 request of the shared monthly AI allowance. The model acts through the tools in
-assistant_tools; deletions wait for the user's confirmation, and what it adds can be undone.
+assistant_tools, in the user's mode (design 2026-11-06): in Manual every change waits as a card
+until the user approves it (assistant_pending); in Auto changes run at once and can be undone
+for 24 hours, edits and deletes included (assistant_snapshot), but a delete that takes more
+with it, a second delete in one message, or anything with a file still asks.
 
-The request is NestJS's: claude-sonnet-5-5 with adaptive thinking, effort "medium", prompt
-caching, the server-side fallback beta, at most 8 tool rounds (the last one must answer in
-words), and at most 160 stored turns per chat. The system prompt and tools are copied from
-the NestJS build (tests/vournal_os/golden/assistant_golden.mjs). The model's replies are
-stored exactly as the API returned them, so the history replays unchanged.
+The request: claude-sonnet-5-5 with adaptive thinking, effort "low" or "medium" chosen per
+message (assistant_effort), prompt caching, the server-side fallback beta, at most 8 tool
+rounds (the last one must answer in words), and at most 160 stored turns per chat. The system
+prompt and tools began as the NestJS build's (tests/vournal_os/golden/assistant_golden.mjs).
+The model's replies are stored exactly as the API returned them, so the history replays unchanged.
 
 Privacy, as before: a conversation sends the user's messages and what the tools read (their
 own data) to the AI provider, and is stored only in the user's rows."""
