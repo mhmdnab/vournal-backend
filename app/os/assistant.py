@@ -146,7 +146,8 @@ async def _owned(user_id: str, id: str):
 
 
 async def _owned_action(user_id: str, id: str):
-    a = await db.assistantaction.find_first(where={"id": id, "userId": user_id})
+    # an app recording's AI actions are approved and undone only on its review card
+    a = await db.assistantaction.find_first(where={"id": id, "userId": user_id, "entryId": None})
     if a is None:
         raise nest_error(404, "Action not found")
     return a
@@ -401,7 +402,7 @@ async def confirm(id: str, user=Depends(plus_user)):
 async def approve_all(message_id: str, user=Depends(plus_user)):
     """Every waiting card under one reply, in the order the changes were made; one failing
     doesn't stop the rest."""
-    rows = await db.assistantaction.find_many(where={"messageId": message_id, "userId": user.id, "status": "pending"},
+    rows = await db.assistantaction.find_many(where={"messageId": message_id, "userId": user.id, "status": "pending", "entryId": None},
                                               order=[{"position": "asc"}, {"createdAt": "asc"}])
     if not rows:
         raise nest_error(400, "Nothing to approve")

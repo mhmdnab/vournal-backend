@@ -51,6 +51,7 @@ from app.quota import (
     reserve_entry_quota,
 )
 from app.os import include_os_routers
+from app.review_routes import entry_out, router as review_router
 from app.review import IN_JOURNAL
 from app.os.common.http import EmptyJsonBody, TrailingSlash, install_nest_errors
 from app.rate_limit import limiter
@@ -216,6 +217,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(oauth_router)
 app.include_router(threads_router)
+app.include_router(review_router)  # before /entries/{entry_id}: it owns /entries/actions/recent
 app.include_router(billing_apple_router)
 app.include_router(billing_paddle_router)
 
@@ -596,9 +598,7 @@ async def create_entry(body: CreateEntryRequest, current=Depends(get_current_use
     # audio path (POST /entries/audio) runs it in the background instead.
     await process_transcript(entry.id, body.transcript, review=body.review)
 
-    return _to_entry_out(
-        await _load_entry(entry.id), await ambiguous_norm_sets(db, current.id)
-    )
+    return await entry_out(entry.id, current.id)
 
 
 @app.post("/entries/audio", response_model=EntryOut)
@@ -685,7 +685,7 @@ async def list_entries(
 @app.get("/entries/{entry_id}", response_model=EntryOut)
 async def get_entry(entry_id: str, current=Depends(get_current_user)):
     entry = await _owned_entry_or_404(entry_id, current.id)
-    return _to_entry_out(entry, await ambiguous_norm_sets(db, current.id))
+    return await entry_out(entry.id, current.id)
 
 
 @app.delete("/entries/{entry_id}", status_code=204)
