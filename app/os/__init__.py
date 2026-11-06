@@ -50,6 +50,7 @@ def include_os_routers() -> APIRouter:
             ai,
             app_todos,
             assistant,
+            assistant_voice,
             attachments,
             auth,
             budgets,
@@ -140,6 +141,7 @@ def include_os_routers() -> APIRouter:
         api_router.include_router(push.router)
         api_router.include_router(ai.router)
         api_router.include_router(assistant.router)
+        api_router.include_router(assistant_voice.router)
         api_router.include_router(work.router)
         _included = True
     return api_router

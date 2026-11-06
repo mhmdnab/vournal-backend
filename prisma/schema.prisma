@@ -686,6 +686,8 @@ model UserSettings {
   onboardingCompleted Boolean         @default(false)
   // AI features are opt-in: the user's text is sent to the AI provider only when this is on
   aiEnabled           Boolean         @default(false)
+  // the chat's mode: "manual" (every change waits for approval) | "auto" (acts at once, with Undo)
+  assistantMode       String          @default("manual")
   // spending plan: { "savingsMode": "none" | "percent" | "amount", "savingsValue": 10, "periodMode": "auto" | "month" }
   spendingPlan        Json?
   // prayer times: { "cityId": "beirut", "lat": 33.89, "lng": 35.50, "method": "MuslimWorldLeague", "madhab": "shafi" }
@@ -1642,7 +1644,10 @@ model AssistantAction {
   label          String
   link           String?
   undo           Json? // how to reverse it, when it can be
-  status         String // done | pending | cancelled | undone
+  status         String // done | pending | running | failed | cancelled | undone
+  call           Json? // a waiting change: { "name": tool, "input": {...} }, run when approved
+  error          String? // why an approved change failed
+  position       Int                   @default(0) // its order within the reply
   createdAt      DateTime              @default(now())
   resolvedAt     DateTime?
 

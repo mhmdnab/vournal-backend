@@ -1,13 +1,16 @@
 """/api/assistant: the chatbot (port of vournalOS AssistantService and its controller). Off
 unless the server has ANTHROPIC_API_KEY and the user turned AI on. Each message is one
 request of the shared monthly AI allowance. The model acts through the tools in
-assistant_tools; deletions wait for the user's confirmation, and what it adds can be undone.
+assistant_tools, in the user's mode (design 2026-11-06): in Manual every change waits as a card
+until the user approves it (assistant_pending); in Auto changes run at once and can be undone
+for 24 hours, edits and deletes included (assistant_snapshot), but a delete that takes more
+with it, a second delete in one message, or anything with a file still asks.
 
-The request is NestJS's: claude-sonnet-5-5 with adaptive thinking, effort "medium", prompt
-caching, the server-side fallback beta, at most 8 tool rounds (the last one must answer in
-words), and at most 160 stored turns per chat. The system prompt and tools are copied from
-the NestJS build (tests/vournal_os/golden/assistant_golden.mjs). The model's replies are
-stored exactly as the API returned them, so the history replays unchanged.
+The request: claude-sonnet-5-5 with adaptive thinking, effort "low" or "medium" chosen per
+message (assistant_effort), prompt caching, the server-side fallback beta, at most 8 tool
+rounds (the last one must answer in words), and at most 160 stored turns per chat. The system
+prompt and tools began as the NestJS build's (tests/vournal_os/golden/assistant_golden.mjs).
+The model's replies are stored exactly as the API returned them, so the history replays unchanged.
 
 Privacy, as before: a conversation sends the user's messages and what the tools read (their
 own data) to the AI provider, and is stored only in the user's rows."""
@@ -15,15 +18,17 @@ own data) to the AI provider, and is stored only in the user's rows."""
 import json
 import logging
 import re
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import anthropic
-from fastapi import Depends
+from fastapi import Depends, HTTPException
 from prisma import Json
 
 from app.db import db
-from app.os import ai, assistant_tools
+from app.os import ai, assistant_pending, assistant_tools
+from app.os.assistant_effort import escalate, pick_effort
 from app.os.common import dates, validators
 from app.os.common.body import RuleBody
 from app.os.common.deps import plus_user
@@ -47,11 +52,18 @@ REPLY = {
 _SPACES = re.compile(f"[{re.escape(_JS_SPACE)}]+")
 
 
-def context_block(now: str, weekday: str, tz: str, language: str, currency: str, name: str | None) -> str:
+MODE_LINE = {
+    "manual": "Mode: manual — every change waits for the user's approval.",
+    "auto": "Mode: auto — changes happen at once and can be undone.",
+}
+
+
+def context_block(now: str, weekday: str, tz: str, language: str, currency: str, name: str | None, mode: str | None = None) -> str:
     """Per-message facts, placed before the user's text."""
     lang = "Arabic" if language == "ar" else "English"
     who = f" User's name: {name}." if name else ""
-    return f"<context>Now: {weekday} {now} ({tz}). App language: {lang}. Default currency: {currency}.{who}</context>"
+    how = f" {MODE_LINE[mode]}" if mode in MODE_LINE else ""
+    return f"<context>Now: {weekday} {now} ({tz}). App language: {lang}. Default currency: {currency}.{who}{how}</context>"
 
 
 def title_from(text: str) -> str:
@@ -69,13 +81,44 @@ def for_replay(content: list[dict]) -> list[dict]:
     return [b for n, b in enumerate(content) if n >= boundary or b.get("type") not in ("thinking", "redacted_thinking", "tool_use")]
 
 
+def _last_reply_failed(history: list) -> bool:
+    """Whether a tool call failed while answering the previous message (the rows after its
+    visible user row)."""
+    start = max((n for n, h in enumerate(history) if h.role == "user" and not h.hidden), default=len(history))
+    return any(b.get("type") == "tool_result" and b.get("is_error") for h in history[start + 1:] for b in (h.content or []) if isinstance(b, dict))
+
+
 def _text_of(content: list[dict]) -> str:
     return "\n".join(b.get("text", "") for b in content if b.get("type") == "text").strip(_JS_SPACE)
 
 
+RUNNING_TTL = timedelta(minutes=5)  # an approval still "running" after this was cut off
+INTERRUPTED = "Interrupted — ask again"
+
+
+def _expired(a) -> bool:
+    return datetime.now(timezone.utc) - a.createdAt > PENDING_TTL
+
+
+def _stuck(a) -> bool:
+    return a.status == "running" and datetime.now(timezone.utc) - (a.resolvedAt or a.createdAt) > RUNNING_TTL
+
+
+def _details(a) -> dict | None:
+    """What a waiting change will set, from its stored call (ids left out), so the user sees
+    the change itself and not only the model's words about it."""
+    call = a.call if isinstance(a.call, dict) else json.loads(a.call) if a.call else None
+    if a.status != "pending" or not call:
+        return None
+    return {k: v for k, v in (call.get("input") or {}).items()
+            if k not in ("id", "label") and not k.endswith("_id") and isinstance(v, (str, int, float, bool)) and v != ""}
+
+
 def action_view(a) -> dict:
+    status = "expired" if a.status == "pending" and _expired(a) else "failed" if _stuck(a) else a.status
     return {"id": a.id, "kind": a.kind, "entityType": a.entityType, "entityId": a.entityId, "label": a.label, "link": a.link,
-            "status": a.status, "canUndo": a.status == "done" and a.undo is not None}
+            "status": status, "error": INTERRUPTED if _stuck(a) else a.error, "details": _details(a),
+            "canUndo": a.status == "done" and a.undo is not None and not _expired(a)}
 
 
 def _view(m, actions) -> dict:
@@ -148,7 +191,7 @@ def _log_error(exc: Exception) -> None:
         log.warning("Assistant failed: %s", exc)
 
 
-async def _call(client, round_: int, messages: list) -> dict:
+async def _call(client, round_: int, messages: list, effort: str) -> dict:
     """One round, as the API returned it (stored and replayed unchanged)."""
     raw = await client.beta.messages.with_raw_response.create(
         model=ai.MODEL,
@@ -160,7 +203,7 @@ async def _call(client, round_: int, messages: list) -> dict:
         tools=TOOLS,
         **({"tool_choice": {"type": "none"}} if round_ == MAX_ROUNDS else {}),
         thinking={"type": "adaptive"},
-        output_config={"effort": "medium"},
+        output_config={"effort": effort},
         messages=messages,
         timeout=120,
     )
@@ -203,9 +246,10 @@ async def send(user, text: str, conversation_id: str | None = None) -> dict:
     tz = dates.valid_zone(s.timezone)
     now = datetime.now(timezone.utc)
     today = assistant_tools.local_day(now, tz)
-    ctx = assistant_tools.Ctx(user, tz, today)
+    mode = s.assistantMode if s.assistantMode in MODE_LINE else "manual"
+    ctx = assistant_tools.Ctx(user, tz, today, mode)
     weekday = ai.WEEKDAYS[(datetime.fromisoformat(f"{today}T12:00:00+00:00").weekday() + 1) % 7]
-    block = context_block(f"{today} {assistant_tools.local_time(now, tz)}", weekday, s.timezone, lang, s.defaultCurrency, s.name)
+    block = context_block(f"{today} {assistant_tools.local_time(now, tz)}", weekday, s.timezone, lang, s.defaultCurrency, s.name, mode)
     first = [{"type": "text", "text": f"{block}\n{text}"}]
     user_row = await _append(conv["id"], "user", first, text, False)
     messages = [{"role": h.role, "content": h.content} for h in history] + [{"role": "user", "content": first}]
@@ -213,9 +257,10 @@ async def send(user, text: str, conversation_id: str | None = None) -> dict:
     drafts: list[dict] = []
     reply = None
     failed = False
+    effort = pick_effort(text, _last_reply_failed(history))
     try:
         for round_ in range(1, MAX_ROUNDS + 1):
-            res = await _call(client, round_, messages)
+            res = await _call(client, round_, messages, effort)
             if res.get("stop_reason") == "refusal":
                 reply = {"content": [{"type": "text", "text": REPLY["refused"][lang]}], "text": REPLY["refused"][lang]}
                 break
@@ -230,16 +275,18 @@ async def send(user, text: str, conversation_id: str | None = None) -> dict:
                 reply = {"content": kept, "text": _text_of(kept) or REPLY["failed"][lang]}
                 break
             results = []
+            ctx.round_deletes = sum(1 for use in uses if use["name"] == "delete_item")
             for use in uses:
                 out = await assistant_tools.run(use["name"], use.get("input"), ctx)
                 if out.get("action"):
-                    drafts.append(out["action"])
+                    drafts.append({"id": out["action"].get("id") or uuid.uuid4().hex, **out["action"], "position": len(drafts)})
                 results.append({"type": "tool_result", "tool_use_id": use["id"], "content": out["content"], **({"is_error": True} if out.get("isError") else {})})
             # a round is stored whole, so the history always pairs each tool call with its result
             async with db.tx() as tx:
                 await _append(conv["id"], "assistant", content, None, True, tx)
                 await _append(conv["id"], "user", results, None, True, tx)
             messages += [{"role": "assistant", "content": content}, {"role": "user", "content": results}]
+            effort = escalate(effort, len(uses), any(r.get("is_error") for r in results))
     except Exception as exc:  # noqa: BLE001 — the user gets a short reply; the history stays valid
         _log_error(exc)
         failed = True
@@ -263,10 +310,13 @@ async def _save_actions(user_id: str, conversation_id: str, message_id: str, dra
     async with db.tx() as tx:
         rows = []
         for d in drafts:
-            data = {"conversationId": conversation_id, "userId": user_id, "messageId": message_id, "kind": d["kind"], "entityType": d["entityType"],
-                    "entityId": d["entityId"], "label": js_slice(d["label"], 300), "link": d["link"], "status": d["status"]}
+            data = {"id": d["id"], "conversationId": conversation_id, "userId": user_id, "messageId": message_id, "kind": d["kind"],
+                    "entityType": d["entityType"], "entityId": d["entityId"], "label": js_slice(d["label"], 300), "link": d["link"],
+                    "status": d["status"], "position": d.get("position", 0)}
             if d.get("undo"):
                 data["undo"] = Json(d["undo"])
+            if d.get("call"):
+                data["call"] = Json(d["call"])
             rows.append(await tx.assistantaction.create(data=data))
         return rows
 
@@ -274,9 +324,9 @@ async def _save_actions(user_id: str, conversation_id: str, message_id: str, dra
 # ----- buttons on actions ----------------------------------------------------------------
 
 
-async def _resolve(id: str, state: str):
+async def _resolve(id: str, state: str, from_states=("pending", "done")):
     # conditional on the current status, so a double click can't run it twice
-    count = await db.assistantaction.update_many(where={"id": id, "status": {"in": ["pending", "done"]}}, data={"status": state, "resolvedAt": datetime.now(timezone.utc)})
+    count = await db.assistantaction.update_many(where={"id": id, "status": {"in": list(from_states)}}, data={"status": state, "resolvedAt": datetime.now(timezone.utc)})
     if count != 1:
         raise nest_error(400, "Already handled")
     return await db.assistantaction.find_unique(where={"id": id})
@@ -294,25 +344,75 @@ async def _tool_ctx(user):
     return assistant_tools.Ctx(user, tz, assistant_tools.local_day(datetime.now(timezone.utc), tz))
 
 
+EXPIRED = "This request expired — ask again"
+
+
+async def _approve(user, a, ctx) -> dict:
+    """Runs a waiting card once: it's claimed (pending → running) before anything runs, so two
+    clicks or two tabs can't both run it."""
+    if a.status != "pending":
+        raise nest_error(400, "Nothing to approve" if a.status not in ("running", "done") else "Already handled")
+    if _expired(a):
+        raise nest_error(400, EXPIRED)
+    await _resolve(a.id, "running", ("pending",))
+    try:
+        out = await assistant_pending.run_approved(a, ctx)
+    except Exception as exc:  # noqa: BLE001 — never leave a card running
+        log.warning("Approving %s failed: %r", a.id, exc)
+        out = {"error": "Something went wrong while doing that"}
+    if "error" in out:
+        data = {"status": "failed", "error": js_slice(out["error"], 300)}
+        note = f'[The user approved "{a.label}" but it failed: {out["error"]}]'
+    else:
+        r = out["action"]
+        data = {"status": "done", "entityId": r.get("entityId") or a.entityId, "label": js_slice(r.get("label") or a.label, 300),
+                "link": r.get("link") or a.link}
+        if r.get("undo"):
+            data["undo"] = Json(r["undo"])
+        note = f'[The user approved: "{data["label"]}" — done.]'
+    done = await db.assistantaction.update(where={"id": a.id}, data={**data, "resolvedAt": datetime.now(timezone.utc)})
+    await _note(a.conversationId, note)
+    return action_view(done)
+
+
+@router.post("/actions/{id}/approve")
+async def approve(id: str, user=Depends(plus_user)):
+    a = await _owned_action(user.id, id)
+    return await _approve(user, a, await _tool_ctx(user))
+
+
 @router.post("/actions/{id}/confirm")
 async def confirm(id: str, user=Depends(plus_user)):
-    a = await _owned_action(user.id, id)
-    if a.status != "pending" or a.kind != "delete":
-        raise nest_error(400, "Nothing to confirm")
-    if datetime.now(timezone.utc) - a.createdAt > PENDING_TTL:
-        raise nest_error(400, "This request expired — ask again")
-    await assistant_tools.remove(user, a.entityType, a.entityId)
-    done = await _resolve(a.id, "done")
-    await _note(a.conversationId, f'[The user confirmed: "{a.label}" was deleted.]')
-    return action_view(done)
+    """The older name for approve (deletes only, before the modes)."""
+    return await approve(id, user)
+
+
+@router.post("/messages/{message_id}/approve-all")
+async def approve_all(message_id: str, user=Depends(plus_user)):
+    """Every waiting card under one reply, in the order the changes were made; one failing
+    doesn't stop the rest."""
+    rows = await db.assistantaction.find_many(where={"messageId": message_id, "userId": user.id, "status": "pending"},
+                                              order=[{"position": "asc"}, {"createdAt": "asc"}])
+    if not rows:
+        raise nest_error(400, "Nothing to approve")
+    ctx = await _tool_ctx(user)
+    views = []
+    for a in rows:
+        try:
+            views.append(await _approve(user, a, ctx))
+        except HTTPException:
+            views.append(action_view(await db.assistantaction.find_unique(where={"id": a.id})))
+    return views
 
 
 @router.post("/actions/{id}/cancel")
 async def cancel(id: str, user=Depends(plus_user)):
     a = await _owned_action(user.id, id)
-    if a.status != "pending":
+    if a.status != "pending" and not _stuck(a):
         raise nest_error(400, "Nothing to cancel")
-    done = await _resolve(a.id, "cancelled")
+    if a.status == "pending" and _expired(a):
+        raise nest_error(400, EXPIRED)
+    done = await _resolve(a.id, "cancelled", ("pending", "running"))
     await _note(a.conversationId, f'[The user cancelled deleting "{a.label}". It was kept.]')
     return action_view(done)
 
@@ -320,10 +420,13 @@ async def cancel(id: str, user=Depends(plus_user)):
 @router.post("/actions/{id}/undo")
 async def undo(id: str, user=Depends(plus_user)):
     a = await _owned_action(user.id, id)
-    if a.status != "done" or not a.undo:
+    if a.status != "done" or not a.undo or _expired(a):
         raise nest_error(400, "This cannot be undone")
-    await assistant_tools.reverse(user, a.undo)
-    done = await _resolve(a.id, "undone")
+    try:
+        await assistant_tools.reverse(user, a.undo, await _tool_ctx(user))
+    except assistant_tools.ToolError as exc:  # changed or deleted since: say so, change nothing
+        raise nest_error(400, str(exc)) from exc
+    done = await _resolve(a.id, "undone", ("done",))
     await _note(a.conversationId, f'[The user pressed Undo: "{a.label}" ({a.kind}) was reversed.]')
     return action_view(done)
 

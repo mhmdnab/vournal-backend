@@ -75,6 +75,11 @@ def normalize(body: Any) -> Any:
     return walk(body)
 
 
+# Fields the Python backend added after the port, which NestJS never had: left out of Python's
+# side only, so everything else still has to match (dashboard AI part 1, design 2026-11-06).
+ADDED_AFTER_THE_PORT = ("assistantMode", "voiceSecondsLeftThisMonth")
+
+
 def _without(node: Any, keys: tuple[str, ...]) -> Any:
     if isinstance(node, dict):
         return {k: _without(v, keys) for k, v in node.items() if k not in keys}
@@ -237,5 +242,5 @@ class ParityCase(unittest.IsolatedAsyncioTestCase):
     def assertParity(self, nest: httpx.Response, py: httpx.Response, *, ignore_keys: tuple[str, ...] = ()):
         self.assertEqual(nest.status_code, py.status_code, f"NestJS {nest.text}\nPython {py.text}")
         expected = normalize(_without(nest.json(), ignore_keys)) if nest.content else None
-        actual = normalize(_without(py.json(), ignore_keys)) if py.content else None
+        actual = normalize(_without(py.json(), ignore_keys + ADDED_AFTER_THE_PORT)) if py.content else None
         self.assertEqual(expected, actual)

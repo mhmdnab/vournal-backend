@@ -42,7 +42,8 @@ class ChatBase(OsTestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
         self.client = await self.signed_in()
-        await self.client.patch("/api/settings", json={"timezone": "Asia/Beirut", "aiEnabled": True})
+        # Auto: these tests are about what the tools do; test_assistant_modes covers Manual
+        await self.client.patch("/api/settings", json={"timezone": "Asia/Beirut", "aiEnabled": True, "assistantMode": "auto"})
 
     async def say(self, message, conversation=None):
         response = await self.client.post("/api/assistant/chat", json={"message": message, **({"conversationId": conversation} if conversation else {})})
@@ -71,6 +72,7 @@ class Chat(ChatBase):
         self.assertEqual((full["status"], full["messages"]), ("too_long", []))
         self.assertTrue((await self.client.get(f"/api/assistant/conversations/{conv}")).json()["full"])
 
+        await self.client.patch("/api/settings", json={"assistantMode": "manual"})  # Auto deletes one plain item at once
         task = (await self.client.post("/api/tasks", json={"title": "Old"})).json()
         fm.script(fm.tools(("delete_item", {"type": "task", "id": task["id"]})), fm.message(fm.text("Confirm below.")))
         pending = (await self.say("delete Old"))["messages"][1]["actions"][0]
