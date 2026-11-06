@@ -110,7 +110,9 @@ Return ONLY a single JSON object, no markdown, no code fences, no commentary bef
   ],
   "topics": string[],         // 1-6 recurring themes, see rules
   "people": string[],         // names/handles of people mentioned, [] if none
-  "places": string[]          // specific named locations mentioned, [] if none
+  "places": string[],         // specific named locations mentioned, [] if none
+  "wantsActions": boolean,    // see rules
+  "journalSuggested": boolean // see rules
 }
 
 Rules:
@@ -124,6 +126,8 @@ Rules:
 - topics: normalize to general, reusable ENGLISH nouns so they aggregate across days. Prefer "work", "sleep", "health", "family", "money", "relationship" over hyper-specific phrases. This is what powers "you talked about sleep 5 times this week", so favor stable labels.
 - people: use the name as spoken. If the speaker refers to someone only by role ("my boss", "my sister") and no name, you may include that role. Skip vague references. [] if none.
 - places: SPECIFIC named locations the speaker was at, went to, or is going to — a city, neighborhood, venue, or a named personal place ("Beirut", "Hamra", "the gym", "the office", "Mom's"). Use the name as spoken (keep the original language). Do NOT include vague or generic locations ("home", "outside", "there", "somewhere"), and do NOT invent a place that was not mentioned. [] if none.
+- wantsActions: true when the speaker mentions spending or receiving money, a habit done or skipped, a project, food eaten or drunk, exercise or weight, a gift, a goal, a change to something that already exists, or asks for something to be done in vournal. To-dos and plans alone do NOT count. Otherwise false.
+- journalSuggested: false only when the whole entry is a command with nothing about the speaker's day, thoughts or feelings (e.g. "create a project called Vournal 2"). Otherwise true.
 - If the transcript is empty or has no real content, return the object with an empty summary, mood.score 3, and empty arrays.
 
 Output the JSON object and nothing else."""
@@ -363,6 +367,9 @@ def _normalize(raw: dict[str, Any]) -> dict[str, Any]:
         "topics": topics,
         "people": people,
         "places": places,
+        # the review card (design 2026-11-06): only a real bool counts
+        "wantsActions": raw.get("wantsActions") is True,
+        "journalSuggested": raw.get("journalSuggested") is not False,
     }
 
 
