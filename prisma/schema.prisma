@@ -147,6 +147,9 @@ model User {
   exerciseLogs      ExerciseLog[]
   weightLogs        WeightLog[]
   waterLogs         WaterLog[]
+  challenges        Challenge[]
+  workoutPlans      WorkoutPlan[]
+  workoutSessions   WorkoutSession[]
 }
 
 // Prepared for credentialed provider adapters; identity is issuer+subject,
@@ -1091,6 +1094,7 @@ model Habit {
   goal         Goal?          @relation(fields: [goalId], references: [id], onDelete: SetNull)
   sortOrder    Int            @default(0)
   logs         HabitLog[]
+  challenges   ChallengeHabit[]
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
@@ -1818,4 +1822,120 @@ model WaterLog {
   updatedAt DateTime @updatedAt
 
   @@unique([userId, date])
+}
+
+/// A personal challenge: a set of habits to keep for a fixed number of days from startDate.
+/// A day is "perfect" when every habit scheduled that day is done.
+model Challenge {
+  id           String           @id @default(cuid())
+  userId       String
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  icon         String?
+  color        String?
+  startDate    DateTime         @db.Date
+  durationDays Int
+  isArchived   Boolean          @default(false)
+  sortOrder    Int              @default(0)
+  habits       ChallengeHabit[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([userId, isArchived])
+}
+
+model ChallengeHabit {
+  id          String    @id @default(cuid())
+  challengeId String
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  habitId     String
+  habit       Habit     @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  sortOrder   Int       @default(0)
+
+  @@unique([challengeId, habitId])
+  @@index([habitId])
+}
+
+/// A weekly training plan: days (e.g. Push / Pull / Legs), each with target exercises.
+model WorkoutPlan {
+  id          String           @id @default(cuid())
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  isActive    Boolean          @default(true)
+  days        WorkoutPlanDay[]
+  sessions    WorkoutSession[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([userId])
+}
+
+model WorkoutPlanDay {
+  id        String                @id @default(cuid())
+  planId    String
+  plan      WorkoutPlan           @relation(fields: [planId], references: [id], onDelete: Cascade)
+  name      String
+  /// 0 = Sun … 6 = Sat; null = any day
+  weekday   Int?
+  sortOrder Int                   @default(0)
+  exercises WorkoutPlanExercise[]
+  sessions  WorkoutSession[]
+
+  @@index([planId])
+}
+
+model WorkoutPlanExercise {
+  id         String         @id @default(cuid())
+  dayId      String
+  day        WorkoutPlanDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  /// catalog exercise id ("bench-press"…) or null for the user's own
+  exerciseId String?
+  name       String
+  sets       Int            @default(3)
+  /// target reps as text: "10", "8-12", "AMRAP", "30s"
+  reps       String?
+  weightKg   Decimal?       @db.Decimal(6, 2)
+  restSec    Int?
+  notes      String?
+  sortOrder  Int            @default(0)
+
+  @@index([dayId])
+}
+
+/// One workout done on a day, optionally started from a plan day.
+model WorkoutSession {
+  id          String          @id @default(cuid())
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId      String?
+  plan        WorkoutPlan?    @relation(fields: [planId], references: [id], onDelete: SetNull)
+  planDayId   String?
+  planDay     WorkoutPlanDay? @relation(fields: [planDayId], references: [id], onDelete: SetNull)
+  name        String
+  date        DateTime        @db.Date
+  durationMin Int?
+  notes       String?
+  completedAt DateTime?
+  sets        WorkoutSet[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([userId, date])
+}
+
+model WorkoutSet {
+  id         String         @id @default(cuid())
+  sessionId  String
+  session    WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exerciseId String?
+  name       String
+  reps       Int?
+  weightKg   Decimal?       @db.Decimal(6, 2)
+  done       Boolean        @default(false)
+  sortOrder  Int            @default(0)
+
+  @@index([sessionId])
 }

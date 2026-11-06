@@ -1,6 +1,7 @@
 """/api/dashboard (port of vournalOS DashboardService): everything the home screen needs in
 one call. A disabled section's widget is null and never queried."""
 
+import logging
 from datetime import date, timedelta
 
 from fastapi import Depends
@@ -248,6 +249,32 @@ def _summary(c: dict, ctx) -> str:
     return fmt(M["summary"], list=join_list(lang, parts)) if parts else M["summaryEmpty"]
 
 
+async def _challenges(user) -> dict | None:
+    """Active (and upcoming) challenges; None when there are none, so the widget stays away."""
+    from app.os import challenges as challenge_routes
+
+    rows = await db.challenge.find_many(where={"userId": user.id, "isArchived": False}, include=challenge_routes._INCLUDE,
+                                        order=[{"sortOrder": "asc"}, {"createdAt": "desc"}])
+    items = [c for c in await challenge_routes._views(user, rows) if c["status"] != "completed"]
+    if not items:
+        return None
+    keep = ("id", "name", "icon", "color", "status", "startDate", "endDate", "durationDays", "dayNumber", "daysLeft", "perfectDays",
+            "currentStreak", "completionRate", "todayDone", "todayTotal")
+    return {"items": [{k: c[k] for k in keep} for c in items[:4]], "total": len(items)}
+
+
+async def _workouts(user) -> dict | None:
+    """Today's planned workout and this week's sessions; None when the user has no plan or session."""
+    from app.os import workouts as workout_routes
+
+    if not await db.workoutplan.count(where={"userId": user.id}) and not await db.workoutsession.count(where={"userId": user.id}):
+        return None
+    s = await workout_routes.stats(user=user)
+    last = s["weekly"][-1] if s["weekly"] else {"sessions": 0, "volumeKg": 0}
+    return {"todayPlan": s["todayPlan"], "todaySession": s["todaySession"] and {k: s["todaySession"][k] for k in ("id", "name", "doneSets", "setCount", "completedAt")},
+            "thisWeekSessions": s["thisWeekSessions"], "thisWeekVolumeKg": last["volumeKg"], "weekStreak": s["weekStreak"], "totalSessions": s["totalSessions"]}
+
+
 @router.get("")
 async def get_dashboard(user=Depends(plus_user)):
     ctx = await life.context(user)
@@ -264,6 +291,12 @@ async def get_dashboard(user=Depends(plus_user)):
     goals = await life.goals(ctx) if on("goals") else None
     habits = await _habits(ctx) if on("habits") else None
     deadlines = await _deadlines(ctx)
+    try:
+        challenges = await _challenges(user) if on("habits") else None
+        workouts = await _workouts(user) if on("health") else None
+    except Exception:  # noqa: BLE001 — the home screen shows without them rather than failing
+        logging.getLogger("vournal.os").exception("dashboard: challenges/workouts widgets failed")
+        challenges = workouts = None
     try:
         insights = await insights_for(user, ctx)
     except Exception:  # noqa: BLE001 — the home screen shows without insights rather than failing
@@ -328,6 +361,8 @@ async def get_dashboard(user=Depends(plus_user)):
         "goals": {"items": goals[:5], "activeCount": len(goals),
                   "averageProgress": js_round(sum(g["progress"] for g in goals) / len(goals)) if goals else None} if goals is not None else None,
         "habits": habits,
+        "challenges": challenges,
+        "workouts": workouts,
         "deadlines": {"items": deadlines[:10], "total": len(deadlines)},
         "insights": {"items": insights[:3], "total": len(insights)},
     }

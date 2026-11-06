@@ -50,6 +50,8 @@ DASHBOARD_WIDGET_IDS = [
     "birthdays",
     "goals",
     "habits",
+    "challenges",
+    "workouts",
     "deadlines",
     "insights",
     "quickActions",
