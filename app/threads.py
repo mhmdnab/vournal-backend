@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.auth import get_current_user
 from app.db import db
 from app.entities import normalize_name
+from app.review import LISTED_SQL
 from app.schemas import (
     DisambiguationCandidate,
     DisambiguationOut,
@@ -57,7 +58,7 @@ async def list_threads(
             FROM "{tbl}" x
             JOIN "{join}" j ON j."{fk}" = x."id"
             JOIN "Entry" e ON e."id" = j."entryId"
-            WHERE x."userId" = $1
+            WHERE x."userId" = $1 AND {LISTED_SQL}
             ORDER BY x."id", e."createdAt"''',
         current.id,
     )
@@ -118,7 +119,7 @@ async def get_thread(
                    e."moodScore" AS mood, e."summary" AS summary
             FROM "{join}" j
             JOIN "Entry" e ON e."id" = j."entryId"
-            WHERE j."{fk}" = $1 AND e."userId" = $2
+            WHERE j."{fk}" = $1 AND e."userId" = $2 AND {LISTED_SQL}
             ORDER BY e."createdAt"''',
         thread_id,
         current.id,

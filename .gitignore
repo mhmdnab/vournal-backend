@@ -25,3 +25,12 @@ env/
 uploads/
 samples/*
 !samples/README.md
+
+# AI evals: keep cases, runner, per-round results and notes; leave out bulky or local output
+.claude/hillclimb/**/traces/
+.claude/hillclimb/**/report*.html
+.claude/hillclimb/**/state.json
+.claude/hillclimb/**/trajectory/
+.claude/hillclimb/**/.harness_sha
+.claude/hillclimb/**/fake-*/
+.claude/hillclimb/**/*.before-label-fix.jsonl

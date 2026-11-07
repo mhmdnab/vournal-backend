@@ -1,0 +1,1 @@
+{"prompt_id": "project-lb-01", "rep": 0, "failure": "extraction failed: vournal couldn’t organise this entry. Your words are saved; please try again.", "calls": [{"step": "extraction", "model": "claude-sonnet-5", "stop_reason": "end_turn", "usage": {"input_tokens": 4451, "output_tokens": 219, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}}]}

@@ -1,0 +1,92 @@
+{
+  "_doc": "The test account every case runs against (scripts/eval_entry_actions.py seeds it, then deletes it). Plus, Asia/Beirut, USD, AI actions on. Case expectations refer to these items as @kind:Name.",
+  "timezone": "Asia/Beirut",
+  "currency": "USD",
+  "people": [
+    {
+      "name": "Ali",
+      "relationship": "Friend"
+    },
+    {
+      "name": "Sara",
+      "relationship": "Family",
+      "notes": "My sister"
+    },
+    {
+      "name": "Rami",
+      "relationship": "Colleague"
+    },
+    {
+      "name": "Nour",
+      "relationship": "Friend"
+    },
+    {
+      "name": "Mom",
+      "relationship": "Family"
+    }
+  ],
+  "habits": [
+    {
+      "name": "Gym"
+    },
+    {
+      "name": "Read",
+      "targetPerDay": 20,
+      "unit": "pages"
+    },
+    {
+      "name": "Meditation"
+    },
+    {
+      "name": "Walk"
+    }
+  ],
+  "projects": [
+    {
+      "name": "Website redesign"
+    },
+    {
+      "name": "Kitchen renovation"
+    }
+  ],
+  "goals": [
+    {
+      "name": "Run a 10k"
+    },
+    {
+      "name": "Save 5000"
+    }
+  ],
+  "transactions": [
+    {
+      "key": "Rent",
+      "type": "EXPENSE",
+      "amount": 500,
+      "title": "Rent",
+      "daysAgo": 3
+    },
+    {
+      "key": "Netflix",
+      "type": "EXPENSE",
+      "amount": 12,
+      "title": "Netflix",
+      "daysAgo": 5
+    },
+    {
+      "key": "Lunch",
+      "type": "EXPENSE",
+      "amount": 20,
+      "title": "Lunch with Rami",
+      "daysAgo": 1
+    }
+  ],
+  "debts": [
+    {
+      "key": "Rami",
+      "direction": "OWED_TO_ME",
+      "person": "Rami",
+      "amount": 50,
+      "title": "Concert tickets"
+    }
+  ]
+}

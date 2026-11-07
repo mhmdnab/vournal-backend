@@ -239,11 +239,20 @@ model Entry {
   llmInTokens   Int?
   llmOutTokens  Int?
   createdAt     DateTime         @default(now())
+  // the review card (design 2026-11-06): null = saved straight away (older apps);
+  // "needs_review" | "saving" | "saved". An unreviewed entry is in no list.
+  reviewState   String?
+  // what extraction found, kept until Save: { result, now, useMerged, journalSuggested, question?, skipped?, answers? }
+  proposal      Json?
+  // false: the user saved it as a command only; its to-dos stay, the journal doesn't show it
+  inJournal     Boolean          @default(true)
 
   todos  Todo[]
   topics EntryTopic[]
   people EntryPerson[]
   places EntryPlace[]
+  assistantConversation AssistantConversation?
+  assistantActions      AssistantAction[]
 
   @@index([userId, createdAt])
   @@index([userId, status])
@@ -695,6 +704,8 @@ model UserSettings {
   focusModes          Json?
   // the focus mode on now (one of focusModes' ids), or null
   activeFocusModeId   String?
+  // when the app last asked for AI actions consent (aiEnabled holds the answer)
+  aiActionsAskedAt    DateTime?
   // spending plan: { "savingsMode": "none" | "percent" | "amount", "savingsValue": 10, "periodMode": "auto" | "month" }
   spendingPlan        Json?
   // prayer times: { "cityId": "beirut", "lat": 33.89, "lng": 35.50, "method": "MuslimWorldLeague", "madhab": "shafi" }
@@ -1620,6 +1631,9 @@ model AssistantConversation {
   lastMessageAt DateTime           @default(now())
   messages      AssistantMessage[]
   actions       AssistantAction[]
+  // the app's review card: one conversation per reviewed entry (null for the dashboard chat)
+  entryId       String?            @unique
+  entry         Entry?             @relation(fields: [entryId], references: [id], onDelete: Cascade)
   createdAt     DateTime           @default(now())
 
   @@index([userId, lastMessageAt])
@@ -1656,10 +1670,14 @@ model AssistantAction {
   call           Json? // a waiting change: { "name": tool, "input": {...} }, run when approved
   error          String? // why an approved change failed
   position       Int                   @default(0) // its order within the reply
+  // proposed from an app recording: only the app's review card approves it
+  entryId        String?
+  entry          Entry?                @relation(fields: [entryId], references: [id], onDelete: Cascade)
   createdAt      DateTime              @default(now())
   resolvedAt     DateTime?
 
   @@index([conversationId])
+  @@index([entryId])
   @@index([userId, status])
 }
 

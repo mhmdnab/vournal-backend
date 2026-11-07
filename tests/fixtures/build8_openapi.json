@@ -2551,6 +2551,7 @@
  },
  "/entries": {
   "get": {
+   "description": "The journal, newest first. `?review=pending`: the entries waiting on the review card.",
    "operationId": "list_entries_entries_get",
    "parameters": [
     {
@@ -2561,6 +2562,23 @@
       "default": 20,
       "title": "Limit",
       "type": "integer"
+     }
+    },
+    {
+     "in": "query",
+     "name": "review",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "const": "pending",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Review"
      }
     },
     {
@@ -2628,6 +2646,11 @@
           "id": {
            "title": "Id",
            "type": "string"
+          },
+          "inJournal": {
+           "default": true,
+           "title": "Injournal",
+           "type": "boolean"
           },
           "mood": {
            "properties": {
@@ -2754,6 +2777,29 @@
           "rawTranscript": {
            "title": "Rawtranscript",
            "type": "string"
+          },
+          "review": {
+           "anyOf": [
+            {
+             "additionalProperties": true,
+             "type": "object"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Review"
+          },
+          "reviewState": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Reviewstate"
           },
           "source": {
            "title": "Source",
@@ -3089,6 +3135,11 @@
          ],
          "title": "Durationsec"
         },
+        "review": {
+         "default": false,
+         "title": "Review",
+         "type": "boolean"
+        },
         "source": {
          "anyOf": [
           {
@@ -3166,6 +3217,11 @@
          "id": {
           "title": "Id",
           "type": "string"
+         },
+         "inJournal": {
+          "default": true,
+          "title": "Injournal",
+          "type": "boolean"
          },
          "mood": {
           "properties": {
@@ -3292,6 +3348,29 @@
          "rawTranscript": {
           "title": "Rawtranscript",
           "type": "string"
+         },
+         "review": {
+          "anyOf": [
+           {
+            "additionalProperties": true,
+            "type": "object"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Review"
+         },
+         "reviewState": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Reviewstate"
          },
          "source": {
           "title": "Source",
@@ -3578,6 +3657,98 @@
    "summary": "Create Entry"
   }
  },
+ "/entries/actions/recent": {
+  "get": {
+   "description": "What AI actions did from recordings in the last 24 hours, newest first, for Undo.",
+   "operationId": "recent_entries_actions_recent_get",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {}
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Recent"
+  }
+ },
  "/entries/audio": {
   "post": {
    "description": "Ingest an audio recording. Returns a PENDING entry immediately; the\ntranscript + extraction fill in via a background task. Poll GET /entries/{id}\nuntil status is DONE (or FAILED).",
@@ -3620,6 +3791,11 @@
          "contentMediaType": "application/octet-stream",
          "title": "File",
          "type": "string"
+        },
+        "review": {
+         "default": false,
+         "title": "Review",
+         "type": "boolean"
         }
        },
        "required": [
@@ -3679,6 +3855,11 @@
          "id": {
           "title": "Id",
           "type": "string"
+         },
+         "inJournal": {
+          "default": true,
+          "title": "Injournal",
+          "type": "boolean"
          },
          "mood": {
           "properties": {
@@ -3805,6 +3986,29 @@
          "rawTranscript": {
           "title": "Rawtranscript",
           "type": "string"
+         },
+         "review": {
+          "anyOf": [
+           {
+            "additionalProperties": true,
+            "type": "object"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Review"
+         },
+         "reviewState": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Reviewstate"
          },
          "source": {
           "title": "Source",
@@ -4263,6 +4467,11 @@
           "title": "Id",
           "type": "string"
          },
+         "inJournal": {
+          "default": true,
+          "title": "Injournal",
+          "type": "boolean"
+         },
          "mood": {
           "properties": {
            "emotions": {
@@ -4388,6 +4597,29 @@
          "rawTranscript": {
           "title": "Rawtranscript",
           "type": "string"
+         },
+         "review": {
+          "anyOf": [
+           {
+            "additionalProperties": true,
+            "type": "object"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Review"
+         },
+         "reviewState": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Reviewstate"
          },
          "source": {
           "title": "Source",
@@ -4674,6 +4906,115 @@
    "summary": "Get Entry"
   }
  },
+ "/entries/{entry_id}/actions/{action_id}/undo": {
+  "post": {
+   "operationId": "undo_entries__entry_id__actions__action_id__undo_post",
+   "parameters": [
+    {
+     "in": "path",
+     "name": "entry_id",
+     "required": true,
+     "schema": {
+      "title": "Entry Id",
+      "type": "string"
+     }
+    },
+    {
+     "in": "path",
+     "name": "action_id",
+     "required": true,
+     "schema": {
+      "title": "Action Id",
+      "type": "string"
+     }
+    },
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {}
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Undo"
+  }
+ },
  "/entries/{entry_id}/audio": {
   "delete": {
    "description": "Remove just the recording, keeping the written entry.\n\nA real privacy affordance for a voice product: you can strip the audio and\nkeep the journal text. Returns the updated entry (audioUrl now null).",
@@ -4752,6 +5093,11 @@
          "id": {
           "title": "Id",
           "type": "string"
+         },
+         "inJournal": {
+          "default": true,
+          "title": "Injournal",
+          "type": "boolean"
          },
          "mood": {
           "properties": {
@@ -4878,6 +5224,29 @@
          "rawTranscript": {
           "title": "Rawtranscript",
           "type": "string"
+         },
+         "review": {
+          "anyOf": [
+           {
+            "additionalProperties": true,
+            "type": "object"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Review"
+         },
+         "reviewState": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Reviewstate"
          },
          "source": {
           "title": "Source",
@@ -5263,6 +5632,522 @@
    "summary": "Get Entry Audio"
   }
  },
+ "/entries/{entry_id}/discard": {
+  "post": {
+   "description": "Throws an unsaved entry away, with its recording and its waiting AI actions. The month's\nentry count isn't given back: the recording was already transcribed and read.",
+   "operationId": "discard_entries__entry_id__discard_post",
+   "parameters": [
+    {
+     "in": "path",
+     "name": "entry_id",
+     "required": true,
+     "schema": {
+      "title": "Entry Id",
+      "type": "string"
+     }
+    },
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "responses": {
+    "204": {
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Discard"
+  }
+ },
+ "/entries/{entry_id}/propose": {
+  "post": {
+   "description": "With an answer: the AI carries on from its question (free, at most MAX_ANSWERS). Without:\nthe step runs now that the user allowed AI actions (one request of the allowance).",
+   "operationId": "propose_entries__entry_id__propose_post",
+   "parameters": [
+    {
+     "in": "path",
+     "name": "entry_id",
+     "required": true,
+     "schema": {
+      "title": "Entry Id",
+      "type": "string"
+     }
+    },
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "additionalProperties": false,
+       "properties": {
+        "answer": {
+         "anyOf": [
+          {
+           "additionalProperties": false,
+           "properties": {
+            "choice": {
+             "anyOf": [
+              {
+               "maxLength": 200,
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Choice"
+            },
+            "text": {
+             "anyOf": [
+              {
+               "maxLength": 1000,
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ],
+             "title": "Text"
+            }
+           },
+           "title": "Answer",
+           "type": "object"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        }
+       },
+       "title": "ProposeBody",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {}
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Propose"
+  }
+ },
+ "/entries/{entry_id}/save": {
+  "post": {
+   "operationId": "save_entries__entry_id__save_post",
+   "parameters": [
+    {
+     "in": "path",
+     "name": "entry_id",
+     "required": true,
+     "schema": {
+      "title": "Entry Id",
+      "type": "string"
+     }
+    },
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "additionalProperties": false,
+       "properties": {
+        "actions": {
+         "default": [],
+         "items": {
+          "additionalProperties": false,
+          "properties": {
+           "id": {
+            "title": "Id",
+            "type": "string"
+           },
+           "input": {
+            "anyOf": [
+             {
+              "additionalProperties": true,
+              "type": "object"
+             },
+             {
+              "type": "null"
+             }
+            ],
+            "title": "Input"
+           },
+           "keep": {
+            "default": true,
+            "title": "Keep",
+            "type": "boolean"
+           }
+          },
+          "required": [
+           "id"
+          ],
+          "title": "KeptAction",
+          "type": "object"
+         },
+         "title": "Actions",
+         "type": "array"
+        },
+        "inJournal": {
+         "default": true,
+         "title": "Injournal",
+         "type": "boolean"
+        },
+        "people": {
+         "default": [],
+         "items": {
+          "additionalProperties": false,
+          "properties": {
+           "index": {
+            "minimum": 0.0,
+            "title": "Index",
+            "type": "integer"
+           },
+           "keep": {
+            "default": true,
+            "title": "Keep",
+            "type": "boolean"
+           }
+          },
+          "required": [
+           "index"
+          ],
+          "title": "Kept",
+          "type": "object"
+         },
+         "title": "People",
+         "type": "array"
+        },
+        "places": {
+         "default": [],
+         "items": {
+          "additionalProperties": false,
+          "properties": {
+           "index": {
+            "minimum": 0.0,
+            "title": "Index",
+            "type": "integer"
+           },
+           "keep": {
+            "default": true,
+            "title": "Keep",
+            "type": "boolean"
+           }
+          },
+          "required": [
+           "index"
+          ],
+          "title": "Kept",
+          "type": "object"
+         },
+         "title": "Places",
+         "type": "array"
+        },
+        "todos": {
+         "default": [],
+         "items": {
+          "additionalProperties": false,
+          "properties": {
+           "index": {
+            "minimum": 0.0,
+            "title": "Index",
+            "type": "integer"
+           },
+           "keep": {
+            "default": true,
+            "title": "Keep",
+            "type": "boolean"
+           },
+           "text": {
+            "anyOf": [
+             {
+              "maxLength": 500,
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ],
+            "title": "Text"
+           }
+          },
+          "required": [
+           "index"
+          ],
+          "title": "KeptTodo",
+          "type": "object"
+         },
+         "title": "Todos",
+         "type": "array"
+        },
+        "topics": {
+         "default": [],
+         "items": {
+          "additionalProperties": false,
+          "properties": {
+           "index": {
+            "minimum": 0.0,
+            "title": "Index",
+            "type": "integer"
+           },
+           "keep": {
+            "default": true,
+            "title": "Keep",
+            "type": "boolean"
+           }
+          },
+          "required": [
+           "index"
+          ],
+          "title": "Kept",
+          "type": "object"
+         },
+         "title": "Topics",
+         "type": "array"
+        }
+       },
+       "title": "SaveBody",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {}
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Save"
+  }
+ },
  "/health": {
   "get": {
    "operationId": "health_health_get",
@@ -5479,6 +6364,207 @@
     }
    },
    "summary": "Insights"
+  }
+ },
+ "/me/ai-actions": {
+  "get": {
+   "operationId": "get_ai_actions_me_ai_actions_get",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {}
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Get Ai Actions"
+  },
+  "post": {
+   "operationId": "set_ai_actions_me_ai_actions_post",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "additionalProperties": false,
+       "properties": {
+        "enabled": {
+         "title": "Enabled",
+         "type": "boolean"
+        }
+       },
+       "required": [
+        "enabled"
+       ],
+       "title": "AiActionsBody",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {}
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Set Ai Actions"
   }
  },
  "/threads": {
