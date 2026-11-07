@@ -84,6 +84,24 @@ async def _entry_block(entry, user_id: str, ctx: assistant_tools.Ctx) -> str:
             ctx.entry_people[placeholder] = name
             lines.append(f'[{index}] {name} (new: use "{placeholder}" as their id)')
     lines.append("</entry>")
+    lines.append(await _their_items(user_id))
+    return "\n".join(lines)
+
+
+async def _their_items(user_id: str) -> str:
+    """The user's habits, projects and goals, so the step can act on them without searching."""
+    habits = await db.habit.find_many(where={"userId": user_id, "isArchived": False}, order={"sortOrder": "asc"}, take=40)
+    projects = await db.project.find_many(where={"userId": user_id, "status": {"in": ["PLANNING", "ACTIVE", "ON_HOLD"]}}, take=40)
+    goals = await db.goal.find_many(where={"userId": user_id, "status": {"in": ["ACTIVE", "PAUSED"]}}, take=40)
+
+    def habit(h) -> str:
+        target = f", {h.targetPerDay} {h.unit or 'times'} a day" if h.targetPerDay > 1 or h.unit else ""
+        return f"- {h.name} (id {h.id}{target})"
+
+    lines = ["<their_items>", "Habits:" if habits else "Habits: none", *map(habit, habits)]
+    lines += ["Projects:" if projects else "Projects: none", *(f"- {p.name} (id {p.id}, {p.status.lower()})" for p in projects)]
+    lines += ["Goals:" if goals else "Goals: none", *(f"- {g.name} (id {g.id})" for g in goals)]
+    lines.append("</their_items>")
     return "\n".join(lines)
 
 
@@ -195,7 +213,8 @@ async def run_step(entry, *, spend: bool, answer: dict | None = None) -> None:
     # the same change proposed again (same tool, same input) isn't added twice
     waiting = await db.assistantaction.find_many(where={"entryId": entry.id, "status": "pending"})
     kept = {_same(a.call) for a in waiting if a.call and a.id not in withdrawn}
-    drafts = [d for d in drafts if not d.get("call") or _same(d["call"]) not in kept]
+    # a draft it withdrew in this same run never reaches the card
+    drafts = [d for d in drafts if d["id"] not in withdrawn and (not d.get("call") or _same(d["call"]) not in kept)]
     await assistant._save_actions(user.id, conversation.id, last_row.id, drafts, entry_id=entry.id, withdrawn=withdrawn)
     answers = (entry.proposal or {}).get("answers", 0) + (1 if answer else 0)
     await _set_proposal(entry.id, question=question, answers=answers or None, skipped=None)

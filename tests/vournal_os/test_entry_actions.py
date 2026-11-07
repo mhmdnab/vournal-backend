@@ -172,6 +172,22 @@ class TheStep(EntryActionsBase):
         sent = fm.requests("python")[-2]["body"]["messages"]
         self.assertIn("Card", json.dumps(sent[-1], ensure_ascii=False))
 
+    async def test_a_proposal_withdrawn_in_the_same_run_never_reaches_the_card(self):
+        from types import SimpleNamespace
+
+        from app.os import assistant_pending
+
+        ids = iter(["first", "second"])
+        fake_uuid = SimpleNamespace(uuid4=lambda: SimpleNamespace(hex=next(ids)))
+        fm.script(fm.tools(("add_transaction", {"type": "expense", "amount": 20, "title": "Lunch"})),
+                  fm.tools(("withdraw_proposal", {"id": "pending:first"}),
+                           ("add_transaction", {"type": "expense", "amount": 25, "title": "Lunch"})),
+                  fm.message(fm.text("ok")))
+        with patch.object(assistant_pending, "uuid", fake_uuid):
+            entry = await self.record()
+        rows = await self.pending(entry.id)
+        self.assertEqual([(a.id, a.call["input"]["amount"]) for a in rows], [("second", 25)])
+
     async def test_answer_rerun_keeps_actions_it_does_not_repeat(self):
         from app import entry_actions
 
