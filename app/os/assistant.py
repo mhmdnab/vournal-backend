@@ -443,14 +443,17 @@ async def undo(id: str, user=Depends(plus_user)):
     return action_view(done)
 
 
+MAX_MESSAGE = 12_000
+
+
 class ChatBody(RuleBody):
-    """@Trim() @IsString() @MinLength(1) @MaxLength(4000) message; optional conversationId."""
+    """@Trim() @IsString() @MinLength(1) @MaxLength(MAX_MESSAGE) message (long enough for a pasted plan); optional conversationId."""
 
     RULES = (
         ("message", False, True, lambda v, f: (
-            ([f"{f} must be shorter than or equal to 4000 characters"] if len(v) > 4000 else []) + ([f"{f} must be longer than or equal to 1 characters"] if not v else [])
+            ([f"{f} must be shorter than or equal to {MAX_MESSAGE} characters"] if len(v) > MAX_MESSAGE else []) + ([f"{f} must be longer than or equal to 1 characters"] if not v else [])
             if isinstance(v, str) else
-            [f"{f} must be shorter than or equal to 4000 characters", f"{f} must be longer than or equal to 1 characters", f"{f} must be a string"])),
+            [f"{f} must be shorter than or equal to {MAX_MESSAGE} characters", f"{f} must be longer than or equal to 1 characters", f"{f} must be a string"])),
         ("conversationId", True, False, validators.string_rules),
     )
     message: object = None

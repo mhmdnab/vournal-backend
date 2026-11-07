@@ -887,31 +887,338 @@ async def _delete_item(i: dict, ctx: Ctx) -> dict:
             "action": {"kind": "delete", "entityType": kind, "entityId": id, "label": found["label"], "link": found["link"], "undo": None, "status": "pending"}}
 
 
+# ----- dashboard layout, habits, challenges and workout plans (applying a plan the user brings) ---
+
+# what each home-screen widget shows, and the section it needs switched on (None: always available)
+WIDGETS = {
+    "dailyCompletion": ("How much of today's tasks and habits is done (fixed at the top)", "tasks"),
+    "topPriorities": ("Today's top 3 focus tasks (fixed near the top)", "tasks"),
+    "todayTasks": ("Tasks due today", "tasks"),
+    "overdueTasks": ("Overdue tasks", "tasks"),
+    "upcomingEvents": ("Next calendar events", "calendar"),
+    "reminders": ("Upcoming reminders", "reminders"),
+    "upcomingBills": ("Bills and subscriptions due soon", "finance"),
+    "todayExpenses": ("What was spent today", "finance"),
+    "monthlyFinance": ("Income vs expenses this month", "finance"),
+    "savings": ("Net balance and savings", "finance"),
+    "accounts": ("Balance per account", "finance"),
+    "budgets": ("Budget usage", "finance"),
+    "birthdays": ("Upcoming birthdays and dates", "people"),
+    "goals": ("Progress on active goals", "goals"),
+    "habits": ("Today's habits and streaks", "habits"),
+    "challenges": ("Active personal challenges (habit groups over N days) and today's progress", "habits"),
+    "workouts": ("Today's planned workout and this week's training", "health"),
+    "deadlines": ("Upcoming deadlines", None),
+    "insights": ("Smart observations from the user's data", "reports"),
+    "quickActions": ("One-tap quick-add buttons (fixed at the bottom)", None),
+}
+HABIT_FREQUENCIES = ("DAILY", "WEEKLY", "CUSTOM")
+
+
+def _str_list(v, field: str) -> list[str]:
+    if v is None:
+        return []
+    if not isinstance(v, list) or not all(isinstance(x, str) for x in v):
+        raise ToolError(f'"{field}" must be a list of strings')
+    return list(dict.fromkeys(v))
+
+
+async def _layout_now(ctx: Ctx) -> dict:
+    from app.os import settings as os_settings
+    from app.os.profile import ensure_os_profile
+
+    s = await ensure_os_profile(ctx.user)
+    return {"dashboardWidgets": os_settings.normalize_widgets(s.dashboardWidgets), "enabledSections": list(s.enabledSections)}
+
+
+async def _get_dashboard(i: dict, ctx: Ctx) -> dict:
+    from app.os.common.defaults import ALWAYS_ON_SECTIONS, SECTION_KEYS
+
+    now = await _layout_now(ctx)
+    focus = await _focus_now(ctx)
+    return _json({
+        "shown": [w["id"] for w in now["dashboardWidgets"] if w["visible"]],
+        "hidden": [w["id"] for w in now["dashboardWidgets"] if not w["visible"]],
+        "enabledSections": now["enabledSections"],
+        "widgets": [{"id": wid, "shows": d, "needsSection": s} for wid, (d, s) in WIDGETS.items()],
+        "sections": [k for k in SECTION_KEYS if k not in ALWAYS_ON_SECTIONS],
+        "focusModes": [{"name": m["name"], "sections": m["sections"], "widgets": m["widgets"]} for m in focus["focusModes"]],
+        "activeFocus": next((m["name"] for m in focus["focusModes"] if m["id"] == focus["activeFocusModeId"]), None),
+    })
+
+
+async def _set_dashboard_layout(i: dict, ctx: Ctx) -> dict:
+    from app.os import settings as os_settings
+    from app.os.common.defaults import ALWAYS_ON_SECTIONS, DASHBOARD_WIDGET_IDS, SECTION_KEYS
+
+    show = _str_list(i.get("widgets"), "widgets")
+    unknown = [w for w in show if w not in DASHBOARD_WIDGET_IDS]
+    if unknown:
+        raise ToolError(f"Unknown widget {', '.join(unknown)}; widgets are {', '.join(DASHBOARD_WIDGET_IDS)}")
+    if not show:
+        raise ToolError('"widgets" must list at least one widget to show')
+    enable = _str_list(i.get("enable_sections"), "enable_sections")
+    disable = _str_list(i.get("disable_sections"), "disable_sections")
+    bad = [s for s in enable + disable if s not in SECTION_KEYS]
+    if bad:
+        raise ToolError(f"Unknown section {', '.join(bad)}")
+    if any(s in ALWAYS_ON_SECTIONS for s in disable):
+        raise ToolError("dashboard and settings can't be turned off")
+    before = await _layout_now(ctx)
+    hide_others = i.get("hide_others") is not False
+    rest = [w for w in before["dashboardWidgets"] if w["id"] not in show]
+    widgets = [{"id": wid, "visible": True, "order": n} for n, wid in enumerate(show)]
+    widgets += [{"id": w["id"], "visible": (not hide_others) and w["visible"], "order": len(show) + n} for n, w in enumerate(rest)]
+    # a shown widget needs its section on
+    needed = {WIDGETS[w][1] for w in show if WIDGETS.get(w, (None, None))[1]}
+    sections = (set(before["enabledSections"]) | set(enable) | needed) - set(disable)
+    turned_off = needed & set(disable)
+    if turned_off:
+        raise ToolError(f"Section {', '.join(sorted(turned_off))} is needed by a widget you asked to show")
+    await os_settings.update_settings(_check(os_settings.SettingsBody, {"dashboardWidgets": widgets, "enabledSections": sorted(sections)}), user=ctx.user)
+    after = await _layout_now(ctx)
+    undo = {"op": "restore_settings", "before": before}
+    return _done({"kind": "update", "entityType": "dashboard", "entityId": ctx.user_id, "label": "Dashboard layout", "link": "/dashboard", "undo": undo},
+                 {"shown": [w["id"] for w in after["dashboardWidgets"] if w["visible"]], "enabledSections": after["enabledSections"]})
+
+
+def _habit_body(h: dict, field: str) -> dict:
+    """The habits route's create body from the model's snake_case habit."""
+    body: dict = {"name": _req_str(h.get("name"), f"{field}.name")}
+    freq = h.get("frequency") or "DAILY"
+    if isinstance(freq, str):  # either case: the plan tools send DAILY, the recording step daily
+        freq = freq.upper()
+    if freq not in HABIT_FREQUENCIES:
+        raise ToolError(f'"{field}.frequency" must be one of {", ".join(HABIT_FREQUENCIES)}')
+    body["frequency"] = freq
+    if h.get("days_of_week") is not None:
+        body["daysOfWeek"] = h["days_of_week"]
+    if _number(h.get("times_per_week")):
+        body["timesPerWeek"] = int(h["times_per_week"])
+    if _number(h.get("target_per_day")):
+        body["targetPerDay"] = int(h["target_per_day"])
+    if isinstance(h.get("unit"), str) and h["unit"].strip():
+        body["unit"] = h["unit"].strip()
+    if opt_time(h.get("reminder_time")):
+        body["reminderTime"] = h["reminder_time"]
+    if isinstance(h.get("description"), str) and h["description"].strip():
+        body["description"] = h["description"].strip()
+    if opt_date(h.get("start_date")):
+        body["startDate"] = h["start_date"]
+    return body
+
+
+async def _create_habit(i: dict, ctx: Ctx) -> dict:
+    from app.os import habits
+
+    body = _habit_body(i, "habit")
+    existing = await db.habit.find_first(where={"userId": ctx.user_id, "isArchived": False, "name": {"equals": body["name"], "mode": "insensitive"}})
+    if existing:
+        raise ToolError(f'A habit named "{existing.name}" already exists (id {existing.id})')
+    h = await habits.create(_check(habits.CreateBody, body), user=ctx.user)
+    return _done({"kind": "create", "entityType": "habit", "entityId": h["id"], "label": h["name"], "link": f"/habits?id={h['id']}",
+                  "undo": {"op": "remove_created", "type": "habit", "id": h["id"]}},
+                 {"id": h["id"], "name": h["name"], "frequency": h["frequency"], "daysOfWeek": h["daysOfWeek"], "targetPerDay": h["targetPerDay"]})
+
+
+async def _create_challenge(i: dict, ctx: Ctx) -> dict:
+    from app.os import challenges, habits
+
+    name = _req_str(i.get("name"), "name")
+    days = i.get("duration_days")
+    if not _number(days) or not 1 <= days <= challenges.MAX_DAYS or not float(days).is_integer():
+        raise ToolError(f'"duration_days" must be a whole number from 1 to {challenges.MAX_DAYS}')
+    items = i.get("habits")
+    if not isinstance(items, list) or not items or not all(isinstance(h, dict) for h in items):
+        raise ToolError('"habits" must list at least one habit')
+    if len(items) > challenges.MAX_HABITS:
+        raise ToolError(f"A challenge holds at most {challenges.MAX_HABITS} habits")
+    start = i.get("start_date")
+    if start is not None and not opt_date(start):
+        raise ToolError('"start_date" must be YYYY-MM-DD')
+    bodies = [_habit_body(h, f"habits[{n}]") for n, h in enumerate(items)]  # all checked before anything is written
+    mine = await db.habit.find_many(where={"userId": ctx.user_id, "isArchived": False})
+    by_name = {h.name.strip().lower(): h.id for h in mine}
+    ids: list[str] = []
+    created: list[str] = []
+    try:
+        for body in bodies:
+            hid = by_name.get(body["name"].lower())
+            if hid is None:
+                if start and "startDate" not in body:
+                    body["startDate"] = start
+                hid = (await habits.create(_check(habits.CreateBody, body), user=ctx.user))["id"]
+                created.append(hid)
+                by_name[body["name"].lower()] = hid
+            if hid not in ids:
+                ids.append(hid)
+        payload = {"name": name, "durationDays": int(days), "habitIds": ids}
+        if start:
+            payload["startDate"] = start
+        if isinstance(i.get("description"), str) and i["description"].strip():
+            payload["description"] = i["description"].strip()
+        c = await challenges.create(_check(challenges.CreateBody, payload), user=ctx.user)
+    except Exception:
+        if created:  # nothing half-made stays behind
+            await db.habit.delete_many(where={"id": {"in": created}, "userId": ctx.user_id})
+        raise
+    return _done({"kind": "create", "entityType": "challenge", "entityId": c["id"], "label": c["name"], "link": f"/habits?tab=challenges&challenge={c['id']}",
+                  "undo": {"op": "remove_created", "type": "challenge", "id": c["id"], "habitIds": created}},
+                 {"id": c["id"], "name": c["name"], "startDate": c["startDate"], "endDate": c["endDate"],
+                  "habits": [{"id": h["id"], "name": h["name"], "new": h["id"] in created} for h in c["habits"]]})
+
+
+async def _create_workout_plan(i: dict, ctx: Ctx) -> dict:
+    from app.os import workouts
+
+    name = _req_str(i.get("name"), "name")
+    days = i.get("days")
+    if not isinstance(days, list) or not days or not all(isinstance(d, dict) for d in days):
+        raise ToolError('"days" must list at least one training day')
+    by_name = {}
+    for cid, en, ar, _m in workouts.CATALOG:
+        by_name[en.lower()] = cid
+        by_name[ar] = cid
+    out_days = []
+    for n, d in enumerate(days):
+        exercises = d.get("exercises") or []
+        if not isinstance(exercises, list) or not all(isinstance(e, dict) for e in exercises):
+            raise ToolError(f'"days[{n}].exercises" must be a list')
+        day = {"name": _req_str(d.get("name"), f"days[{n}].name"), "exercises": []}
+        if d.get("weekday") is not None:
+            day["weekday"] = d["weekday"]
+        for m, e in enumerate(exercises):
+            ename = _req_str(e.get("name"), f"days[{n}].exercises[{m}].name")
+            ex: dict = {"name": ename, "exerciseId": by_name.get(ename.lower()) or by_name.get(ename)}
+            if _number(e.get("sets")):
+                ex["sets"] = int(e["sets"])
+            if e.get("reps") is not None:
+                ex["reps"] = str(e["reps"])
+            if _number(e.get("weight_kg")):
+                ex["weightKg"] = e["weight_kg"]
+            if _number(e.get("rest_sec")):
+                ex["restSec"] = int(e["rest_sec"])
+            if isinstance(e.get("notes"), str) and e["notes"].strip():
+                ex["notes"] = e["notes"].strip()
+            day["exercises"].append(ex)
+        out_days.append(day)
+    body = {"name": name, "days": out_days}
+    if isinstance(i.get("description"), str) and i["description"].strip():
+        body["description"] = i["description"].strip()
+    p = await workouts.create_plan(ctx.user, _check(workouts.PlanCreateBody, body))
+    return _done({"kind": "create", "entityType": "workout_plan", "entityId": p["id"], "label": p["name"], "link": "/health/workouts",
+                  "undo": {"op": "remove_created", "type": "workout_plan", "id": p["id"]}},
+                 {"id": p["id"], "name": p["name"], "days": [{"name": d["name"], "weekday": d["weekday"], "exercises": len(d["exercises"])} for d in p["days"]]})
+
+
+async def _focus_now(ctx: Ctx) -> dict:
+    from app.os import settings as os_settings
+    from app.os.profile import ensure_os_profile
+
+    s = await ensure_os_profile(ctx.user)
+    return {"focusModes": os_settings.normalize_focus_modes(s.focusModes), "activeFocusModeId": os_settings.active_focus_id(s)}
+
+
+async def _save_focus_mode(i: dict, ctx: Ctx) -> dict:
+    """Create or replace (by name) a focus mode: the sections, widgets, projects and tasks it keeps."""
+    import uuid
+
+    from app.os import settings as os_settings
+    from app.os.common.defaults import DASHBOARD_WIDGET_IDS, SECTION_KEYS
+
+    name = _req_str(i.get("name"), "name")
+    sections = _str_list(i.get("sections"), "sections")
+    widgets = _str_list(i.get("widgets"), "widgets")
+    bad = [x for x in sections if x not in SECTION_KEYS] + [w for w in widgets if w not in DASHBOARD_WIDGET_IDS]
+    if bad:
+        raise ToolError(f"Unknown section or widget {', '.join(bad)}")
+    for w in widgets:  # a widget brings its section along
+        section = WIDGETS.get(w, (None, None))[1]
+        if section and section not in sections:
+            sections.append(section)
+    project_ids: list[str] = []
+    names = _str_list(i.get("project_names"), "project_names")
+    if names:
+        mine = {p.name.strip().lower(): p.id for p in await db.project.find_many(where={"userId": ctx.user_id})}
+        missing = [n for n in names if n.strip().lower() not in mine]
+        if missing:
+            raise ToolError(f"No project named {', '.join(missing)}")
+        project_ids = [mine[n.strip().lower()] for n in names]
+    task_ids = _str_list(i.get("task_ids"), "task_ids")
+    if task_ids and await db.task.count(where={"id": {"in": task_ids}, "userId": ctx.user_id}) != len(task_ids):
+        raise ToolError("Task not found")
+    before = await _focus_now(ctx)
+    modes = before["focusModes"]
+    same = next((m for m in modes if m["name"].strip().lower() == name.lower()), None)
+    mode = {"id": same["id"] if same else uuid.uuid4().hex[:12], "name": name, "icon": i.get("icon") if isinstance(i.get("icon"), str) else (same or {}).get("icon"),
+            "color": (same or {}).get("color"), "sections": sections, "widgets": widgets, "projectIds": project_ids, "taskIds": task_ids}
+    modes = [mode if m is same else m for m in modes] if same else [*modes, mode]
+    patch: dict = {"focusModes": modes}
+    if i.get("turn_on") is True:
+        patch["activeFocusModeId"] = mode["id"]
+    try:
+        await os_settings.update_settings(_check(os_settings.SettingsBody, patch), user=ctx.user)
+    except ToolError as exc:
+        if "icon" in str(exc):  # not a lucide icon name: keep the mode, drop the icon
+            mode["icon"] = None
+            await os_settings.update_settings(_check(os_settings.SettingsBody, patch), user=ctx.user)
+        else:
+            raise
+    return _done({"kind": "update" if same else "create", "entityType": "focus_mode", "entityId": mode["id"], "label": name, "link": "/settings/focus",
+                  "undo": {"op": "restore_settings", "before": before}},
+                 {"id": mode["id"], "name": name, "sections": sections, "widgets": widgets, "projects": len(project_ids), "on": i.get("turn_on") is True})
+
+
+async def _set_focus(i: dict, ctx: Ctx) -> dict:
+    """Turn a focus mode on by name, or off (name null)."""
+    from app.os import settings as os_settings
+
+    before = await _focus_now(ctx)
+    wanted = i.get("name")
+    if wanted is None:
+        target, label = None, "Focus off"
+    else:
+        name = _req_str(wanted, "name")
+        mode = next((m for m in before["focusModes"] if m["name"].strip().lower() == name.lower()), None)
+        if mode is None:
+            known = ", ".join(m["name"] for m in before["focusModes"]) or "none yet"
+            raise ToolError(f'No focus mode named "{name}" (the user has: {known})')
+        target, label = mode["id"], mode["name"]
+    await os_settings.update_settings(_check(os_settings.SettingsBody, {"activeFocusModeId": target}), user=ctx.user)
+    return _done({"kind": "update", "entityType": "focus_mode", "entityId": target or ctx.user_id, "label": label, "link": "/settings/focus",
+                  "undo": {"op": "restore_settings", "before": {"activeFocusModeId": before["activeFocusModeId"]}}},
+                 {"on": label if target else None})
+
+
+async def _remove_created(user, undo: dict) -> None:
+    """Undo of a create: removes it (and, for a challenge, the habits it made that were never checked)."""
+    kind, id = undo["type"], undo["id"]
+    if kind == "habit":
+        await db.habit.delete_many(where={"id": id, "userId": user.id})
+    elif kind == "challenge":
+        await db.challenge.delete_many(where={"id": id, "userId": user.id})
+        made = undo.get("habitIds") or []
+        if made:
+            used = {log.habitId for log in await db.habitlog.find_many(where={"habitId": {"in": made}, "userId": user.id})}
+            await db.habit.delete_many(where={"id": {"in": [h for h in made if h not in used]}, "userId": user.id})
+    elif kind == "workout_plan":
+        await db.workoutplan.delete_many(where={"id": id, "userId": user.id})
+
+
+async def _restore_settings(user, undo: dict) -> None:
+    from app.os import settings as os_settings
+
+    before = undo["before"]
+    await os_settings.update_settings(_check(os_settings.SettingsBody, before), user=user)
+
 # ----- habits, projects, people, gifts, important dates, goals (design 2026-11-06) --------------
 
-_HABIT_FREQ = {"daily": "DAILY", "weekly": "WEEKLY", "custom": "CUSTOM"}
 _PROJECT_STATUS = {"planning": "PLANNING", "active": "ACTIVE", "on_hold": "ON_HOLD", "completed": "COMPLETED", "cancelled": "CANCELLED"}
 _GOAL_STATUS = {"active": "ACTIVE", "completed": "COMPLETED", "paused": "PAUSED", "abandoned": "ABANDONED"}
 
 
 def _text(i: dict, key: str) -> str | None:
     return i[key].strip() if isinstance(i.get(key), str) and i[key].strip() else None
-
-
-async def _create_habit(i: dict, ctx: Ctx) -> dict:
-    plain = {"name": js_slice(_req_str(i.get("name"), "name"), 120)}
-    if i.get("frequency") in _HABIT_FREQ:
-        plain["frequency"] = _HABIT_FREQ[i["frequency"]]
-    if isinstance(i.get("days_of_week"), list):
-        plain["daysOfWeek"] = i["days_of_week"]
-    for src, dst in (("times_per_week", "timesPerWeek"), ("target_per_day", "targetPerDay")):
-        if _number(i.get(src)):
-            plain[dst] = int(i[src])
-    if _text(i, "unit"):
-        plain["unit"] = _text(i, "unit")
-    h = await habits.create(_check(habits.CreateBody, plain), user=ctx.user)
-    return _done({"kind": "create", "entityType": "habit", "entityId": h["id"], "label": h["name"], "link": f"/habits?id={h['id']}",
-                  "undo": {"op": "delete", "type": "habit", "id": h["id"]}}, {"id": h["id"], "name": h["name"]})
 
 
 async def _update_habit(i: dict, ctx: Ctx) -> dict:
@@ -1060,13 +1367,15 @@ async def _update_goal(i: dict, ctx: Ctx) -> dict:
 
 
 _TOOLS = {
+    "get_dashboard": _get_dashboard, "set_dashboard_layout": _set_dashboard_layout, "create_habit": _create_habit,
+    "create_challenge": _create_challenge, "create_workout_plan": _create_workout_plan, "save_focus_mode": _save_focus_mode, "set_focus": _set_focus,
     "get_options": _get_options, "search": _search, "get_agenda": _get_agenda, "list_tasks": _list_tasks, "get_money": _get_money,
     "list_transactions": _list_transactions, "list_debts": _list_debts, "get_health": _get_health, "update_health_profile": _update_health_profile,
     "get_prayer_times": _get_prayer_times, "create_task": _create_task, "update_task": _update_task, "create_event": _create_event,
     "update_event": _update_event, "create_reminder": _create_reminder, "add_transaction": _add_transaction, "update_transaction": _update_transaction,
     "create_debt": _create_debt, "add_debt_payment": _add_debt_payment, "add_note": _add_note, "add_shopping_item": _add_shopping_item,
     "log_food": _log_food, "log_water": _log_water, "log_weight": _log_weight, "delete_item": _delete_item,
-    "create_habit": _create_habit, "update_habit": _update_habit, "log_habit": _log_habit, "create_project": _create_project,
+    "update_habit": _update_habit, "log_habit": _log_habit, "create_project": _create_project,
     "update_project": _update_project, "update_person": _update_person, "add_gift": _add_gift, "add_important_date": _add_important_date,
     "create_goal": _create_goal, "update_goal": _update_goal,
 }
@@ -1173,7 +1482,7 @@ async def _restore_fields(undo: dict, ctx: Ctx) -> None:
 
 
 READ_TOOLS = frozenset({"get_options", "search", "get_agenda", "list_tasks", "get_money", "list_transactions", "list_debts", "get_health",
-                        "get_prayer_times"})
+                        "get_prayer_times", "get_dashboard"})
 WRITE_TOOLS = frozenset(_TOOLS) - READ_TOOLS
 
 
@@ -1227,6 +1536,10 @@ async def reverse(user, undo: dict, ctx: Ctx | None = None) -> None:
         await db.weightlog.update_many(where={"id": undo["id"], "userId": user.id}, data={"weightKg": undo["previousKg"]})
     elif undo["op"] == "reopen_app_todo":
         await todo_rules.set_done(user, undo["id"], False)
+    elif undo["op"] == "remove_created":
+        await _remove_created(user, undo)
+    elif undo["op"] == "restore_settings":
+        await _restore_settings(user, undo)
     else:
         await debts.remove_payment(undo["debtId"], undo["paymentId"], user=user)
 

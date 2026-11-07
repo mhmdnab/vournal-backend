@@ -11,7 +11,7 @@ from typing import Literal
 
 from fastapi import Depends
 from prisma import Json
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, StrictStr, field_validator
 
 from app.db import db
 from app.os.common.defaults import (
@@ -31,7 +31,8 @@ from app.os.common.defaults import (
     WEEK_STARTS,
 )
 from app.os.common.deps import plus_user
-from app.os.common.http import nest_router
+from app.os.common import validators
+from app.os.common.http import nest_error, nest_router
 from app.os.common.i18n import Lang, to_lang, translate_default_name
 from app.os.profile import ensure_os_profile
 
@@ -92,6 +93,8 @@ def settings_view(row) -> dict:
         "onboardingCompleted": row.onboardingCompleted,
         "aiEnabled": row.aiEnabled,
         "assistantMode": row.assistantMode,
+        "focusModes": normalize_focus_modes(row.focusModes),
+        "activeFocusModeId": active_focus_id(row),
         "updatedAt": row.updatedAt,
     }
 
@@ -104,6 +107,67 @@ class WidgetBody(_Strict):
     id: Literal[tuple(DASHBOARD_WIDGET_IDS)]  # type: ignore[valid-type]
     visible: StrictBool
     order: StrictInt = Field(ge=0)
+
+
+MAX_FOCUS_MODES = 20
+
+
+class FocusModeBody(_Strict):
+    """One focus mode: what the menu and home screen keep while it is on (like iOS Focus)."""
+
+    id: StrictStr = Field(min_length=1, max_length=40)
+    name: StrictStr
+    icon: StrictStr | None = None
+    color: StrictStr | None = None
+    sections: list[Literal[tuple(SECTION_KEYS)]] = Field(default_factory=list, max_length=len(SECTION_KEYS))  # type: ignore[valid-type]
+    widgets: list[Literal[tuple(DASHBOARD_WIDGET_IDS)]] = Field(default_factory=list, max_length=len(DASHBOARD_WIDGET_IDS))  # type: ignore[valid-type]
+    projectIds: list[StrictStr] = Field(default_factory=list, max_length=50)
+    taskIds: list[StrictStr] = Field(default_factory=list, max_length=200)
+
+    @field_validator("name")
+    @classmethod
+    def _name(cls, v):
+        return validators.trimmed(v, "name", 1, 40)
+
+    @field_validator("icon")
+    @classmethod
+    def _icon(cls, v):
+        return validators.icon(v)
+
+    @field_validator("color")
+    @classmethod
+    def _color(cls, v):
+        return validators.color(v)
+
+    @field_validator("sections", "widgets", "projectIds", "taskIds")
+    @classmethod
+    def _unique(cls, v):
+        return list(dict.fromkeys(v))
+
+
+def normalize_focus_modes(value) -> list[dict]:
+    """Stored modes that still validate (a removed section or widget id is dropped, not fatal)."""
+    out = []
+    for raw in value if isinstance(value, list) else []:
+        if not isinstance(raw, dict):
+            continue
+        clean = {**raw, "sections": [k for k in raw.get("sections") or [] if k in SECTION_KEYS],
+                 "widgets": [w for w in raw.get("widgets") or [] if w in DASHBOARD_WIDGET_IDS]}
+        try:
+            out.append(FocusModeBody.model_validate(clean).model_dump())
+        except ValueError:
+            continue
+    return out
+
+
+def active_focus_id(row) -> str | None:
+    wanted = getattr(row, "activeFocusModeId", None)
+    return wanted if wanted and any(m["id"] == wanted for m in normalize_focus_modes(getattr(row, "focusModes", None))) else None
+
+
+def active_focus(row) -> dict | None:
+    wanted = active_focus_id(row)
+    return next((m for m in normalize_focus_modes(row.focusModes) if m["id"] == wanted), None) if wanted else None
 
 
 class PrefsBody(_Strict):
@@ -144,6 +208,15 @@ class SettingsBody(_Strict):
     onboardingCompleted: StrictBool | None = None
     aiEnabled: StrictBool | None = None
     assistantMode: Literal["manual", "auto"] | None = None
+    focusModes: list[FocusModeBody] | None = Field(default=None, max_length=MAX_FOCUS_MODES)
+    activeFocusModeId: StrictStr | None = None
+
+    @field_validator("focusModes")
+    @classmethod
+    def _modes(cls, v):
+        if v is not None and len({m.id for m in v}) != len(v):
+            raise ValueError("focusModes ids must be unique")
+        return v
 
     @field_validator("timezone")
     @classmethod
@@ -228,6 +301,15 @@ async def update_settings(body: SettingsBody, user=Depends(plus_user)):
         data["enabledSections"] = normalize_sections(body.enabledSections)
     if body.dashboardWidgets is not None:
         data["dashboardWidgets"] = Json(normalize_widgets([w.model_dump() for w in body.dashboardWidgets]))
+    if body.focusModes is not None:
+        data["focusModes"] = Json([m.model_dump() for m in body.focusModes])
+    modes = [m.model_dump() for m in body.focusModes] if body.focusModes is not None else normalize_focus_modes(current.focusModes)
+    if "activeFocusModeId" in body.model_fields_set:
+        if body.activeFocusModeId is not None and not any(m["id"] == body.activeFocusModeId for m in modes):
+            raise nest_error(404, "Focus mode not found")
+        data["activeFocusModeId"] = body.activeFocusModeId
+    elif body.focusModes is not None and current.activeFocusModeId and not any(m["id"] == current.activeFocusModeId for m in modes):
+        data["activeFocusModeId"] = None  # the mode that was on was removed
     if body.notificationPrefs is not None:
         merged = {**normalize_prefs(current.notificationPrefs), **body.notificationPrefs.model_dump(exclude_unset=True)}
         data["notificationPrefs"] = Json(merged)

@@ -56,6 +56,7 @@ def include_os_routers() -> APIRouter:
             budgets,
             calendar,
             categories,
+            challenges,
             dashboard,
             debts,
             documents,
@@ -93,6 +94,7 @@ def include_os_routers() -> APIRouter:
             users,
             wellness,
             work,
+            workouts,
         )
 
         api_router.include_router(auth.router)
@@ -117,11 +119,13 @@ def include_os_routers() -> APIRouter:
         api_router.include_router(projects.router)
         api_router.include_router(documents.router)
         api_router.include_router(habits.router)
+        api_router.include_router(challenges.router)
         api_router.include_router(goals.router)
         api_router.include_router(shopping.router)
         api_router.include_router(recipes.router)
         api_router.include_router(meal_plan.router)
         api_router.include_router(wellness.router)
+        api_router.include_router(workouts.router)
         api_router.include_router(prayer_times.router)
         api_router.include_router(household.router)
         api_router.include_router(people.router)

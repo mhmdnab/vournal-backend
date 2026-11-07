@@ -27,7 +27,9 @@ ENTITY = {
     "create_reminder": "reminder", "add_transaction": "transaction", "update_transaction": "transaction",
     "create_debt": "debt", "add_debt_payment": "debt_payment", "add_note": "note", "add_shopping_item": "shopping_item",
     "log_food": "food_log", "log_water": "water", "log_weight": "weight", "update_health_profile": "health_profile",
-    "create_habit": "habit", "update_habit": "habit", "log_habit": "habit_log", "create_project": "project", "update_project": "project",
+    "set_dashboard_layout": "dashboard", "create_habit": "habit", "create_challenge": "challenge", "create_workout_plan": "workout_plan",
+    "save_focus_mode": "focus_mode", "set_focus": "focus_mode",
+    "update_habit": "habit", "log_habit": "habit_log", "create_project": "project", "update_project": "project",
     "update_person": "person", "add_gift": "gift", "add_important_date": "important_date", "create_goal": "goal", "update_goal": "goal",
 }
 # the item an edit or payment points at: (input field, kind for describe)
@@ -99,6 +101,10 @@ async def _describe_target(name: str, i: dict, ctx: Ctx) -> dict:
     """Label and link for the card: the item an edit points at, or what a new one is called."""
     if name == "update_health_profile":
         return {"label": "Health plan", "link": "/health"}
+    if name == "set_dashboard_layout":
+        return {"label": "Dashboard layout", "link": "/dashboard"}
+    if name == "set_focus":
+        return {"label": i["name"] if isinstance(i.get("name"), str) and i["name"].strip() else "Focus off", "link": "/settings/focus"}
     if name in _TARGET:
         field, kind = _TARGET[name]
         target = i.get(field)

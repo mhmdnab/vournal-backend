@@ -94,6 +94,10 @@ async def export_account(user) -> dict:
         "exerciseLogs": rows(await db.exerciselog.find_many(where=where, order={"date": "asc"})),
         "weightLogs": rows(await db.weightlog.find_many(where=where, order={"date": "asc"})),
         "waterLogs": rows(await db.waterlog.find_many(where=where, order={"date": "asc"})),
+        "challenges": rows(await db.challenge.find_many(where=where, include={"habits": True}, order={"createdAt": "asc"}), habits=row),
+        "workoutPlans": rows(await db.workoutplan.find_many(where=where, include={"days": {"include": {"exercises": True}}}, order={"createdAt": "asc"}),
+                             days=lambda d: row(d, exercises=row)),
+        "workoutSessions": rows(await db.workoutsession.find_many(where=where, include={"sets": True}, order={"date": "asc"}), sets=row),
         # the app's journal (vournal OS had none)
         "journalEntries": rows(await db.entry.find_many(where=where, order={"createdAt": "asc"})),
         "appTodos": rows(await db.todo.find_many(where=where, order={"createdAt": "asc"})),

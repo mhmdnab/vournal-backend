@@ -71,24 +71,33 @@ async def account_balances(ctx: LifeContext, include_archived: bool = False) -> 
     uid = ctx.user_id
     accounts = await db.account.find_many(where={"userId": uid, **({} if include_archived else {"isArchived": False})},
                                           order=[{"sortOrder": "asc"}, {"createdAt": "asc"}])
-    own = await db.transaction.group_by(by=["accountId", "type"], where={"userId": uid, "accountId": {"not": None}}, sum={"amount": True})
+    # A transaction's amount is in its own currency, which can differ from its account's (an LBP
+    # expense paid from a USD account), so sums are grouped by currency and converted into the
+    # account's currency before they touch its balance.
+    own = await db.transaction.group_by(by=["accountId", "type", "currency"], where={"userId": uid, "accountId": {"not": None}},
+                                        sum={"amount": True})
     to_amount = await db.transaction.group_by(by=["toAccountId"], where={"userId": uid, "type": "TRANSFER", "toAccountId": {"not": None},
                                                                           "toAmount": {"not": None}}, sum={"toAmount": True})
-    to_same = await db.transaction.group_by(by=["toAccountId"], where={"userId": uid, "type": "TRANSFER", "toAccountId": {"not": None},
-                                                                        "toAmount": None}, sum={"amount": True})
+    to_same = await db.transaction.group_by(by=["toAccountId", "currency"], where={"userId": uid, "type": "TRANSFER", "toAccountId": {"not": None},
+                                                                                   "toAmount": None}, sum={"amount": True})
+    currency_of = {a.id: a.currency for a in accounts}
     delta: dict[str, float] = {}
 
     def add(account_id, n: float) -> None:
         if account_id:
             delta[account_id] = delta.get(account_id, 0) + n
 
+    def in_account_currency(account_id, amount, currency) -> float:
+        target = currency_of.get(account_id)
+        return ctx.fx.convert(amount, currency, target) if target and currency else to_number(amount)
+
     for g in own:
-        amount = to_number(_sum(g, "amount"))
+        amount = in_account_currency(g["accountId"], _sum(g, "amount"), g["currency"])
         add(g["accountId"], amount if g["type"] == "INCOME" else -amount)
     for g in to_amount:
         add(g["toAccountId"], to_number(_sum(g, "toAmount")))
     for g in to_same:
-        add(g["toAccountId"], to_number(_sum(g, "amount")))
+        add(g["toAccountId"], in_account_currency(g["toAccountId"], _sum(g, "amount"), g["currency"]))
     out = []
     for a in accounts:
         balance = round2(to_number(a.initialBalance) + delta.get(a.id, 0))
