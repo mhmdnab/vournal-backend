@@ -213,6 +213,10 @@ model RefreshToken {
   mfaVerified Boolean @default(false)
   generation Int @default(0)
   createdAt DateTime @default(now())
+  // Set when the token is spent. A rotation also records the token it was swapped for,
+  // so a client whose answer never arrived can try again (app/auth.py rotate_refresh_token).
+  revokedAt    DateTime?
+  replacedById String?
 
   @@index([userId])
 }

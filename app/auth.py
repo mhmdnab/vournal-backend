@@ -12,6 +12,7 @@ Nothing here logs passwords or tokens.
 
 from __future__ import annotations
 
+import logging
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -103,8 +104,13 @@ async def _issue_tokens(user_id: str, generation: int | None = None) -> TokenRes
     if generation is None:
         user = await db.user.find_unique(where={"id": user_id})
         generation = user.sessionGeneration if user else 0
+    return (await _issue_tokens_with_id(user_id, generation))[0]
+
+
+async def _issue_tokens_with_id(user_id: str, generation: int) -> tuple[TokenResponse, str]:
+    """_issue_tokens, plus the stored refresh token's id (a rotation records it)."""
     raw_refresh = security.generate_refresh_token()
-    await db.refreshtoken.create(
+    row = await db.refreshtoken.create(
         data={
             "userId": user_id,
             "tokenHash": security.hash_refresh_token(raw_refresh),
@@ -112,10 +118,11 @@ async def _issue_tokens(user_id: str, generation: int | None = None) -> TokenRes
             "generation": generation,
         }
     )
-    return TokenResponse(
+    tokens = TokenResponse(
         accessToken=security.create_access_token(user_id, generation),
         refreshToken=raw_refresh,
     )
+    return tokens, row.id
 
 
 _BAD_CODE = "Invalid or expired code. After five attempts, sign in again."
@@ -421,6 +428,25 @@ async def refresh(body: RefreshRequest):
     return await rotate_refresh_token(body.refreshToken)
 
 
+log = logging.getLogger("vournal.auth")
+
+# A client whose rotation answer never arrived (the app went to the background, the
+# network dropped) still holds the spent token. It may try again with it for this long,
+# as long as the token it was swapped for has never been used.
+REFRESH_RETRY_WINDOW = timedelta(hours=24)
+
+
+async def _unused_successor(stored, now: datetime):
+    """The token `stored` was rotated into, when that answer was evidently lost: it was
+    never used (still live) and the rotation is recent. None otherwise."""
+    if not stored.replacedById or stored.revokedAt is None or now - stored.revokedAt > REFRESH_RETRY_WINDOW:
+        return None
+    successor = await db.refreshtoken.find_unique(where={"id": stored.replacedById})
+    if successor is None or successor.revoked or successor.expiresAt < now:
+        return None
+    return successor
+
+
 async def rotate_refresh_token(raw: str) -> TokenResponse:
     """Spend a refresh token for a fresh pair, or raise 401. Shared with the web."""
     token_hash = security.hash_refresh_token(raw)
@@ -431,24 +457,36 @@ async def rotate_refresh_token(raw: str) -> TokenResponse:
         raise HTTPException(401, "Invalid or expired refresh token.")
 
     # Reuse detection: a token is revoked as soon as it's rotated away (or on
-    # logout). Presenting a REVOKED token means either a replay of a stolen token
-    # or the two legitimately-rotated halves racing — either way, treat it as
-    # compromise and revoke the whole family, so a stolen 60-day token can't be a
-    # 60-day account takeover.
+    # logout). Presenting a REVOKED token means a replay of a stolen token, unless the
+    # answer to its rotation simply never arrived: then the token it became is still
+    # unused, and the client gets a new pair in its place. Anything else revokes the
+    # whole family, so a stolen 60-day token can't be a 60-day account takeover.
+    retry_of = None
     if stored.revoked:
-        await db.refreshtoken.update_many(
-            where={"userId": stored.userId, "revoked": False}, data={"revoked": True}
-        )
-        raise HTTPException(401, "Invalid or expired refresh token.")
+        retry_of = await _unused_successor(stored, now)
+        if retry_of is None:
+            await db.refreshtoken.update_many(
+                where={"userId": stored.userId, "revoked": False}, data={"revoked": True, "revokedAt": now}
+            )
+            log.warning("refresh token reuse: ended every session of user %s", stored.userId)
+            raise HTTPException(401, "Invalid or expired refresh token.")
 
     # Issued before the account's sessions were ended (a link or a reset).
     owner = await db.user.find_unique(where={"id": stored.userId})
     if owner is None or stored.generation != owner.sessionGeneration:
         raise HTTPException(401, "Invalid or expired refresh token.")
 
+    if retry_of is not None:
+        # The lost answer's token is spent in favour of the one issued now.
+        await db.refreshtoken.update(where={"id": retry_of.id}, data={"revoked": True, "revokedAt": now})
+        log.info("refresh retried after a lost answer for user %s", stored.userId)
+
     # Rotate: the presented token is now spent (revoked); a fresh pair is issued.
-    await db.refreshtoken.update(where={"id": stored.id}, data={"revoked": True})
-    return await _issue_tokens(stored.userId, stored.generation)
+    tokens, fresh_id = await _issue_tokens_with_id(stored.userId, stored.generation)
+    await db.refreshtoken.update(
+        where={"id": stored.id}, data={"revoked": True, "revokedAt": stored.revokedAt or now, "replacedById": fresh_id}
+    )
+    return tokens
 
 
 @router.post("/logout")
@@ -463,7 +501,9 @@ async def revoke_refresh_token(raw: str) -> None:
     token_hash = security.hash_refresh_token(raw)
     stored = await db.refreshtoken.find_unique(where={"tokenHash": token_hash})
     if stored is not None and not stored.revoked:
-        await db.refreshtoken.update(where={"id": stored.id}, data={"revoked": True})
+        await db.refreshtoken.update(
+            where={"id": stored.id}, data={"revoked": True, "revokedAt": datetime.now(timezone.utc)}
+        )
 
 
 def _user_out(user) -> UserOut:

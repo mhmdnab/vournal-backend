@@ -54,10 +54,13 @@ def _secure() -> bool:
 
 def set_session_cookies(response: Response, tokens: TokenResponse) -> None:
     common = {"httponly": True, "secure": _secure(), "samesite": "lax"}
+    # The access token inside expires on its own (a 401, then a refresh). The cookie lives
+    # as long as the session: the dashboard's page guard only sees life_at (life_rt is
+    # scoped to /api/auth), and a cookie gone after 30 minutes sent every page load to /login.
     response.set_cookie(
         ACCESS_COOKIE,
         tokens.accessToken,
-        max_age=int(security._access_ttl().total_seconds()),
+        max_age=int(security._refresh_ttl().total_seconds()),
         path="/",
         **common,
     )

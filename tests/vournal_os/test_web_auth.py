@@ -113,7 +113,9 @@ class WebAuth(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(self.client.cookies.get("life_rt"), old_refresh)
         self.assertTrue(first.status_code == 200)
 
-        # Long after the rotation, presenting the old token again is a replay.
+        # Once the new cookie has been used, presenting the old token again is a replay.
+        # (Before that, it may be a lost answer: test_sessions.LostRefreshAnswer.)
+        self.assertEqual((await self.client.post("/api/auth/refresh", headers=CSRF)).status_code, 200)
         await self.db.refreshtoken.update_many(
             where={"userId": user.id, "revoked": False},
             data={"createdAt": datetime.now(timezone.utc) - timedelta(minutes=5)},
