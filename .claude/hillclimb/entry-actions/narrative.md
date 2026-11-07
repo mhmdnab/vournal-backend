@@ -1,0 +1,7 @@
+| round | change (one line) | test | train | s/rec | tool calls | $/rec | $/run | spend |
+|---|---|---|---|---|---|---|---|---|
+| 0 | baseline (3 labels corrected) | 0.828 | 0.914 | 5.3 | 1.69 | $0.0376 | $4.12 | $4.60 |
+| 1 | needs-actions rule, items up front, habit counts, LBP, ambiguity | 0.922 | 0.948 | 5.3 | 1.40 (0.8×) | $0.0377 (1.0×) | $4.37 | $9.00 |
+| 2 | unnamed person asks, no confirm-only questions, withdraw bug fix | 0.938 | 0.949 | 5.7 | 1.36 (0.8×) | $0.0374 (1.0×) | $4.35 | $13.35 |
+
+Best: round 2 (test 0.938, +10.9 points paired vs baseline, ±7.6 - outside noise; 7 held-out cases fixed, 0 broken; cost per recording flat). Round 1's bundled fixes (needs-actions rule widened to birthdays, person facts and habit activities; the user's habits/projects/goals shown with ids and targets; habit amounts as counts; "alf" as LBP; ambiguity questions) carried most of the gain. Round 2 added two question rules and fixed a real product bug where a proposal withdrawn in the same run still reached the review card; on its own it moved the held-out half +1.6 points, within noise, so the loop is at a plateau for this eval. Remaining train failures are one-offs, including a flaky extraction crash on a Lebanese project name (upstream of the tuned artifacts). Round 1's held-out gain is not fully blind (baseline failures were read before the split); round 2 was chosen from train traces only.
