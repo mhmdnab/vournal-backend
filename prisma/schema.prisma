@@ -938,6 +938,8 @@ model Account {
   icon           String?
   isArchived     Boolean     @default(false)
   includeInTotal Boolean     @default(true)
+  // the spending plan spends from it (savings and investments start switched off)
+  spendFrom      Boolean     @default(true)
   sortOrder      Int         @default(0)
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt

@@ -31,11 +31,12 @@ router = nest_router("/accounts")
 
 TYPES = ("CASH", "BANK", "SAVINGS", "CREDIT_CARD", "DEBIT_CARD", "DIGITAL_WALLET", "INVESTMENT", "OTHER")
 TYPE_ORDER = ("CASH", "BANK", "SAVINGS", "DEBIT_CARD", "CREDIT_CARD", "DIGITAL_WALLET", "INVESTMENT", "OTHER")
+NOT_SPENT = ("SAVINGS", "INVESTMENT")  # new accounts of these types start with spendFrom off
 AccountTypeName = Literal[TYPES]  # type: ignore[valid-type]
 CurrencyCode = Literal[tuple(SUPPORTED_CURRENCIES)]  # type: ignore[valid-type]
 _FIELDS = (
     "id", "name", "type", "currency", "initialBalance", "color", "icon", "isArchived", "includeInTotal",
-    "sortOrder", "createdAt", "updatedAt",
+    "spendFrom", "sortOrder", "createdAt", "updatedAt",
 )
 GROUP_LABELS = {
     "en": {
@@ -120,6 +121,7 @@ class _Fields(BaseModel):
     icon: StrictStr | None = None
     isArchived: StrictBool | None = None
     includeInTotal: StrictBool | None = None
+    spendFrom: StrictBool | None = None
     sortOrder: StrictInt | None = Field(default=None, ge=0)
 
     @field_validator("name")
@@ -262,6 +264,8 @@ async def create(body: CreateBody, user=Depends(plus_user)):
             "icon": body.icon,
             "isArchived": bool(body.isArchived),
             "includeInTotal": True if body.includeInTotal is None else body.includeInTotal,
+            # the spending plan doesn't spend savings or investments unless told to
+            "spendFrom": (body.type or "BANK") not in NOT_SPENT if body.spendFrom is None else body.spendFrom,
             "sortOrder": sort_order,
         }
     )
@@ -278,7 +282,7 @@ async def _update(user, id: str, body: UpdateBody) -> dict:
     existing = await _owned(user.id, id)
     sent = body.model_fields_set
     # `?? undefined` in NestJS: a null leaves these unchanged; color and icon can be cleared.
-    data = {f: getattr(body, f) for f in ("name", "type", "currency", "isArchived", "includeInTotal", "sortOrder") if getattr(body, f) is not None}
+    data = {f: getattr(body, f) for f in ("name", "type", "currency", "isArchived", "includeInTotal", "spendFrom", "sortOrder") if getattr(body, f) is not None}
     if body.initialBalance is not None:
         data["initialBalance"] = as_decimal(body.initialBalance)
     for field in ("color", "icon"):

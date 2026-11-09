@@ -252,3 +252,27 @@ class PlanFromBalance(Subset):
     def test_without_accounts_the_plan_is_from_income(self):
         p = build_plan(BASE)
         self.assertSubset(p, {"basis": "income", "balance": None, "leftToSpend": 430})
+
+
+class PlanWithSavingsAccounts(Subset):
+    """Accounts the user saves in are not spent from (owner, 2026-11-09). Money moved into
+    them this period counts toward the savings target; when the spending accounts cannot
+    cover what is due, the plan says how much savings could."""
+
+    BAL = {**BASE, "balance": 900}
+
+    def test_money_already_moved_to_savings_is_not_set_aside_again(self):
+        p = build_plan({**self.BAL, "savedThisPeriod": 100})
+        # 900 − 200 car loan − 50 savings still to move
+        self.assertSubset(p, {"leftToSpend": 650, "savingsTarget": 150, "savingsPaid": 100})
+        self.assertEqual(p["advice"]["stillNeeded"], 250)
+
+    def test_saving_more_than_the_target_leaves_nothing_to_set_aside(self):
+        p = build_plan({**self.BAL, "savedThisPeriod": 400})
+        self.assertSubset(p, {"leftToSpend": 700, "savingsPaid": 400})
+
+    def test_savings_could_cover_what_the_spending_accounts_cannot(self):
+        p = build_plan({**self.BAL, "balance": 100, "savingsBalance": 400})
+        self.assertSubset(p["advice"], {"shortfall": 250, "fromSavings": 250})
+        self.assertEqual(build_plan({**self.BAL, "balance": 100, "savingsBalance": 60})["advice"]["fromSavings"], 60)
+        self.assertEqual(build_plan(self.BAL)["advice"]["fromSavings"], 0)

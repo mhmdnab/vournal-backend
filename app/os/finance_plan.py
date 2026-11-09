@@ -8,7 +8,8 @@ For the current pay period (payday → day before the next payday, or the month)
 With accounts (a "balance" given), the plan starts from the money the user has instead
 (owner, 2026-11-09): left to spend = balance + income still expected − bills still to
 pay − debt payoff still due − savings. The balance already holds what was received,
-paid and spent so far.
+paid and spent so far. Money already moved to savings accounts this period
+("savedThisPeriod") counts toward the savings target.
 Debts due after this period (or undated) are paid off gradually, an even share per
 period up to their target date. Extra (one-off) income first covers what regular
 income cannot, then is split between paying debts early, savings and spending.
@@ -135,7 +136,9 @@ def build_plan(p: dict) -> dict:
     savings_target = _round2(base_savings + extra_savings)
     income_received = _sum(i for i in p["income"] if i["done"])
     expected_income = _round2(income_total - income_received)
-    still_needed = _round2(commitments_total - commitments_paid + savings_target + (debt_plan_total - debt_plan_paid))
+    saved = _round2(max(0, p.get("savedThisPeriod") or 0))
+    savings_due = _round2(max(0, savings_target - saved))
+    still_needed = _round2(commitments_total - commitments_paid + savings_due + (debt_plan_total - debt_plan_paid))
     balance = p.get("balance")
     if balance is None:
         free_to_spend = _round2(income_total - commitments_total - savings_target - debt_plan_total)
@@ -176,6 +179,8 @@ def build_plan(p: dict) -> dict:
         "incomeShare": math.floor(min(1, gap / expected_income) * 1000 + 0.5) / 1000 if expected_income > 0 else None,
         "shortfall": _round2(max(0, gap - expected_income)),
     }
+    # what the savings accounts could cover of what the spending accounts cannot
+    advice["fromSavings"] = _round2(min(max(0, p.get("savingsBalance") or 0), advice["shortfall"]))
 
     return {
         "basis": "income" if balance is None else "balance",
@@ -189,6 +194,8 @@ def build_plan(p: dict) -> dict:
         "commitmentsTotal": commitments_total,
         "commitmentsPaid": commitments_paid,
         "savingsTarget": savings_target,
+        "savingsPaid": saved,
+        "savingsBalance": p.get("savingsBalance"),
         "debtPlanTotal": debt_plan_total,
         "debtPlanPaid": debt_plan_paid,
         "debtPlan": debt_plan,

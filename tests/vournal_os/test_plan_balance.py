@@ -39,6 +39,28 @@ class PlanBalance(OsTestCase):
         # this morning 500 were left (80 went today)
         self.assertEqual(p["dailyAllowance"], round(500 / p["daysLeft"], 2))
 
+    async def test_savings_accounts_are_not_spent_from(self):
+        web = await self.signed_in()
+        user = web.user
+        now = datetime.now(timezone.utc)
+        cash = await self.account(user, "Cash", 500)
+        # the owner's bank account holds savings: switched off for spending
+        bank = await self.account(user, "Bank", 400, spendFrom=False)
+        await self.db.transaction.create(data={
+            "userId": user.id, "type": "TRANSFER", "amount": 50, "currency": "USD",
+            "date": now - timedelta(minutes=5), "accountId": cash.id, "toAccountId": bank.id,
+        })
+        p = (await web.get("/api/finance/plan")).json()
+        self.assertEqual((p["basis"], p["balance"], p["savingsBalance"], p["savingsPaid"]), ("balance", 450, 450, 50))
+
+    async def test_new_savings_accounts_are_not_spent_from(self):
+        web = await self.signed_in()
+        savings = (await web.post("/api/accounts", json={"name": "Rainy day", "type": "SAVINGS"})).json()
+        bank = (await web.post("/api/accounts", json={"name": "Bank", "type": "BANK"})).json()
+        self.assertEqual((savings["spendFrom"], bank["spendFrom"]), (False, True))
+        changed = (await web.patch(f"/api/accounts/{bank['id']}", json={"spendFrom": False})).json()
+        self.assertFalse(changed["spendFrom"])
+
     async def test_an_unused_account_leaves_the_plan_on_income(self):
         # every account starts with an empty Cash account
         web = await self.signed_in()
