@@ -49,14 +49,15 @@ GROUP_LABELS = {
 }
 
 
-async def with_balances(user_id: str, rows, fx: Converter) -> list[dict]:
+async def with_balances(user_id: str, rows, fx: Converter, until: datetime | None = None) -> list[dict]:
+    """Each account with its balance; with `until`, only transactions dated up to then count."""
     if not rows:
         return []
     ids = [r.id for r in rows]
     by_id = {r.id: r for r in rows}
     # summed in the database, as NestJS's groupBy did: never every row on the shared server
     group = db.transaction.group_by
-    mine = {"userId": user_id}
+    mine = {"userId": user_id, **({"date": {"lte": until}} if until else {})}
     out_sums = await group(by=["accountId", "type", "currency"], where={**mine, "accountId": {"in": ids}}, sum={"amount": True})
     in_with_to = await group(
         by=["toAccountId"], where={**mine, "type": "TRANSFER", "toAccountId": {"in": ids}, "toAmount": {"not": None}}, sum={"toAmount": True}

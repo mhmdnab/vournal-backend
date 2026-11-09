@@ -12,6 +12,7 @@ from prisma import Json
 
 from app.db import db
 from app.os import finance_utils as fu
+from app.os.accounts import with_balances
 from app.os.calendar_utils import local_date_time
 from app.os.common import dates, rrule
 from app.os.common.jsparse import js_sum
@@ -80,6 +81,23 @@ async def _sum_expenses(user_id: str, start: datetime, end: datetime, fx) -> flo
         where={"userId": user_id, "type": "EXPENSE", "recurringPaymentId": None, "rrule": None, **_NOT_DEBT, "date": {"gte": start, "lte": end}}
     )
     return round_money(js_sum(fx.to_default(t.amount, t.currency) for t in rows))
+
+
+async def _balance_now(user_id: str, start: datetime, now: datetime, fx) -> float | None:
+    """The money the user has now: the accounts they count in their total, plus what was
+    received or spent without an account this period (it came in or out of that money
+    too). None while no such account is in use (every account starts with an empty
+    Cash account): the plan then works from income alone."""
+    rows = await db.account.find_many(where={"userId": user_id, "isArchived": False, "includeInTotal": True})
+    used = {a["id"] for a in await with_balances(user_id, rows, fx) if a["transactionCount"] or to_number(a["initialBalance"])}
+    if not used:
+        return None
+    in_accounts = js_sum(a["balanceInDefault"] for a in await with_balances(user_id, [r for r in rows if r.id in used], fx, until=now))
+    loose = await db.transaction.find_many(
+        where={"userId": user_id, "accountId": None, "type": {"in": ["INCOME", "EXPENSE"]}, "date": {"gte": start, "lte": now}}
+    )
+    flows = js_sum(fx.to_default(t.amount, t.currency) * (1 if t.type == "INCOME" else -1) for t in loose)
+    return round_money(in_accounts + flows)
 
 
 def _kind_of(kind: str, is_plan: bool) -> str:
@@ -158,6 +176,7 @@ async def plan(user) -> dict:
     everyday = await _sum_expenses(user.id, start_at, now, fx)
     spent_today = await _sum_expenses(user.id, today_start, now, fx)
     later_from = max(now + _MS, start_at)
+    balance = await _balance_now(user.id, start_at, now, fx)
 
     # ----- income lines -----
     # a past occurrence of a recurring income is a copy of its series (same title, payer, category, currency)
@@ -246,6 +265,7 @@ async def plan(user) -> dict:
         "spentToday": spent_today,
         "debts": plan_debts,
         "extraSplit": {"debts": prefs["extraDebtPct"], "savings": prefs["extraSavingsPct"]},
+        "balance": balance,
     })
     by_date = lambda line: (line["done"], line["date"])  # noqa: E731 — unpaid first, then by date
     return {

@@ -216,3 +216,39 @@ class Schedule(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PlanFromBalance(Subset):
+    """With accounts, the plan starts from the money in them, not from income alone
+    (owner, 2026-11-09): what is left = balance + income still expected − bills still
+    to pay − debt payoff still due − savings."""
+
+    BAL = {**BASE, "balance": 900}
+
+    def test_starts_from_the_money_in_the_accounts(self):
+        p = build_plan(self.BAL)
+        # 900 − 200 still due for the car loan − 150 savings
+        self.assertSubset(p, {"basis": "balance", "balance": 900, "leftToSpend": 550, "freeToSpend": 770, "status": "ok"})
+        # this morning 570 were left for 20 days
+        self.assertSubset(p, {"dailyAllowance": 28.5, "todayLeft": 8.5})
+        self.assertSubset(p["advice"], {"cashOnHand": 900, "stillNeeded": 350, "keepAside": 350, "gap": 0, "shortfall": 0})
+
+    def test_adds_income_still_expected(self):
+        bonus = {"title": "Freelance", "amount": 400, "date": "2026-11-25", "done": False}
+        p = build_plan({**self.BAL, "income": [*BASE["income"], bonus]})
+        # 900 + 400 − 200 car loan − 190 savings (10% of 1900)
+        self.assertEqual(p["leftToSpend"], 910)
+
+    def test_money_without_income_is_a_plan(self):
+        p = build_plan({**self.BAL, "income": [], "balance": 300, "spentToday": 0})
+        # no income: a percentage saves nothing; 300 − 200 car loan, over 20 days
+        self.assertSubset(p, {"status": "ok", "savingsTarget": 0, "leftToSpend": 100, "dailyAllowance": 5})
+
+    def test_less_money_than_what_is_due_is_over(self):
+        p = build_plan({**self.BAL, "balance": 100})
+        self.assertSubset(p, {"status": "over", "leftToSpend": -250, "dailyAllowance": 0})
+        self.assertSubset(p["advice"], {"cashOnHand": 100, "gap": 250, "shortfall": 250})
+
+    def test_without_accounts_the_plan_is_from_income(self):
+        p = build_plan(BASE)
+        self.assertSubset(p, {"basis": "income", "balance": None, "leftToSpend": 430})

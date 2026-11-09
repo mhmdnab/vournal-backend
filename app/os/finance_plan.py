@@ -5,6 +5,10 @@ For the current pay period (payday → day before the next payday, or the month)
   free to spend = income − commitments (bills, subscriptions, installments, debts due) − savings
   left to spend = free to spend − everyday spending so far
   today's allowance = what was left this morning ÷ days left (today included)
+With accounts (a "balance" given), the plan starts from the money the user has instead
+(owner, 2026-11-09): left to spend = balance + income still expected − bills still to
+pay − debt payoff still due − savings. The balance already holds what was received,
+paid and spent so far.
 Debts due after this period (or undated) are paid off gradually, an even share per
 period up to their target date. Extra (one-off) income first covers what regular
 income cannot, then is split between paying debts early, savings and spending.
@@ -129,14 +133,23 @@ def build_plan(p: dict) -> dict:
     debt_plan_total = _round2(debt_plan_paid + _sum({"amount": x["remaining"]} for x in debt_plan))
 
     savings_target = _round2(base_savings + extra_savings)
-    free_to_spend = _round2(income_total - commitments_total - savings_target - debt_plan_total)
-    left_to_spend = _round2(free_to_spend - p["everydaySpent"])
+    income_received = _sum(i for i in p["income"] if i["done"])
+    expected_income = _round2(income_total - income_received)
+    still_needed = _round2(commitments_total - commitments_paid + savings_target + (debt_plan_total - debt_plan_paid))
+    balance = p.get("balance")
+    if balance is None:
+        free_to_spend = _round2(income_total - commitments_total - savings_target - debt_plan_total)
+        left_to_spend = _round2(free_to_spend - p["everydaySpent"])
+    else:
+        balance = _round2(balance)
+        left_to_spend = _round2(balance + expected_income - still_needed)
+        free_to_spend = _round2(left_to_spend + p["everydaySpent"])
     # fixed for the whole day: what was left this morning, spread over the days that remain
     left_this_morning = left_to_spend + p["spentToday"]
     daily_allowance = _round2(max(0, left_this_morning / days_left))
     today_left = _round2(daily_allowance - p["spentToday"])
     from_tomorrow = _round2(max(0, left_to_spend / (days_left - 1))) if days_left > 1 else 0
-    if income_total <= 0:
+    if balance is None and income_total <= 0:
         status = "noIncome"
     elif left_to_spend < 0:
         status = "over"
@@ -146,12 +159,12 @@ def build_plan(p: dict) -> dict:
         status = "ok"
 
     # ----- what to keep aside -----
-    income_received = _sum(i for i in p["income"] if i["done"])
-    still_needed = _round2(commitments_total - commitments_paid + savings_target + (debt_plan_total - debt_plan_paid))
-    cash_on_hand = _round2(income_received - commitments_paid - debt_plan_paid - p["everydaySpent"])
+    if balance is None:
+        cash_on_hand = _round2(income_received - commitments_paid - debt_plan_paid - p["everydaySpent"])
+    else:
+        cash_on_hand = balance
     keep_aside = _round2(max(0, min(cash_on_hand, still_needed)))
     gap = _round2(max(0, still_needed - max(0, cash_on_hand)))
-    expected_income = _round2(income_total - income_received)
     advice = {
         "stillNeeded": still_needed,
         "cashOnHand": cash_on_hand,
@@ -165,6 +178,8 @@ def build_plan(p: dict) -> dict:
     }
 
     return {
+        "basis": "income" if balance is None else "balance",
+        "balance": balance,
         "daysTotal": days_total,
         "daysLeft": days_left,
         "incomeTotal": income_total,
