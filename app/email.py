@@ -102,7 +102,7 @@ async def send_trial_ending(to: str, ends_at) -> bool:
     day = f"{ends_at.day} {ends_at:%B}"
     lines = [
         f"Your free vournal Plus ends on {day}.",
-        "Nothing will be charged: the free months end on their own.",
+        "Nothing will be charged: the free month ends on its own.",
         "To keep Plus, subscribe in the vournal app or at life.vournal.app.",
         "Your journal and everything in vournal life stay yours either way.",
     ]

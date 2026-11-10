@@ -1,4 +1,4 @@
-"""The free months of Plus: 60 days from email confirmation, once per person.
+"""The free month of Plus: 30 days from email confirmation, once per person.
 
 Run only through the guarded runner (frontend-mobile-app):
     ../voice-journal-backend/.venv/bin/python scripts/dev/isolated_backend.py check
@@ -67,11 +67,11 @@ class Trial(TrialBase):
         self.assertEqual(normalise_email(" A.b+x@Gmail.com "), "ab@gmail.com")
         self.assertEqual(normalise_email("a.b+x@example.com"), "a.b+x@example.com")
 
-    async def test_confirm_starts_a_60_day_trial(self):
+    async def test_confirm_starts_a_30_day_trial(self):
         user = await confirm_email(self.db, await self._user())
         self.assertEqual(effective_plan(user), "plus")
         self.assertEqual(user.planSource, "trial")
-        _near(self, user.trialEndsAt, _in(60))
+        _near(self, user.trialEndsAt, _in(30))
         self.assertEqual(user.planExpiresAt, user.trialEndsAt)
 
     async def test_no_trial_while_switched_off(self):
@@ -152,7 +152,7 @@ class Trial(TrialBase):
         await grant_plus(self.db, user.id, _in(-3), "apple", f"orig-{uuid.uuid4().hex}")
         user = await self._reload(user)
         self.assertEqual((user.planSource, effective_plan(user)), ("trial", "plus"))
-        _near(self, user.planExpiresAt, _in(60))
+        _near(self, user.planExpiresAt, _in(30))
 
     async def test_apple_during_trial_takes_over(self):
         user = await self._user()

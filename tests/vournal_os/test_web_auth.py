@@ -310,7 +310,7 @@ class WebAuth(unittest.IsolatedAsyncioTestCase):
         with patch.dict(os.environ, {"PLUS_TRIAL_FROM": ""}):
             self.assertEqual((await self.client.get("/api/auth/offer")).json(), {"trialDays": None})
         with patch.dict(os.environ, {"PLUS_TRIAL_FROM": "2026-11-01T00:00:00Z"}):
-            self.assertEqual((await self.client.get("/api/auth/offer")).json(), {"trialDays": 60})
+            self.assertEqual((await self.client.get("/api/auth/offer")).json(), {"trialDays": 30})
 
     async def test_register_rate_limited_per_email(self):
         from app.rate_limit import rate_limited

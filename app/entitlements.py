@@ -198,12 +198,12 @@ async def apply_pending_grants(db, user) -> None:
 
 
 # ---- The free months (spec 2026-11-09-web-signup-paddle-trial) ---------------
-# Every account created after PLUS_TRIAL_FROM gets Plus for TRIAL_DAYS once its email
+# Every account created after PLUS_TRIAL_FROM gets a free month of Plus (TRIAL_DAYS) once its email
 # is confirmed. Once per person: the email (Gmail dots and +tags ignored) and each
 # linked sign-in identity are kept as keyed hashes in TrialClaim, which outlives the
 # account. Unset PLUS_TRIAL_FROM means no trials at all.
 
-TRIAL_DAYS = 60
+TRIAL_DAYS = 30  # one free month (owner, 2026-11-10; was 60)
 _GMAIL = ("gmail.com", "googlemail.com")
 
 
