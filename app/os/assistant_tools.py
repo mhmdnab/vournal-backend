@@ -51,6 +51,7 @@ class Ctx:
         self.deletes_this_message = 0
         self.round_deletes = 0  # delete_item calls in the round being run
         self.entry_people: dict[str, str] = {}  # an app recording's new people: "proposal-person:<i>" → name
+        self.importing = False  # an import from other AI chats: it adds and updates, never deletes
 
 
 # ----- results ---------------------------------------------------------------------------
@@ -290,6 +291,8 @@ async def run(name: str, raw_input, ctx: Ctx) -> dict:
         tool = _TOOLS.get(name)
         if tool is None:
             return {"content": f"Unknown tool {name}", "isError": True}
+        if ctx.importing and name == "delete_item":
+            return {"content": "Error: an import only adds and updates; it never deletes anything.", "isError": True}
         if ctx.mode == "manual" and name in WRITE_TOOLS and name != "delete_item":
             from app.os.assistant_pending import defer
 
