@@ -27,7 +27,7 @@ from app.os.calendar_utils import (
 from app.os.common import dates, rrule, validators
 from app.os.common.dbnull import DB_NULL, pop_db_nulls, set_db_null
 from app.os.common.activity import log_activity
-from app.os.common.deps import plus_user
+from app.os.common.space import Space, assert_in_space, assert_personal_links_allowed, current_space
 from app.os.common.http import invalid_data, nest_error, nest_router
 from app.os.common.i18n import to_lang
 from app.os.common.ownership import assert_owned
@@ -203,16 +203,24 @@ class DetachBody(_EventFields):
 # Helpers
 
 
-async def _owned(user_id: str, id: str):
-    row = await db.event.find_first(where={"id": id, "userId": user_id}, include=_INCLUDE)
+async def _owned(space: Space, id: str):
+    row = await db.event.find_first(where={"id": id, **space.where}, include=_INCLUDE)
     if row is None:
         raise nest_error(404, "Event not found")
     return row
 
 
-async def _assert_links(user_id: str, body) -> None:
+async def _assert_links(space: Space, body) -> None:
+    """Categories, goals, trips and courses are personal; a task or project is in the same
+    space; sharing with the household is Personal only."""
+    assert_personal_links_allowed(space, body)
+    if not space.personal and getattr(body, "shared", None):
+        raise nest_error(400, "Household sharing isn't available in a workspace")
     for model, field in _LINKS:
-        await assert_owned(model, getattr(body, field, None), user_id)
+        if model in ("task", "project"):
+            await assert_in_space(model, getattr(body, field, None), space)
+        else:
+            await assert_owned(model, getattr(body, field, None), space.user.id)
 
 
 def _resolve_start(start_at, day, all_day: bool, tz: str, fallback: datetime | None) -> datetime:
@@ -354,7 +362,8 @@ _LIST_EVENTS_QUERY = (  # the NestJS query DTO's fields
 
 
 @router.get("")
-async def list_events(request: Request, user=Depends(plus_user)):
+async def list_events(request: Request, space: Space = Depends(current_space)):
+    user = space.user
     tz, lang = await _locale(user)
     q = request.query_params
     errors = unknown_params(request, _LIST_EVENTS_QUERY)
@@ -402,7 +411,7 @@ async def list_events(request: Request, user=Depends(plus_user)):
                 ]
             }
         )
-    where: dict = {"userId": user.id}
+    where: dict = dict(space.where)
     for field in ("taskId", "projectId", "goalId", "tripId", "courseId", "categoryId"):
         if q.get(field):
             where[field] = q.get(field)
@@ -439,32 +448,35 @@ async def list_events(request: Request, user=Depends(plus_user)):
 
 
 @router.post("", status_code=201)
-async def create(body: CreateBody, user=Depends(plus_user)):
+async def create(body: CreateBody, space: Space = Depends(current_space)):
+    user = space.user
     tz, lang = await _locale(user)
-    await _assert_links(user.id, body)
+    await _assert_links(space, body)
     sent = body.model_fields_set
     data = _create_data(body, tz, sent)
     if body.timeAnchor and not data["allDay"]:
         data["startAt"], data["endAt"], anchor = await _anchored(user.id, body.timeAnchor, data["startAt"], data["endAt"], tz)
         data["timeAnchor"] = Json(anchor)
     data["householdId"] = await _household_for(user.id) if body.shared else None
-    created = await db.event.create(data={**data, "userId": user.id}, include=_INCLUDE)
+    created = await db.event.create(data={**data, **space.create_fields()}, include=_INCLUDE)
     await log_activity(user.id, "event.created", entity_id=created.id, title=created.title, startAt=created.startAt)
     return event_view(created, tz, datetime.now(timezone.utc), lang)
 
 
 @router.get("/{id}")
-async def get(id: str, user=Depends(plus_user)):
+async def get(id: str, space: Space = Depends(current_space)):
+    user = space.user
     tz, _ = await _locale(user)
     # NestJS left out the language here: the repeat text is always English on this route.
-    return event_view(await _owned(user.id, id), tz, datetime.now(timezone.utc))
+    return event_view(await _owned(space, id), tz, datetime.now(timezone.utc))
 
 
 @router.patch("/{id}")
-async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
+async def update(id: str, body: UpdateBody, space: Space = Depends(current_space)):
+    user = space.user
     tz, lang = await _locale(user)
-    existing = await _owned(user.id, id)
-    await _assert_links(user.id, body)
+    existing = await _owned(space, id)
+    await _assert_links(space, body)
     sent = body.model_fields_set
     old_start = dates._utc(existing.startAt)
     old_end = dates._utc(existing.endAt) if existing.endAt else None
@@ -534,18 +546,22 @@ async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
 
 
 @router.delete("/{id}")
-async def remove(id: str, user=Depends(plus_user)):
-    existing = await _owned(user.id, id)
+async def remove(id: str, space: Space = Depends(current_space)):
+    user = space.user
+    existing = await _owned(space, id)
+    if not space.can_delete(existing):
+        raise nest_error(404, "Event not found")
     await db.event.delete(where={"id": existing.id})
     await log_activity(user.id, "event.deleted", entity_id=id, title=existing.title)
     return {"ok": True}
 
 
 @router.post("/{id}/exclude")
-async def exclude(id: str, body: ExcludeBody, user=Depends(plus_user)):
+async def exclude(id: str, body: ExcludeBody, space: Space = Depends(current_space)):
+    user = space.user
     """Skip one occurrence of a repeating event ("delete this event only")."""
     tz, lang = await _locale(user)
-    existing = await _owned(user.id, id)
+    existing = await _owned(space, id)
     occurrence = _resolve_occurrence(existing, body.date, tz)
     row = await db.event.update(
         where={"id": existing.id}, data={"exDates": _add_ex_date(existing.exDates, occurrence)}, include=_INCLUDE
@@ -555,12 +571,13 @@ async def exclude(id: str, body: ExcludeBody, user=Depends(plus_user)):
 
 
 @router.post("/{id}/occurrence")
-async def detach(id: str, body: DetachBody, user=Depends(plus_user)):
+async def detach(id: str, body: DetachBody, space: Space = Depends(current_space)):
+    user = space.user
     """"Edit this occurrence only": excluded from the series, recreated standalone."""
     tz, lang = await _locale(user)
-    series = await _owned(user.id, id)
+    series = await _owned(space, id)
     occurrence = _resolve_occurrence(series, body.occurrence, tz)
-    await _assert_links(user.id, body)
+    await _assert_links(space, body)
     start, end = dates._utc(series.startAt), dates._utc(series.endAt) if series.endAt else None
     duration = end - start if end else None
     iso = lambda m: m.isoformat().replace("+00:00", "Z")  # noqa: E731
@@ -606,7 +623,9 @@ async def detach(id: str, body: DetachBody, user=Depends(plus_user)):
         series_row = await tx.event.update(
             where={"id": series.id}, data={"exDates": _add_ex_date(series.exDates, occurrence)}, include=_INCLUDE
         )
-        created = await tx.event.create(data={**data, "userId": user.id}, include=_INCLUDE)
+        created = await tx.event.create(
+            data={**data, "userId": series.userId, "createdById": series.createdById, "workspaceId": series.workspaceId}, include=_INCLUDE
+        )
     await log_activity(user.id, "event.occurrenceExcluded", entity_id=id, occurrence=occurrence)
     await log_activity(user.id, "event.created", entity_id=created.id, title=created.title, detachedFrom=id)
     now = datetime.now(timezone.utc)
