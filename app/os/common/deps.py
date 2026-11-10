@@ -17,7 +17,7 @@ REFRESH_COOKIE = "life_rt"
 REFRESH_COOKIE_PATH = "/api/auth"
 CSRF_HEADER = "x-requested-with"
 CSRF_VALUE = "life-os"
-PLUS_REQUIRED = "vournal OS is part of vournal Plus."
+PLUS_REQUIRED = "vournal life is part of vournal Plus."
 
 _SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 

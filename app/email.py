@@ -104,7 +104,7 @@ async def send_trial_ending(to: str, ends_at) -> bool:
         f"Your free vournal Plus ends on {day}.",
         "Nothing will be charged: the free months end on their own.",
         "To keep Plus, subscribe in the vournal app or at life.vournal.app.",
-        "Your journal and everything in vournal OS stay yours either way.",
+        "Your journal and everything in vournal life stay yours either way.",
     ]
     html = "".join(f"<p>{line}</p>" for line in lines)
     return await _send(to, f"Your free vournal Plus ends on {day}", html, "\n\n".join(lines))

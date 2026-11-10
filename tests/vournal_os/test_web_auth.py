@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends
 
 PASSWORD = "web-passphrase-1"
 CSRF = {"X-Requested-With": "life-os"}
-PLUS_TEXT = "vournal OS is part of vournal Plus."
+PLUS_TEXT = "vournal life is part of vournal Plus."
 
 def _cookie(response: httpx.Response, name: str) -> str:
     for header in response.headers.get_list("set-cookie"):
