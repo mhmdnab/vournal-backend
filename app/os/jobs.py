@@ -6,7 +6,8 @@
 - assistant-undo-cleanup, at 03:05: the chat's undo copies older than 24 hours;
 - entry-review-cleanup, at 03:05: app recordings left unsaved on the review card for 7 days;
 - finance-recurring-transactions and finance-recurring-autolog, hourly;
-- market-rates, at minute 17 every 6 hours.
+- market-rates, at minute 17 every 6 hours;
+- plus-trial-reminders, at 09:00: the email a week before the free months of Plus end.
 
 Started from the app's startup; VOURNAL_OS_JOBS=0 switches them off. Each run holds a
 Postgres advisory lock for as long as it runs (in a transaction, so a crash or a dropped
@@ -106,6 +107,12 @@ async def finance_autolog() -> None:
     await _each("finance-recurring-autolog", await _plus_users({p.userId for p in due}), lambda u: recurring_payments.auto_log_due(u.id))
 
 
+async def plus_trial_reminders() -> None:
+    from app.trial_reminders import send_trial_reminders
+
+    await send_trial_reminders(datetime.now(timezone.utc))
+
+
 async def refresh_market_rates() -> None:
     await market_rates.refresh()
 
@@ -128,6 +135,7 @@ JOBS = (
     Job("market-rates", lambda t: t.minute == 17 and t.hour % 6 == 0, refresh_market_rates),
     Job("finance-recurring-transactions", lambda t: t.minute == 0, finance_repeat),
     Job("finance-recurring-autolog", lambda t: t.minute == 0, finance_autolog),
+    Job("plus-trial-reminders", lambda t: (t.hour, t.minute) == (9, 0), plus_trial_reminders),
 )
 _BY_NAME = {j.name: j for j in JOBS}
 

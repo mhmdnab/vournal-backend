@@ -152,3 +152,63 @@ class Trial(TrialBase):
         user = await self._reload(user)
         self.assertEqual(user.planSource, "apple")
         _near(self, user.planExpiresAt, _in(30))
+
+
+class TrialReminder(TrialBase):
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        self.sent: list[tuple[str, datetime]] = []
+
+        async def capture(to, ends_at):
+            self.sent.append((to, ends_at))
+            return True
+
+        self.mail = patch("app.email.send_trial_ending", capture)
+        self.mail.start()
+
+    async def asyncTearDown(self):
+        self.mail.stop()
+        await super().asyncTearDown()
+
+    async def _on_trial(self, days_left: float):
+        user = await self._user()
+        await start_trial(self.db, user)
+        ends = _in(days_left)
+        await self.db.user.update(
+            where={"id": user.id}, data={"trialEndsAt": ends, "planExpiresAt": ends}
+        )
+        return await self._reload(user)
+
+    def _mine(self, user) -> list:
+        return [s for s in self.sent if s[0] == user.email]
+
+    async def test_reminder_sent_once_in_the_last_week(self):
+        from app.trial_reminders import send_trial_reminders
+
+        user = await self._on_trial(5)
+        await send_trial_reminders(datetime.now(timezone.utc))
+        self.assertEqual(len(self._mine(user)), 1)
+        self.assertIsNotNone((await self._reload(user)).trialReminderSentAt)
+        await send_trial_reminders(datetime.now(timezone.utc))
+        self.assertEqual(len(self._mine(user)), 1)
+
+    async def test_reminder_not_sent_early(self):
+        from app.trial_reminders import send_trial_reminders
+
+        user = await self._on_trial(20)
+        await send_trial_reminders(datetime.now(timezone.utc))
+        self.assertEqual(self._mine(user), [])
+
+    async def test_reminder_skips_subscribers(self):
+        from app.trial_reminders import send_trial_reminders
+
+        user = await self._on_trial(5)
+        await grant_plus(self.db, user.id, _in(30), "paddle", f"sub_{uuid.uuid4().hex[:8]}")
+        await send_trial_reminders(datetime.now(timezone.utc))
+        self.assertEqual(self._mine(user), [])
+
+    def test_reminder_job_is_scheduled(self):
+        from app.os import jobs
+
+        self.assertIn("plus-trial-reminders", jobs.due_jobs(datetime(2026, 11, 10, 9, 0, tzinfo=timezone.utc)))
+        self.assertNotIn("plus-trial-reminders", jobs.due_jobs(datetime(2026, 11, 10, 9, 1, tzinfo=timezone.utc)))

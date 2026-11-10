@@ -94,3 +94,17 @@ async def send_plus_confirm_link(to: str, url: str) -> bool:
         "<p>The link works for 7 days.</p>"
     )
     return await _send(to, "Turn on vournal Plus", html, text)
+
+
+async def send_trial_ending(to: str, ends_at) -> bool:
+    """A week before the free months of Plus end. Outside the app, so it can name both
+    ways to subscribe."""
+    day = f"{ends_at.day} {ends_at:%B}"
+    lines = [
+        f"Your free vournal Plus ends on {day}.",
+        "Nothing will be charged: the free months end on their own.",
+        "To keep Plus, subscribe in the vournal app or at life.vournal.app.",
+        "Your journal and everything in vournal OS stay yours either way.",
+    ]
+    html = "".join(f"<p>{line}</p>" for line in lines)
+    return await _send(to, f"Your free vournal Plus ends on {day}", html, "\n\n".join(lines))
