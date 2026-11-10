@@ -24,7 +24,7 @@ from fastapi.responses import HTMLResponse
 
 from app import email, security
 from app.db import db
-from app.entitlements import confirm_email, effective_plan
+from app.entitlements import confirm_email, effective_plan, plan_details
 from app.quota import usage_snapshot
 from app.rate_limit import limiter, rate_limited
 from app.storage import delete_audio
@@ -510,12 +510,16 @@ def _user_out(user) -> UserOut:
     """Serialize a user, resolving the EFFECTIVE plan and hiding a stale expiry
     once the entitlement has lapsed to free."""
     plan = effective_plan(user)
+    details = plan_details(user)
     return UserOut(
         id=user.id,
         email=user.email,
         timezone=user.timezone,
         plan=plan,
         planExpiresAt=user.planExpiresAt if plan != "free" else None,
+        planSource=details["planSource"],
+        trialEndsAt=details["trialEndsAt"],
+        paddleManageUrl=details["paddleManageUrl"],
         usage=UsageOut(**usage_snapshot(user)),
         createdAt=user.createdAt,
         emailConfirmed=user.emailVerifiedAt is not None,

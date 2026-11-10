@@ -25,7 +25,7 @@ from app.auth import (
     rotate_refresh_token,
 )
 from app.db import db
-from app.entitlements import confirm_email, effective_plan
+from app.entitlements import confirm_email, effective_plan, plan_details
 from app.os.common.deps import (
     ACCESS_COOKIE,
     REFRESH_COOKIE,
@@ -115,6 +115,7 @@ def web_user_out(user, settings) -> dict:
         "lastLoginAt": None,  # the app doesn't track it
         "createdAt": user.createdAt,
         "plan": effective_plan(user),
+        **plan_details(user),
     }
 
 

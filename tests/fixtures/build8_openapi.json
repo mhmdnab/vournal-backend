@@ -194,6 +194,17 @@
           "title": "Id",
           "type": "string"
          },
+         "paddleManageUrl": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Paddlemanageurl"
+         },
          "plan": {
           "default": "free",
           "title": "Plan",
@@ -211,6 +222,17 @@
           ],
           "title": "Planexpiresat"
          },
+         "planSource": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Plansource"
+         },
          "timezone": {
           "anyOf": [
            {
@@ -221,6 +243,18 @@
            }
           ],
           "title": "Timezone"
+         },
+         "trialEndsAt": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Trialendsat"
          },
          "usage": {
           "anyOf": [
@@ -1141,6 +1175,17 @@
           "title": "Id",
           "type": "string"
          },
+         "paddleManageUrl": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Paddlemanageurl"
+         },
          "plan": {
           "default": "free",
           "title": "Plan",
@@ -1158,6 +1203,17 @@
           ],
           "title": "Planexpiresat"
          },
+         "planSource": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Plansource"
+         },
          "timezone": {
           "anyOf": [
            {
@@ -1168,6 +1224,18 @@
            }
           ],
           "title": "Timezone"
+         },
+         "trialEndsAt": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Trialendsat"
          },
          "usage": {
           "anyOf": [
@@ -1356,6 +1424,17 @@
           "title": "Id",
           "type": "string"
          },
+         "paddleManageUrl": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Paddlemanageurl"
+         },
          "plan": {
           "default": "free",
           "title": "Plan",
@@ -1373,6 +1452,17 @@
           ],
           "title": "Planexpiresat"
          },
+         "planSource": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Plansource"
+         },
          "timezone": {
           "anyOf": [
            {
@@ -1383,6 +1473,18 @@
            }
           ],
           "title": "Timezone"
+         },
+         "trialEndsAt": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Trialendsat"
          },
          "usage": {
           "anyOf": [
@@ -2389,6 +2491,17 @@
           "title": "Id",
           "type": "string"
          },
+         "paddleManageUrl": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Paddlemanageurl"
+         },
          "plan": {
           "default": "free",
           "title": "Plan",
@@ -2406,6 +2519,17 @@
           ],
           "title": "Planexpiresat"
          },
+         "planSource": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Plansource"
+         },
          "timezone": {
           "anyOf": [
            {
@@ -2416,6 +2540,18 @@
            }
           ],
           "title": "Timezone"
+         },
+         "trialEndsAt": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ],
+          "title": "Trialendsat"
          },
          "usage": {
           "anyOf": [

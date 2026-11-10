@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends
 
 PASSWORD = "web-passphrase-1"
 CSRF = {"X-Requested-With": "life-os"}
-PLUS_TEXT = "vournal OS is part of vournal Plus. Subscribe in the vournal app on your iPhone."
+PLUS_TEXT = "vournal OS is part of vournal Plus."
 
 def _cookie(response: httpx.Response, name: str) -> str:
     for header in response.headers.get_list("set-cookie"):
@@ -77,6 +77,25 @@ class WebAuth(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(body["email"], user.email)
         self.assertIs(body["twoFactorEnabled"], False)
         self.assertEqual(body["plan"], "plus")
+
+    async def test_me_shows_plan_details(self):
+        expires = datetime.now(timezone.utc) + timedelta(days=20)
+        user = await self._user(planSource="paddle", planExpiresAt=expires, paddleSubscriptionId="sub_x")
+        await self._login(user)
+        with patch.dict(os.environ, {"PADDLE_MANAGE_URL": "https://pdl.test/portal"}):
+            body = (await self.client.get("/api/auth/me")).json()["user"]
+        self.assertEqual(body["planSource"], "paddle")
+        self.assertEqual(body["paddleManageUrl"], "https://pdl.test/portal")
+        self.assertTrue(body["planExpiresAt"].startswith(expires.date().isoformat()))
+        self.assertIsNone(body["trialEndsAt"])
+
+    async def test_me_plan_details_are_empty_without_plus(self):
+        user = await self._user(plan="free", planSource="paddle")
+        response = await self._login(user)
+        body = response.json()["user"]
+        for key in ("planSource", "planExpiresAt", "trialEndsAt", "paddleManageUrl"):
+            self.assertIn(key, body)
+            self.assertIsNone(body[key], key)
 
     async def test_wrong_password_is_nest_401(self):
         user = await self._user()

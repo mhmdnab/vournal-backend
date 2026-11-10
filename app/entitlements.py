@@ -60,6 +60,20 @@ def is_paid(user) -> bool:
     return effective_plan(user) in PAID_PLANS
 
 
+def plan_details(user) -> dict:
+    """What the Plus pages show: which grant they're on, until when, the free months'
+    end, and (for a web subscription) where to manage it. Empty while on free."""
+    live = is_paid(user)
+    source = user.planSource if live else None
+    manage = os.environ.get("PADDLE_MANAGE_URL", "").strip() or None
+    return {
+        "planSource": source,
+        "planExpiresAt": user.planExpiresAt if live else None,
+        "trialEndsAt": getattr(user, "trialEndsAt", None),
+        "paddleManageUrl": manage if source == "paddle" else None,
+    }
+
+
 # ---- Writes (build 5 billing) -------------------------------------------------
 # The ONLY code that writes plan / planExpiresAt. Apple purchases, App Store Server
 # Notifications and Paddle webhooks all come through here, so two sources can't

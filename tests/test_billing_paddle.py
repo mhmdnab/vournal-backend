@@ -117,6 +117,31 @@ class Webhook(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(user.planSource, "paddle")
         self.assertEqual(user.paddleSubscriptionId, self.sub)
 
+    async def test_signed_in_checkout_grants_by_user_id(self):
+        # The dashboard's checkout carries the signed-in account's id: it grants at once,
+        # whatever email was typed at checkout, confirmed or not.
+        from app.entitlements import effective_plan
+
+        user = await self.db.user.create(data={"email": self.email})
+        event = _event("subscription.activated", "someone-else@example.test", self.sub)
+        event["data"]["custom_data"]["vournalUserId"] = user.id
+        response = await self._send(event)
+        self.assertEqual(response.status_code, 200, response.text)
+        user = await self.db.user.find_unique(where={"id": user.id})
+        self.assertEqual(effective_plan(user), "plus")
+        self.assertEqual(user.planSource, "paddle")
+        self.assertIsNone(await self.db.pendinggrant.find_unique(where={"externalId": self.sub}))
+
+    async def test_unknown_user_id_falls_back_to_email(self):
+        from app.entitlements import effective_plan
+
+        user = await self._user()
+        event = _event("subscription.activated", self.email, self.sub)
+        event["data"]["custom_data"]["vournalUserId"] = "not-an-account"
+        await self._send(event)
+        user = await self.db.user.find_unique(where={"id": user.id})
+        self.assertEqual(effective_plan(user), "plus")
+
     async def test_unknown_email_stores_pending_grant_then_applies_on_confirm(self):
         from app.entitlements import confirm_email, effective_plan
 

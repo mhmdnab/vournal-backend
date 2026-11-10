@@ -5,10 +5,12 @@ request is authenticated by its Paddle-Signature header (HMAC-SHA256 of
 "{ts}:{raw body}" with the notification destination's secret key,
 PADDLE_WEBHOOK_SECRET), and rejected if older than five minutes.
 
-The website checkout has no sign-in; it records the vournal email in the
-subscription's custom_data.vournalEmail. That email finds the account. A purchase
-made before the account exists is kept as a PendingGrant and applied when an
-account with that email is created (app.entitlements.apply_pending_grants).
+The dashboard's checkout runs signed in and records the account in the
+subscription's custom_data.vournalUserId (and the email in vournalEmail); that
+account is granted at once. A checkout that carries only an email (the old website
+one) finds the account by that email, and grants only to a confirmed account; a
+purchase made before the account exists is kept as a PendingGrant and applied when
+an account with that email is confirmed (app.entitlements.apply_pending_grants).
 
 Only subscriptions for PADDLE_PLUS_PRICE_ID count. Sandbox and live Paddle have
 different price ids, so a sandbox purchase can never grant Plus on a backend
@@ -94,10 +96,16 @@ async def webhook(request: Request):
 
     sub_id = data.get("id")
     status = data.get("status")
-    email = ((data.get("custom_data") or {}).get("vournalEmail") or "").strip().lower()
+    custom = data.get("custom_data") or {}
+    email = (custom.get("vournalEmail") or "").strip().lower()
+    user_id = str(custom.get("vournalUserId") or "").strip()
     period_end = (data.get("current_billing_period") or {}).get("ends_at")
     user = None
-    if email:
+    signed_in = False
+    if user_id:
+        user = await db.user.find_unique(where={"id": user_id})
+        signed_in = user is not None
+    if user is None and email:
         user = await db.user.find_unique(where={"email": email})
     if user is None and sub_id:
         user = await db.user.find_first(where={"paddleSubscriptionId": sub_id})
@@ -105,7 +113,7 @@ async def webhook(request: Request):
     if status in _ACTIVE and period_end and sub_id:
         expires = _when(period_end)
         # Only a confirmed account: anyone can register with someone else's email.
-        if user is not None and (user.emailVerifiedAt or user.paddleSubscriptionId == sub_id):
+        if user is not None and (signed_in or user.emailVerifiedAt or user.paddleSubscriptionId == sub_id):
             await grant_plus(db, user.id, expires, "paddle", sub_id)
         elif email:
             first_notice = (

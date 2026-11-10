@@ -169,6 +169,11 @@ class UserOut(BaseModel):
     # the effective plan is free (nothing to show).
     plan: str = "free"
     planExpiresAt: Optional[datetime] = None
+    # Which grant is live ("apple" | "paddle" | "manual" | "trial"), when the free
+    # months end (set once), and the web subscription's manage link (paddle only).
+    planSource: Optional[str] = None
+    trialEndsAt: Optional[datetime] = None
+    paddleManageUrl: Optional[str] = None
     # Live usage/limits for the plan surface (null only on older serializations).
     usage: Optional[UsageOut] = None
     createdAt: datetime
