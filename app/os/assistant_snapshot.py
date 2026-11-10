@@ -19,7 +19,7 @@ from app.os.assistant_tools import ToolError
 # deletable kinds (assistant_tools.remove) → table
 MODELS = {"task": "Task", "event": "Event", "reminder": "Reminder", "transaction": "Transaction", "debt": "Debt", "note": "Note",
           "shopping_item": "ShoppingItem", "food_log": "FoodLog", "weight": "WeightLog", "habit": "Habit", "project": "Project",
-          "gift": "GiftIdea", "goal": "Goal", "important_date": "ImportantDate"}
+          "gift": "GiftIdea", "goal": "Goal", "important_date": "ImportantDate", "account": "Account"}
 # Attachment.entityType for a table, where it differs from the table name in SCREAMING_SNAKE
 _ENTITY_TYPE = {"MaintenanceItem": "MAINTENANCE"}
 

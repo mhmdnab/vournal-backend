@@ -219,7 +219,9 @@ async def _call(client, round_: int, messages: list, effort: str, system: str = 
 
 async def send(user, text: str, conversation_id: str | None = None, display: str | None = None, importing: bool = False) -> dict:
     """One message → the reply. `display` is what the chat shows for the user's turn when it
-    differs from what the model gets (an import part); `importing` forbids deleting."""
+    differs from what the model gets (an import part). `importing`: only creating tools run, and
+    the model gets this turn alone, not the chat's history (each import part stands alone, so
+    a long file neither replays everything before it nor runs into the chat's turn cap)."""
     s = await ensure_os_profile(user)
     lang = to_lang(s.language)
     left = await ai.remaining(user.id, s.timezone)
@@ -243,6 +245,8 @@ async def send(user, text: str, conversation_id: str | None = None, display: str
         conversation = await db.assistantconversation.update(where={"id": conversation.id}, data={"title": title_from(display or text)})
     conv = {"id": conversation.id, "title": conversation.title}
     history = await db.assistantmessage.find_many(where={"conversationId": conv["id"]}, order=_IN_ORDER)
+    if importing:
+        history = []
     if len(history) >= MAX_TURNS:
         return fail("too_long", conv)
 
@@ -466,5 +470,10 @@ class ChatBody(RuleBody):
 @router.post("/chat")
 async def chat(body: ChatBody, user=Depends(plus_user)):
     """One message → the assistant's reply (after any tool calls)."""
+    from app.os.assistant_import import import_running
+
+    if body.conversationId and import_running(body.conversationId):
+        # its rows would interleave with the import's: wait, or chat in a new conversation
+        raise nest_error(409, "This chat is importing a file. Wait for it to finish, or start a new chat.")
     ai.throttle("assistant-chat", user.id)
     return await send(user, body.message, body.conversationId)

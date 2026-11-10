@@ -25,7 +25,7 @@ _JSON_TYPES = {"string": str, "boolean": bool, "object": dict, "array": list}
 ENTITY = {
     "create_task": "task", "update_task": "task", "create_event": "event", "update_event": "event",
     "create_reminder": "reminder", "add_transaction": "transaction", "update_transaction": "transaction",
-    "create_debt": "debt", "add_debt_payment": "debt_payment", "add_note": "note", "add_shopping_item": "shopping_item",
+    "create_debt": "debt", "create_account": "account", "add_debt_payment": "debt_payment", "add_note": "note", "add_shopping_item": "shopping_item",
     "log_food": "food_log", "log_water": "water", "log_weight": "weight", "update_health_profile": "health_profile",
     "set_dashboard_layout": "dashboard", "create_habit": "habit", "create_challenge": "challenge", "create_workout_plan": "workout_plan",
     "save_focus_mode": "focus_mode", "set_focus": "focus_mode",

@@ -144,3 +144,13 @@ class MoreTools(ChatBase):
         a = (await self.say("add walk"))["messages"][1]["actions"][0]
         self.assertEqual((a["status"], a["kind"], a["entityType"]), ("pending", "create", "habit"))
         self.assertEqual(await self.db.habit.count(where={"userId": self.client.user.id}), 0)
+
+
+class AccountTool(MoreTools):
+    async def test_create_account_and_undo(self):
+        a = await self.act("create_account", {"name": "Whish Wallet", "type": "DIGITAL_WALLET", "balance": 120, "currency": "USD"})
+        self.assertEqual((a["kind"], a["entityType"]), ("create", "account"))
+        row = await self.db.account.find_unique(where={"id": a["entityId"]})
+        self.assertEqual((row.name, float(row.initialBalance), row.currency), ("Whish Wallet", 120, "USD"))
+        await self.undo(a)
+        self.assertIsNone(await self.db.account.find_unique(where={"id": a["entityId"]}))

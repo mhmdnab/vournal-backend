@@ -9,6 +9,8 @@ import asyncio
 import unittest
 from unittest.mock import patch
 
+from prisma import Json
+
 from vournal_os.parity import fake_model as fm
 from vournal_os.test_assistant import ChatBase
 
@@ -152,3 +154,75 @@ class Import(ChatBase):
         self.assertEqual(done.status_code, 200, done.text)
         self.assertEqual([a["status"] for a in done.json()], ["done", "done"])
         self.assertEqual(await self.db.project.count(where={"userId": self.client.user.id, "name": "Website relaunch"}), 1)
+
+
+class ImportFixes(Import):
+    async def test_each_part_gets_a_fresh_context(self):
+        # parts don't replay earlier parts (cost and the row cap): only what was added so far
+        from app.os import assistant_import
+
+        with patch.object(assistant_import, "PART_LIMIT", 80):
+            fm.script(
+                fm.tools(("create_project", {"name": "Website relaunch"})), fm.message(fm.text("Added the project.")),
+                fm.message(fm.text("Noted the debt.")),
+                fm.message(fm.text("Report.")),
+            )
+            started = await self.upload()
+        await self.wait(started.json()["conversationId"])
+        calls = [r for r in fm.requests("python") if r.get("body", {}).get("messages")]
+        part_two = next(r for r in calls if "part 2 of 2" in r["body"]["messages"][0]["content"][0]["text"])
+        self.assertEqual(len(part_two["body"]["messages"]), 1)
+        self.assertIn("Website relaunch", part_two["body"]["messages"][0]["content"][0]["text"])  # added so far
+
+    async def test_two_uploads_at_once_start_one_import(self):
+        fm.script(*[fm.message(fm.text("ok")) for _ in range(6)])
+        first, second = await asyncio.gather(self.upload(), self.upload())
+        self.assertEqual(sorted([first.status_code, second.status_code]), [202, 409])
+        winner = first if first.status_code == 202 else second
+        await self.wait(winner.json()["conversationId"])
+
+    async def test_import_only_adds(self):
+        habit = await self.db.habit.create(data={"userId": self.client.user.id, "name": "Read"})
+        fm.script(
+            fm.tools(("update_habit", {"id": habit.id, "archived": True}), ("set_dashboard_layout", {"widgets": []})),
+            fm.message(fm.text("Done.")), fm.message(fm.text("Report.")),
+        )
+        started = await self.upload()
+        await self.wait(started.json()["conversationId"])
+        self.assertFalse((await self.db.habit.find_unique(where={"id": habit.id})).isArchived)
+
+    async def test_an_interrupted_import_says_so(self):
+        # the process restarted mid-import: no live state, the parts so far, no report
+        conversation = await self.db.assistantconversation.create(
+            data={"userId": self.client.user.id, "channel": "APP", "title": "Import: plan.md"}
+        )
+        await self.db.assistantmessage.create(
+            data={"conversationId": conversation.id, "role": "user", "content": Json([{"type": "text", "text": "x"}]),
+                  "text": "plan.md — part 1 of 3", "hidden": False}
+        )
+        status = (await self.client.get(f"/api/assistant/import/{conversation.id}")).json()
+        self.assertEqual((status["status"], status["done"], status["total"]), ("interrupted", 1, 3))
+
+    async def test_chat_waits_while_its_import_runs(self):
+        from app.os import assistant_import
+
+        conversation = await self.db.assistantconversation.create(
+            data={"userId": self.client.user.id, "channel": "APP", "title": "Import: plan.md"}
+        )
+        assistant_import._status[conversation.id] = {"userId": self.client.user.id, "status": "running", "done": 0, "total": 2, "failed": 0}
+        try:
+            response = await self.client.post("/api/assistant/chat", json={"message": "hi", "conversationId": conversation.id})
+        finally:
+            assistant_import._status.pop(conversation.id, None)
+        self.assertEqual(response.status_code, 409, response.text)
+
+    async def test_accounts_from_the_file_are_added(self):
+        fm.script(
+            fm.tools(("create_account", {"name": "Whish Wallet", "type": "DIGITAL_WALLET", "balance": 120, "currency": "USD"})),
+            fm.message(fm.text("Added the account.")), fm.message(fm.text("Report.")),
+        )
+        started = await self.upload("# Money\n## Accounts\n- Whish Wallet: 120 USD\n")
+        await self.wait(started.json()["conversationId"])
+        account = await self.db.account.find_first(where={"userId": self.client.user.id, "name": "Whish Wallet"})
+        self.assertIsNotNone(account)
+        self.assertEqual(float(account.initialBalance), 120)

@@ -11,6 +11,7 @@ The person's mode applies: in Manual the changes wait as cards, and one Approve 
 
 import asyncio
 import logging
+import re
 
 from fastapi import Depends, Request
 from starlette.datastructures import UploadFile
@@ -35,6 +36,7 @@ _running: set[str] = set()
 _status: dict[str, dict] = {}
 
 INSTRUCTION = """[Import from my other AI chats: part {i} of {n} of my file "{name}".]
+{added_so_far}
 Add everything in this part to my vournal: projects (with their tasks), tasks, goals, money (accounts with their balances, budgets, debts, bills and subscriptions), habits, events, people and notes.
 Rules for this import:
 - Only add what the text below says. Copy amounts, dates and names exactly as written; if a date isn't clear, leave it out.
@@ -45,10 +47,12 @@ Rules for this import:
 {part}"""
 
 REPORT = (
-    "That was the whole file. Now give me the import report in three short lists: what you added, "
-    "what you skipped because it was already there, and what you couldn't add (quote each one, so I "
-    "can add it by hand)."
+    "I imported my file \"{name}\" into vournal in {n} parts. Here is what you replied after each part:\n\n"
+    "{replies}\n\nNow give me the import report in three short lists: what you added, what you skipped "
+    "because it was already there, and what you couldn't add (quote each one, so I can add it by hand). "
+    "Use only what the replies above say."
 )
+_REPLY_CHARS = 1_500  # of each part's reply, in the report request
 
 
 def _is_top_heading(line: str) -> bool:
@@ -125,30 +129,62 @@ async def _read(request: Request) -> tuple[str, str]:
     return name, text
 
 
+def _added_line(added: list[str]) -> str:
+    if not added:
+        return ""
+    shown = added[-80:]  # the latest, so a big file doesn't grow every request
+    return "Already added by earlier parts of this import (don't add these again): " + "; ".join(shown) + "\n"
+
+
 async def _run(user, conversation_id: str, name: str, parts: list[str]) -> None:
+    """Each part is its own request (the history isn't replayed): what earlier parts added is
+    passed along instead, so nothing is added twice. The report is made from the parts' replies."""
     from app.os import assistant
 
     state = _status[conversation_id]
+    added: list[str] = []
+    replies: list[str] = []
     try:
         for i, part in enumerate(parts, start=1):
             try:
                 res = await assistant.send(
-                    user, INSTRUCTION.format(i=i, n=len(parts), name=name, part=part), conversation_id,
-                    display=f"{name} — part {i} of {len(parts)}", importing=True,
+                    user, INSTRUCTION.format(i=i, n=len(parts), name=name, part=part, added_so_far=_added_line(added)),
+                    conversation_id, display=f"{name} — part {i} of {len(parts)}", importing=True,
                 )
                 if res.get("status") != "ok":
                     state["failed"] += 1
+                reply = res["messages"][1] if len(res.get("messages") or []) > 1 else None
+                if reply:
+                    added += [a["label"] for a in reply.get("actions") or [] if a.get("kind") == "create" and a.get("status") != "failed"]
+                    replies.append(f"Part {i}: {reply['text'][:_REPLY_CHARS]}")
+                else:
+                    replies.append(f"Part {i}: (this part couldn't be read: {res.get('status')})")
             except Exception:  # noqa: BLE001 — one part never stops the rest
                 log.exception("import part %s failed", i)
                 state["failed"] += 1
+                replies.append(f"Part {i}: (this part couldn't be read)")
             state["done"] = i
         try:
-            await assistant.send(user, REPORT, conversation_id, display="Import report", importing=True)
+            report = await assistant.send(
+                user, REPORT.format(name=name, n=len(parts), replies="\n\n".join(replies)), conversation_id,
+                display="Import report", importing=True,
+            )
+            if report.get("status") != "ok":
+                state["reportFailed"] = True
         except Exception:  # noqa: BLE001
             log.exception("import report failed")
+            state["reportFailed"] = True
     finally:
         state["status"] = "done"
         _running.discard(user.id)
+
+
+def import_running(conversation_id: str) -> bool:
+    state = _status.get(conversation_id)
+    return bool(state and state["status"] == "running")
+
+
+_tasks: set[asyncio.Task] = set()  # kept, so a running import isn't garbage-collected
 
 
 def _refused(message: str, state: str):
@@ -166,20 +202,36 @@ async def start(request: Request, user=Depends(plus_user)):
         raise nest_error(400, f"The file is too long to import at once ({MAX_PARTS} parts at most)")
     if user.id in _running:
         raise nest_error(409, "An import is already running. Wait for it to finish.")
-    s = await ensure_os_profile(user)
-    if ai.client() is None:
-        raise _refused("The assistant isn't available right now.", "not_configured")
-    if not s.aiEnabled:
-        raise _refused("Turn on the AI assistant in Settings → AI first.", "disabled")
-    if await ai.remaining(user.id, s.timezone) < len(parts) + 1:
-        raise _refused("Not enough assistant messages left this month for this file.", "limit")
-    conversation = await db.assistantconversation.create(
-        data={"userId": user.id, "channel": "APP", "title": f"Import: {name}"[:80]}
-    )
+    # claimed before anything is awaited, so two uploads at once can't both start
     _running.add(user.id)
+    try:
+        ai.throttle("assistant-import", user.id)
+        s = await ensure_os_profile(user)
+        if ai.client() is None:
+            raise _refused("The assistant isn't available right now.", "not_configured")
+        if not s.aiEnabled:
+            raise _refused("Turn on the AI assistant in Settings → AI first.", "disabled")
+        if await ai.remaining(user.id, s.timezone) < len(parts) + 1:
+            raise _refused("Not enough assistant messages left this month for this file.", "limit")
+        conversation = await db.assistantconversation.create(
+            data={"userId": user.id, "channel": "APP", "title": f"Import: {name}"[:80]}
+        )
+    except BaseException:
+        _running.discard(user.id)
+        raise
+    _forget_finished()
     _status[conversation.id] = {"userId": user.id, "status": "running", "done": 0, "total": len(parts), "failed": 0}
-    asyncio.create_task(_run(user, conversation.id, name, parts))
+    task = asyncio.create_task(_run(user, conversation.id, name, parts))
+    _tasks.add(task)
+    task.add_done_callback(_tasks.discard)
     return {"conversationId": conversation.id, "parts": len(parts)}
+
+
+def _forget_finished() -> None:
+    """Finished imports' counters go once there are many (their chats keep everything)."""
+    finished = [k for k, v in _status.items() if v["status"] != "running"]
+    for k in finished[:-200]:
+        _status.pop(k, None)
 
 
 async def _owned_conversation(user_id: str, conversation_id: str):
@@ -189,11 +241,29 @@ async def _owned_conversation(user_id: str, conversation_id: str):
     return row
 
 
+_PART_LABEL = re.compile(r" — part (\d+) of (\d+)$")
+
+
+async def _from_the_chat(conversation_id: str) -> dict:
+    """No live state (a restart, or another server): read it from the chat. A report means it
+    finished; parts without one mean it was cut off."""
+    rows = await db.assistantmessage.find_many(where={"conversationId": conversation_id, "role": "user", "hidden": False})
+    texts = [r.text or "" for r in rows]
+    if "Import report" in texts:
+        return {"status": "done", "done": 0, "total": 0, "failed": 0}
+    parts = [m for m in (_PART_LABEL.search(t) for t in texts) if m]
+    if not parts:
+        return {"status": "done", "done": 0, "total": 0, "failed": 0}
+    done = max(int(m.group(1)) for m in parts)
+    total = max(int(m.group(2)) for m in parts)
+    return {"status": "interrupted", "done": done, "total": total, "failed": 0}
+
+
 @router.get("/{conversation_id}")
 async def status(conversation_id: str, user=Depends(plus_user)):
     await _owned_conversation(user.id, conversation_id)
-    state = _status.get(conversation_id) or {"status": "done", "done": 0, "total": 0, "failed": 0}
-    return {k: state[k] for k in ("status", "done", "total", "failed")}
+    state = _status.get(conversation_id) or await _from_the_chat(conversation_id)
+    return {**{k: state[k] for k in ("status", "done", "total", "failed")}, "reportFailed": bool(state.get("reportFailed"))}
 
 
 @router.post("/{conversation_id}/approve-all")
@@ -205,7 +275,8 @@ async def approve_all(conversation_id: str, user=Depends(plus_user)):
 
     await _owned_conversation(user.id, conversation_id)
     rows = await db.assistantaction.find_many(
-        where={"conversationId": conversation_id, "userId": user.id, "status": "pending", "entryId": None},
+        # the import's own additions (a delete asked for later in the same chat keeps its own card)
+        where={"conversationId": conversation_id, "userId": user.id, "status": "pending", "entryId": None, "kind": {"not": "delete"}},
         order=[{"createdAt": "asc"}, {"position": "asc"}],
     )
     if not rows:
