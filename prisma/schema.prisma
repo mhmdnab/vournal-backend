@@ -82,13 +82,17 @@ model User {
   // Billing (build 5). appAccountToken is the UUID the app attaches to every App
   // Store purchase so a transaction maps back to this user; created on demand.
   // planSource says which grant set the current planExpiresAt ("apple" | "paddle"
-  // | "manual"). Written only through app.entitlements.grant_plus/revoke_plus.
+  // | "manual" | "trial"). Written only through app.entitlements.grant_plus/revoke_plus.
   appAccountToken            String? @unique
   appleOriginalTransactionId String? @unique
   planSource                 String?
   // When Apple last refunded/revoked this user's subscription. A signed
   // transaction bought before this moment never grants Plus again (stale replay).
   appleRevokedAt             DateTime?
+  // The free months of Plus (9m): set once when the trial starts, never cleared, so
+  // it also means "has had a trial". The reminder email a week before is sent once.
+  trialEndsAt         DateTime?
+  trialReminderSentAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt @default(now())
 
@@ -393,6 +397,16 @@ model EntryPlace {
 
 // A web (Paddle) purchase whose email matched no account yet. Applied when an
 // account with that email is created; externalId is the Paddle subscription id.
+// One row per email or sign-in identity that has had the free months of Plus, kept
+// after the account is deleted (no relation), so the trial is given once per person.
+// `hash` is a keyed HMAC (app.mfa.digest), never the plain value.
+model TrialClaim {
+  id        String   @id @default(cuid())
+  kind      String
+  hash      String   @unique
+  createdAt DateTime @default(now())
+}
+
 model PendingGrant {
   id         String    @id @default(cuid())
   email      String
