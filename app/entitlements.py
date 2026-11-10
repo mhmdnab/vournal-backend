@@ -11,7 +11,8 @@ expires, rather than sticking forever.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import os
+from datetime import datetime, timedelta, timezone
 
 # The tiers. Keep in lockstep with the Prisma `Plan` enum.
 #   free — $0, the default for everyone
@@ -64,7 +65,9 @@ def is_paid(user) -> bool:
 # Notifications and Paddle webhooks all come through here, so two sources can't
 # fight: the later expiry always wins, and a source can only end its own grant.
 
-SOURCES = ("apple", "paddle", "manual")
+SOURCES = ("apple", "paddle", "manual", "trial")
+# Paid sources: a purchase always takes over from the free months (spec 2026-11-09).
+_PAID_SOURCES = ("apple", "paddle")
 
 
 def _aware(value: datetime | None) -> datetime | None:
@@ -100,7 +103,10 @@ async def grant_plus(
     expires_at = _aware(expires_at)
     lifetime = is_paid(user) and user.planExpiresAt is None
     current = _aware(user.planExpiresAt) if is_paid(user) else None
-    governs = not lifetime and (current is None or expires_at > current)
+    # A purchase replaces the free months even when it ends sooner: billing starts the
+    # day they subscribe, and planSource must say what they're on.
+    replaces_trial = user.planSource == "trial" and source in _PAID_SOURCES
+    governs = not lifetime and (current is None or expires_at > current or replaces_trial)
     data: dict = {}
     if governs:
         data.update(plan=PLUS, planExpiresAt=expires_at, planSource=source)
@@ -174,12 +180,85 @@ async def apply_pending_grants(db, user) -> None:
         await db.pendinggrant.update(where={"id": grant.id}, data={"appliedAt": now})
 
 
+# ---- The free months (spec 2026-11-09-web-signup-paddle-trial) ---------------
+# Every account created after PLUS_TRIAL_FROM gets Plus for TRIAL_DAYS once its email
+# is confirmed. Once per person: the email (Gmail dots and +tags ignored) and each
+# linked sign-in identity are kept as keyed hashes in TrialClaim, which outlives the
+# account. Unset PLUS_TRIAL_FROM means no trials at all.
+
+TRIAL_DAYS = 60
+_GMAIL = ("gmail.com", "googlemail.com")
+
+
+def normalise_email(email: str) -> str:
+    """Lowercase; for Gmail, without dots and +tags (they reach the same inbox)."""
+    local, _, domain = email.strip().lower().partition("@")
+    if domain in _GMAIL:
+        local = local.split("+", 1)[0].replace(".", "")
+    return f"{local}@{domain}"
+
+
+def _trial_from() -> datetime | None:
+    raw = os.environ.get("PLUS_TRIAL_FROM", "").strip()
+    if not raw:
+        return None
+    try:
+        return _aware(datetime.fromisoformat(raw.replace("Z", "+00:00")))
+    except ValueError:
+        return None
+
+
+async def trial_claims(db, user) -> list[tuple[str, str]]:
+    """(kind, hash) for the account's email and every linked sign-in identity."""
+    from app.mfa import digest
+
+    claims = [("email", digest(normalise_email(user.email), "trial-claim"))]
+    for identity in await db.externalidentity.find_many(where={"userId": user.id}):
+        claims.append(("provider", digest(f"{identity.issuer}|{identity.subject}", "trial-claim")))
+    return claims
+
+
+async def start_trial(db, user) -> bool:
+    """Start the free months if this person can have them; True when they started.
+
+    Nothing happens while trials are off, for accounts from before they were switched
+    on, for anyone who had them (on this account or a deleted one), or for an account
+    already on Plus (a lifetime grant or a purchase isn't overwritten, and the free
+    months aren't spent on it)."""
+    from prisma.errors import UniqueViolationError
+
+    since = _trial_from()
+    if since is None or user.trialEndsAt is not None or is_paid(user):
+        return False
+    if _aware(user.createdAt) < since:
+        return False
+    claims = await trial_claims(db, user)
+    if await db.trialclaim.count(where={"hash": {"in": [h for _, h in claims]}}):
+        return False
+    ends = datetime.now(timezone.utc) + timedelta(days=TRIAL_DAYS)
+    try:
+        async with db.tx() as tx:
+            started = await tx.user.update_many(
+                where={"id": user.id, "trialEndsAt": None}, data={"trialEndsAt": ends}
+            )
+            if not started:
+                return False
+            for kind, hashed in claims:
+                await tx.trialclaim.create(data={"kind": kind, "hash": hashed})
+            await grant_plus(tx, user.id, ends, "trial", None)
+    except UniqueViolationError:
+        return False  # claimed at the same moment by another account of theirs
+    return True
+
+
 async def confirm_email(db, user):
-    """This address is proven theirs: mark it, and give them what was bought with it.
-    The only place pending grants apply, so claiming an email can't claim a purchase."""
+    """This address is proven theirs: mark it, and give them what was bought with it,
+    or else the free months. The only place pending grants apply, so claiming an email
+    can't claim a purchase."""
     if user.emailVerifiedAt is None:
         user = await db.user.update(
             where={"id": user.id}, data={"emailVerifiedAt": datetime.now(timezone.utc)}
         )
     await apply_pending_grants(db, user)
+    await start_trial(db, await db.user.find_unique(where={"id": user.id}))
     return await db.user.find_unique(where={"id": user.id})
