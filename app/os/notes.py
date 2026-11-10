@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr, field_
 from app.db import db
 from app.os.common import validators
 from app.os.common.activity import log_activity
-from app.os.common.deps import plus_user
+from app.os.common.space import Space, assert_in_space, assert_personal_links_allowed, current_space
 from app.os.common.http import invalid_data, nest_error, nest_router
 from app.os.common.jsparse import _JS_SPACE
 from app.os.common.ownership import assert_many_owned, assert_owned
@@ -123,7 +123,10 @@ def _unique(ids):
     return list(dict.fromkeys(ids))
 
 
-async def _assert_links(user_id: str, body: _Fields) -> None:
+async def _assert_links(space: Space, body: _Fields) -> None:
+    """Categories, tags, trips, courses and people are personal; a project is in the same space."""
+    assert_personal_links_allowed(space, body)
+    user_id = space.user.id
     if body.categoryId:
         category = await db.category.find_first(where={"id": body.categoryId, "userId": user_id})
         if category is None:
@@ -131,12 +134,13 @@ async def _assert_links(user_id: str, body: _Fields) -> None:
         if category.scope != "NOTE":
             raise nest_error(400, "Category must be a NOTE category")
     await assert_many_owned("tag", _unique(body.tagIds) if body.tagIds else None, user_id)
-    for model, value in (("project", body.projectId), ("trip", body.tripId), ("course", body.courseId), ("person", body.personId)):
+    await assert_in_space("project", body.projectId, space)
+    for model, value in (("trip", body.tripId), ("course", body.courseId), ("person", body.personId)):
         await assert_owned(model, value, user_id)
 
 
-async def _owned(user_id: str, id: str):
-    row = await db.note.find_first(where={"id": id, "userId": user_id}, include=_INCLUDE)
+async def _owned(space: Space, id: str):
+    row = await db.note.find_first(where={"id": id, **space.where}, include=_INCLUDE)
     if row is None:
         raise nest_error(404, "Note not found")
     return row
@@ -150,7 +154,8 @@ SORTS = ("updatedAt", "createdAt", "title")
 
 
 @router.get("")
-async def list_notes(request: Request, user=Depends(plus_user)):
+async def list_notes(request: Request, space: Space = Depends(current_space)):
+    user = space.user
     q = request.query_params
     errors = unknown_params(request, _LIST_QUERY)
     text = q.get("q")
@@ -166,7 +171,7 @@ async def list_notes(request: Request, user=Depends(plus_user)):
     page_size = _query_int(request, "pageSize", errors, MAX_PAGE_SIZE)
     if errors:
         raise nest_error(400, errors)
-    where: dict = {"userId": user.id, "isArchived": bool(archived)}
+    where: dict = {**space.where, "isArchived": bool(archived)}
     if favorite is not None:
         where["isFavorite"] = favorite
     if pinned is not None:
@@ -188,11 +193,12 @@ async def list_notes(request: Request, user=Depends(plus_user)):
 
 
 @router.post("", status_code=201)
-async def create(body: CreateBody, user=Depends(plus_user)):
-    await _assert_links(user.id, body)
+async def create(body: CreateBody, space: Space = Depends(current_space)):
+    user = space.user
+    await _assert_links(space, body)
     row = await db.note.create(
         data={
-            "userId": user.id,
+            **space.create_fields(),
             "title": body.title,
             "content": body.content or "",
             "color": body.color,
@@ -213,14 +219,16 @@ async def create(body: CreateBody, user=Depends(plus_user)):
 
 
 @router.get("/{id}")
-async def get(id: str, user=Depends(plus_user)):
-    return view(await _owned(user.id, id))
+async def get(id: str, space: Space = Depends(current_space)):
+    user = space.user
+    return view(await _owned(space, id))
 
 
 @router.patch("/{id}")
-async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
-    existing = await _owned(user.id, id)
-    await _assert_links(user.id, body)
+async def update(id: str, body: UpdateBody, space: Space = Depends(current_space)):
+    user = space.user
+    existing = await _owned(space, id)
+    await _assert_links(space, body)
     sent = body.model_fields_set
     if "title" in sent and body.title is None:
         raise invalid_data()  # Prisma refused null on a required column
@@ -248,8 +256,11 @@ async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
 
 
 @router.delete("/{id}")
-async def remove(id: str, user=Depends(plus_user)):
-    existing = await _owned(user.id, id)
+async def remove(id: str, space: Space = Depends(current_space)):
+    user = space.user
+    existing = await _owned(space, id)
+    if not space.can_delete(existing):
+        raise nest_error(404, "Note not found")
     await db.note.delete(where={"id": existing.id})
     await log_activity(user.id, "note.deleted", entity_id=id, title=existing.title)
     return {"ok": True}

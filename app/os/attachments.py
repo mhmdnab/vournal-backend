@@ -17,10 +17,10 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app import storage
 from app.db import db
 from app.os.common.activity import log_activity
-from app.os.common.deps import plus_user
+from app.os.common.space import Space, WORKSPACE_MODELS, current_space
 from app.os.common.http import nest_error, nest_router
 from app.os.common.jsparse import _JS_SPACE
-from app.os.common.ownership import ENTITY_TYPE_MODEL, assert_entity
+from app.os.common.ownership import ENTITY_TYPE_MODEL, LABELS, assert_entity
 from app.os.common.query import unknown_params
 
 router = nest_router("/attachments")
@@ -73,24 +73,42 @@ def _file_name(name: str | None) -> str:
     return cleaned.encode("utf-16-le")[:400].decode("utf-16-le", errors="ignore")
 
 
+# Files on the shared models follow their item into a workspace; everything else is personal.
+_SHARED_PARENTS = {t for t, m in ENTITY_TYPE_MODEL.items() if m in WORKSPACE_MODELS}
+
+
+async def _assert_parent(space: Space, entity_type: str | None, entity_id: str | None) -> None:
+    """The item a file hangs on must be in this space (a file's access follows its item, not
+    whoever uploaded it). In a workspace only tasks, events, projects and notes have files."""
+    if not entity_type or not entity_id or entity_type not in _SHARED_PARENTS:
+        if not space.personal and entity_type:
+            raise nest_error(400, "Files in a workspace go on tasks, events, projects and notes")
+        await assert_entity(entity_type, entity_id, space.user.id)
+        return
+    model = ENTITY_TYPE_MODEL[entity_type]
+    if await getattr(db, model).count(where={"id": entity_id, **space.where}) == 0:
+        raise nest_error(404, f"{LABELS[model]} not found")
+
+
 @router.get("")
-async def list_attachments(request: Request, user=Depends(plus_user)):
+async def list_attachments(request: Request, space: Space = Depends(current_space)):
+    user = space.user
     q = request.query_params
     errors = unknown_params(request, _FIELDS) + _target_errors({k: q.get(k) for k in _FIELDS})
     if errors:
         raise nest_error(400, errors)
-    await assert_entity(q.get("entityType"), q.get("entityId"), user.id)
+    await _assert_parent(space, q.get("entityType"), q.get("entityId"))
     rows = await db.attachment.find_many(
-        where={"userId": user.id, "entityType": q.get("entityType"), "entityId": q.get("entityId")}, order={"createdAt": "desc"}
+        where={"entityType": q.get("entityType"), "entityId": q.get("entityId")}, order={"createdAt": "desc"}
     )
     return {"items": [view(r) for r in rows], "total": len(rows)}
 
 
 @router.post("", status_code=201)
-async def create(request: Request, user=Depends(plus_user)):
+async def create(request: Request, space: Space = Depends(current_space)):
     try:
         async with request.form(max_files=1) as form:  # temp files close when the request is done
-            return await _create(form, user)
+            return await _create(form, space)
     except StarletteHTTPException as exc:
         raise _multer_error(exc) from exc
 
@@ -105,7 +123,8 @@ def _multer_error(exc: StarletteHTTPException) -> Exception:
     return exc
 
 
-async def _create(form, user) -> dict:
+async def _create(form, space: Space) -> dict:
+    user = space.user
     # busboy drops a file part whose name is empty (an empty browser file input)
     files = [(k, v) for k, v in form.multi_items() if isinstance(v, UploadFile) and _upload_name(v.filename)]
     stray = next((name for name, _ in files if name != "file"), None)
@@ -126,15 +145,16 @@ async def _create(form, user) -> dict:
     if mime not in ALLOWED_MIME:
         raise nest_error(400, "This file type is not allowed")
     entity_type, entity_id = values["entityType"], values["entityId"]
-    await assert_entity(entity_type, entity_id, user.id)
+    await _assert_parent(space, entity_type, entity_id)
 
     data = await upload.read()
-    key = f"os/attachments/{user.id}/{uuid.uuid4().hex}"
+    folder = f"ws/{space.workspace_id}" if space.workspace_id else user.id
+    key = f"os/attachments/{folder}/{uuid.uuid4().hex}"
     await storage.put_object(key, data, mime)
     try:
         row = await db.attachment.create(
             data={
-                "userId": user.id, "entityType": entity_type, "entityId": entity_id,
+                **space.create_fields(), "entityType": entity_type, "entityId": entity_id,
                 "fileName": _file_name(upload.filename), "mimeType": mime, "size": len(data), "storageKey": key,
             }
         )
@@ -145,16 +165,25 @@ async def _create(form, user) -> dict:
     return view(row)
 
 
-async def _owned(user_id: str, id: str):
-    row = await db.attachment.find_first(where={"id": id, "userId": user_id})
+async def _owned(space: Space, id: str):
+    """A file this space can reach: through its item for the shared models, else your own."""
+    row = await db.attachment.find_unique(where={"id": id})
     if row is None:
+        raise nest_error(404, "Attachment not found")
+    if row.entityType in _SHARED_PARENTS:
+        model = ENTITY_TYPE_MODEL[row.entityType]
+        ok = await getattr(db, model).count(where={"id": row.entityId, **space.where}) > 0
+    else:
+        ok = space.personal and row.userId == space.user.id
+    if not ok:
         raise nest_error(404, "Attachment not found")
     return row
 
 
 @router.get("/{id}/download")
-async def download(id: str, request: Request, user=Depends(plus_user)):
-    row = await _owned(user.id, id)
+async def download(id: str, request: Request, space: Space = Depends(current_space)):
+    user = space.user
+    row = await _owned(space, id)
     data = await storage.get_object(row.storageKey)
     if data is None:
         raise nest_error(404, "Attachment not found")
@@ -172,20 +201,24 @@ async def download(id: str, request: Request, user=Depends(plus_user)):
 
 
 @router.delete("/{id}")
-async def remove(id: str, user=Depends(plus_user)):
-    row = await _owned(user.id, id)
+async def remove(id: str, space: Space = Depends(current_space)):
+    user = space.user
+    row = await _owned(space, id)
+    if not space.can_delete(row):
+        raise nest_error(404, "Attachment not found")
     await db.attachment.delete(where={"id": row.id})
     await storage.delete_object(row.storageKey)
     return {"id": row.id}
 
 
-async def delete_rows(client, user_id: str, entity_type: str, entity_ids: list[str]) -> list[str]:
+async def delete_rows(client, user_id: str | None, entity_type: str, entity_ids: list[str]) -> list[str]:
     """Delete the attachment rows of some entities (inside the caller's transaction) and
     return their keys; after the commit, pass them to delete_objects. NestJS deleted only
-    the rows, which held the bytes."""
+    the rows, which held the bytes. user_id None: the caller already checked the entities
+    (a workspace item's files may come from several members)."""
     if not entity_ids:
         return []
-    where = {"userId": user_id, "entityType": entity_type, "entityId": {"in": entity_ids}}
+    where = {"entityType": entity_type, "entityId": {"in": entity_ids}, **({"userId": user_id} if user_id else {})}
     keys = [a.storageKey for a in await client.attachment.find_many(where=where)]
     await client.attachment.delete_many(where=where)
     return keys
