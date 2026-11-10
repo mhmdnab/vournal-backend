@@ -91,7 +91,7 @@ async def _entry_block(entry, user_id: str, ctx: assistant_tools.Ctx) -> str:
 async def _their_items(user_id: str) -> str:
     """The user's habits, projects and goals, so the step can act on them without searching."""
     habits = await db.habit.find_many(where={"userId": user_id, "isArchived": False}, order={"sortOrder": "asc"}, take=40)
-    projects = await db.project.find_many(where={"userId": user_id, "status": {"in": ["PLANNING", "ACTIVE", "ON_HOLD"]}}, take=40)
+    projects = await db.project.find_many(where={"userId": user_id, "workspaceId": None, "status": {"in": ["PLANNING", "ACTIVE", "ON_HOLD"]}}, take=40)
     goals = await db.goal.find_many(where={"userId": user_id, "status": {"in": ["ACTIVE", "PAUSED"]}}, take=40)
 
     def habit(h) -> str:

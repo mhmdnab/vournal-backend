@@ -380,7 +380,7 @@ async def get_trip(id: str, user=Depends(plus_user)):
     tz = (await ensure_os_profile(user)).timezone
     items = await db.tripitem.find_many(where={"tripId": id}, order=_ITEM_ORDER)
     packing = await db.packingitem.find_many(where={"tripId": id}, order=_PACKING_ORDER)
-    trip_where = {"userId": user.id, "tripId": id}
+    trip_where = {"userId": user.id, "workspaceId": None, "tripId": id}
     expenses = await db.transaction.find_many(where={**trip_where, "type": "EXPENSE"}, include={"category": True, "account": True},
                                               order={"date": "desc"}, take=100)
     sums = await db.transaction.group_by(by=["currency"], where={**trip_where, "type": "EXPENSE"}, sum={"amount": True}, count={"_all": True})

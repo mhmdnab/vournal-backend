@@ -116,10 +116,10 @@ async def _tasks(ctx: life.LifeContext) -> dict:
     return {
         "overdueCount": await db.task.count(where=overdue) + todos["overdue"],
         "oldestOverdueDays": diff_days_key(oldest_day, ctx.today) if oldest_day else None,
-        "dueTodayCount": await db.task.count(where={"userId": uid, "status": {"not": "COMPLETED"}, "dueAt": {"gte": today_from, "lte": today_to}})
+        "dueTodayCount": await db.task.count(where={"OR": [{"userId": uid}, {"assigneeId": uid}], "status": {"not": "COMPLETED"}, "dueAt": {"gte": today_from, "lte": today_to}})
         + todos["dueToday"],
-        "completedThisWeek": await db.task.count(where={"userId": uid, "status": "COMPLETED", "completedAt": {"gte": week_from, "lte": now}}),
-        "completedLastWeekSamePeriod": await db.task.count(where={"userId": uid, "status": "COMPLETED",
+        "completedThisWeek": await db.task.count(where={"OR": [{"userId": uid}, {"assigneeId": uid}], "status": "COMPLETED", "completedAt": {"gte": week_from, "lte": now}}),
+        "completedLastWeekSamePeriod": await db.task.count(where={"OR": [{"userId": uid}, {"assigneeId": uid}], "status": "COMPLETED",
                                                                   "completedAt": {"gte": last_week_from, "lte": last_week_same_to}}),
     }
 

@@ -56,7 +56,7 @@ def end_of_day_key(key: str, tz: str) -> datetime:
 def overdue_task_where(user_id: str, now: datetime, start_of_today: datetime) -> dict:
     """Not completed, and due before today or earlier today with a time (an all-day task
     due today isn't overdue yet)."""
-    return {"userId": user_id, "status": {"not": "COMPLETED"},
+    return {"userId": user_id, "workspaceId": None, "status": {"not": "COMPLETED"},
             "OR": [{"dueAt": {"lt": start_of_today}}, {"hasDueTime": True, "dueAt": {"lt": now}}]}
 
 
@@ -234,19 +234,31 @@ async def recurring_monthly(ctx: LifeContext) -> dict:
 # ----- calendar ------------------------------------------------------------------------
 
 
-async def events_between(ctx: LifeContext, start: datetime, end: datetime, limit: int = 2000) -> list[dict]:
+async def shown_workspaces(user_id: str) -> dict:
+    """{workspaceId: {id, name, color}} of the workspaces whose events show in my Personal views."""
+    rows = await db.workspacemember.find_many(where={"userId": user_id, "showInCalendar": True}, include={"workspace": True})
+    return {m.workspaceId: {"id": m.workspaceId, "name": m.workspace.name, "color": m.workspace.color} for m in rows}
+
+
+async def events_between(ctx: LifeContext, start: datetime, end: datetime, limit: int = 2000, overlay: bool = False) -> list[dict]:
+    """Personal events in the range; with `overlay`, also those of the workspaces I show in my
+    calendar (the dashboard's day), each with its workspace."""
     uid = ctx.user_id
-    single = await db.event.find_many(where={"userId": uid, "rrule": None, "startAt": {"lte": end},
+    shown = await shown_workspaces(uid) if overlay else {}
+    owner = {"OR": [{"userId": uid, "workspaceId": None}, *([{"workspaceId": {"in": list(shown)}}] if shown else [])]}
+    single = await db.event.find_many(where={"AND": [owner], "rrule": None, "startAt": {"lte": end},
                                              "OR": [{"endAt": {"gte": start}}, {"endAt": None, "startAt": {"gte": start}}]},
                                       order={"startAt": "asc"}, take=limit)
-    recurring = await db.event.find_many(where={"userId": uid, "rrule": {"not": None}, "startAt": {"lte": end},
+    recurring = await db.event.find_many(where={"AND": [owner], "rrule": {"not": None}, "startAt": {"lte": end},
                                                 "OR": [{"recurrenceEndAt": None}, {"recurrenceEndAt": {"gte": start}}]})
 
     def make(e, first: datetime, last: datetime | None, repeats: bool) -> dict:
         key = day_key(first, ctx.tz)
         return {"id": f"{e.id}:{iso_ms(first)}" if repeats else e.id, "eventId": e.id, "title": e.title, "startAt": iso_ms(first),
                 "endAt": iso_ms(last) if last else None, "allDay": e.allDay, "location": e.location, "type": e.type, "priority": e.priority,
-                "color": e.color, "isRecurring": repeats, "day": key, "link": f"/calendar?id={e.id}&date={key}"}
+                "color": e.color, "isRecurring": repeats, "day": key,
+                "link": f"/calendar?id={e.id}&date={key}" + (f"&space={e.workspaceId}" if e.workspaceId else ""),
+                "workspace": shown.get(e.workspaceId) if e.workspaceId else None}
 
     out = [make(e, e.startAt, e.endAt, False) for e in single]
     for e in recurring:
@@ -372,10 +384,10 @@ async def goals(ctx: LifeContext, where: dict | None = None, accounts: list[dict
 
 async def projects_progress(ctx: LifeContext, where: dict) -> list[dict]:
     """A project's progress: its override, or done / all of its top-level tasks."""
-    rows = await db.project.find_many(where={"userId": ctx.user_id, **where}, order={"deadline": "asc"})
+    rows = await db.project.find_many(where={"userId": ctx.user_id, "workspaceId": None, **where}, order={"deadline": "asc"})
     if not rows:
         return []
-    counts = await db.task.group_by(by=["projectId", "status"], where={"userId": ctx.user_id, "projectId": {"in": [p.id for p in rows]},
+    counts = await db.task.group_by(by=["projectId", "status"], where={"userId": ctx.user_id, "workspaceId": None, "projectId": {"in": [p.id for p in rows]},
                                                                         "parentId": None}, count={"_all": True})
     out = []
     for p in rows:
