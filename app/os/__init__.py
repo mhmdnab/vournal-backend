@@ -68,6 +68,7 @@ def include_os_routers() -> APIRouter:
             habits,
             household,
             workspaces,
+            move,
             insights,
             journal,
             maintenance,
@@ -149,5 +150,6 @@ def include_os_routers() -> APIRouter:
         api_router.include_router(assistant_voice.router)
         api_router.include_router(work.router)
         api_router.include_router(workspaces.router)
+        api_router.include_router(move.router)
         _included = True
     return api_router
