@@ -25,7 +25,7 @@ from app.auth import (
     rotate_refresh_token,
 )
 from app.db import db
-from app.entitlements import confirm_email, effective_plan, plan_details
+from app.entitlements import confirm_email, effective_plan, plan_details, trial_days_offered
 from app.os.common.deps import (
     ACCESS_COOKIE,
     REFRESH_COOKIE,
@@ -58,6 +58,9 @@ class ProviderBody(BaseModel):
     idToken: str = Field(min_length=1, max_length=8192)
     nonce: str = Field(min_length=1, max_length=256)
     timezone: str | None = Field(default=None, max_length=64)
+    # Apple only: exchanged (with the website's Services ID) for the token that deleting
+    # the account revokes, as the app does.
+    authorizationCode: str | None = Field(default=None, max_length=4096)
 
 
 class WebRegisterBody(RegisterRequest):
@@ -146,18 +149,31 @@ async def login(body: LoginBody, response: Response):
     return await _signed_in(user, response)
 
 
+async def _apple_token(body: ProviderBody) -> str | None:
+    """The code was issued to the client the (already verified) id token names."""
+    import jwt
+
+    audience = jwt.decode(body.idToken, options={"verify_signature": False}).get("aud")
+    client = audience[0] if isinstance(audience, list) and audience else audience
+    return await oauth.exchange_apple_code(body.authorizationCode, client if isinstance(client, str) else None)
+
+
 @router.post("/oauth/{provider}")
 async def provider_sign_in(provider: oauth.Provider, body: ProviderBody, response: Response):
     if not oauth._audiences(provider):
         raise nest_error(503, "This sign-in option isn't available yet.")
     user, identity = await oauth.identity_user(provider, body.idToken, body.nonce)
+    sealed = await _apple_token(body) if provider == "apple" and body.authorizationCode else None
+    if user is not None and sealed:
+        await db.user.update(where={"id": user.id}, data={"appleRefreshToken": sealed})
     if user is None:
         existing = await db.user.find_unique(where={"email": identity.email.lower()}) if identity.email else None
         if existing is None:
             # A new account, as the app makes it: only with an email the provider verified.
             if identity.email is None or not identity.email_verified:
                 raise nest_error(409, NO_VERIFIED_EMAIL)
-            user = await db.user.create(data={"email": identity.email.lower(), "timezone": body.timezone})
+            extra = {"appleRefreshToken": sealed} if sealed else {}
+            user = await db.user.create(data={"email": identity.email.lower(), "timezone": body.timezone, **extra})
             await oauth.link_identity(user.id, identity.issuer, identity.subject)
             return await _signed_in(await confirm_email(db, user), response)
         # The app's own rule: the account proved this address, and the provider runs it (Gmail
@@ -166,6 +182,8 @@ async def provider_sign_in(provider: oauth.Provider, body: ProviderBody, respons
         if not (existing.emailVerifiedAt is not None and identity.authoritative and identity.email_verified):
             raise nest_error(403, LINK_IN_APP, code="link_in_app")
         await oauth.link_identity(existing.id, identity.issuer, identity.subject)
+        if sealed:
+            await db.user.update(where={"id": existing.id}, data={"appleRefreshToken": sealed})
         user = existing
     return await _signed_in(user, response)
 
@@ -175,13 +193,19 @@ def _challenge(out: AuthChallengeOut) -> dict:
 
 
 async def _unfinished_sign_up(user) -> bool:
-    """An account that took the code step and never finished it, and has no other way in.
-    Such an account never had a session (the code comes first), so signing up again with
-    its email starts over. Accounts from app builds without the code step are in use and
-    are never replaced."""
+    """An account that took the code step and never finished it, and has no other way in:
+    signing up again with its email starts over (new password, every session ended).
+    Accounts from app builds without the code step are in use and are never replaced."""
     if not user.emailConfirmRequired or user.emailVerifiedAt is not None:
         return False
     return await db.externalidentity.find_first(where={"userId": user.id}) is None
+
+
+@router.get("/offer")
+async def offer():
+    """What a new account gets: the free months only while they're switched on, so the
+    sign-up page never promises them before then."""
+    return {"trialDays": trial_days_offered()}
 
 
 @router.post("/register")
@@ -194,6 +218,9 @@ async def register(request: Request, body: WebRegisterBody):
     if existing is None:
         user = await db.user.create(data={"email": body.email, "timezone": body.timezone, **data})
     elif await _unfinished_sign_up(existing):
+        # Whoever made it may have signed in through a login without the code step (old app
+        # builds): every session it had ends, so only the person with the inbox gets in.
+        await end_all_sessions(existing.id)
         user = await db.user.update(where={"id": existing.id}, data=data)
     else:
         raise nest_error(409, ACCOUNT_EXISTS)

@@ -119,7 +119,10 @@ async def grant_plus(
     current = _aware(user.planExpiresAt) if is_paid(user) else None
     # A purchase replaces the free months even when it ends sooner: billing starts the
     # day they subscribe, and planSource must say what they're on.
-    replaces_trial = user.planSource == "trial" and source in _PAID_SOURCES
+    # (Only a live one: an old transaction replayed after it ended changes nothing.)
+    replaces_trial = (
+        user.planSource == "trial" and source in _PAID_SOURCES and expires_at > datetime.now(timezone.utc)
+    )
     governs = not lifetime and (current is None or expires_at > current or replaces_trial)
     data: dict = {}
     if governs:
@@ -220,6 +223,11 @@ def _trial_from() -> datetime | None:
         return _aware(datetime.fromisoformat(raw.replace("Z", "+00:00")))
     except ValueError:
         return None
+
+
+def trial_days_offered() -> int | None:
+    """TRIAL_DAYS while the free months are switched on, else None (for sign-up copy)."""
+    return TRIAL_DAYS if _trial_from() is not None else None
 
 
 async def trial_claims(db, user) -> list[tuple[str, str]]:

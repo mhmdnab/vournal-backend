@@ -398,6 +398,42 @@ class OAuth(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(calls[-1][0].endswith("/auth/revoke"))
             self.assertEqual(calls[-1][1]["token"], "apple-rt")
 
+    async def test_web_apple_sign_up_keeps_a_token_deletion_revokes(self):
+        # The dashboard signs in with Apple through its Services ID: the code is exchanged
+        # with that client, and deleting the account revokes the token with it too.
+        from app import mfa
+
+        calls = []
+
+        class Fake:
+            def __init__(self, *a, **k): ...
+            async def __aenter__(self): return self
+            async def __aexit__(self, *a): return False
+            async def post(self, url, data=None, **_):
+                calls.append((url, data))
+                return MagicMock(status_code=200, json=lambda: {"refresh_token": "web-rt"}, raise_for_status=lambda: None)
+
+        web_env = {**self._apple_key_env(), "OAUTH_APPLE_AUDIENCES": "app.vournal.mobile,app.vournal.web"}
+        id_token = token(aud="app.vournal.web", sub=self.subject, email=self.address, email_verified="true", is_private_email="true")
+        with patch.dict(os.environ, web_env), patch("app.oauth.httpx.AsyncClient", Fake):
+            signed = await self.client.post(
+                "/api/auth/oauth/apple",
+                json={"idToken": id_token, "nonce": NONCE, "authorizationCode": "web-code"},
+                headers={"X-Requested-With": "life-os"},
+            )
+            self.assertEqual(signed.status_code, 200, signed.text)
+            self.assertEqual((calls[0][1]["code"], calls[0][1]["client_id"]), ("web-code", "app.vournal.web"))
+            secret = jwt.decode(calls[0][1]["client_secret"], options={"verify_signature": False}, audience=APPLE)
+            self.assertEqual(secret["sub"], "app.vournal.web")
+            user = await self.db.user.find_unique(where={"email": self.address})
+            self.assertIn("web-rt", mfa.decrypt(user.appleRefreshToken))
+
+            from app.auth import delete_account
+
+            await delete_account(user)
+            self.assertTrue(calls[-1][0].endswith("/auth/revoke"))
+            self.assertEqual((calls[-1][1]["token"], calls[-1][1]["client_id"]), ("web-rt", "app.vournal.web"))
+
     async def test_delete_survives_apple_being_down(self):
         class Down:
             def __init__(self, *a, **k): ...

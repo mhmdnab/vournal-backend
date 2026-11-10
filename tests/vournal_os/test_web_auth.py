@@ -292,6 +292,26 @@ class WebAuth(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(login.status_code, 200, login.text)
 
+    async def test_signing_up_again_ends_every_earlier_session(self):
+        # Someone registers your email, signs in through the app's login without the code
+        # step, and waits. When you sign up with your email, their session must die.
+        email = self._new_email()
+        await self._register(email, "attacker-pass-1")
+        app_login = await self.client.post("/auth/login", json={"email": email, "password": "attacker-pass-1"})
+        self.assertEqual(app_login.status_code, 200, app_login.text)
+        stolen = app_login.json()["refreshToken"]
+        again = await self._register(email, "victim-pass-99")
+        verified = await self._verify(again.json()["challengeToken"], self.codes[-1])
+        self.assertEqual(verified.status_code, 200, verified.text)
+        reuse = await self.client.post("/auth/refresh", json={"refreshToken": stolen})
+        self.assertEqual(reuse.status_code, 401, reuse.text)
+
+    async def test_the_offer_says_whether_free_months_are_on(self):
+        with patch.dict(os.environ, {"PLUS_TRIAL_FROM": ""}):
+            self.assertEqual((await self.client.get("/api/auth/offer")).json(), {"trialDays": None})
+        with patch.dict(os.environ, {"PLUS_TRIAL_FROM": "2026-11-01T00:00:00Z"}):
+            self.assertEqual((await self.client.get("/api/auth/offer")).json(), {"trialDays": 60})
+
     async def test_register_rate_limited_per_email(self):
         from app.rate_limit import rate_limited
 

@@ -145,6 +145,15 @@ class Trial(TrialBase):
         _near(self, user.planExpiresAt, _in(30))
         self.assertEqual(user.paddleSubscriptionId, "sub_1")
 
+    async def test_an_expired_purchase_never_ends_the_trial(self):
+        # The app replays old transactions on launch: one that already ended changes nothing.
+        user = await self._user()
+        await start_trial(self.db, user)
+        await grant_plus(self.db, user.id, _in(-3), "apple", f"orig-{uuid.uuid4().hex}")
+        user = await self._reload(user)
+        self.assertEqual((user.planSource, effective_plan(user)), ("trial", "plus"))
+        _near(self, user.planExpiresAt, _in(60))
+
     async def test_apple_during_trial_takes_over(self):
         user = await self._user()
         await start_trial(self.db, user)

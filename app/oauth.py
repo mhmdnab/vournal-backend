@@ -125,7 +125,7 @@ async def verify_identity(provider: Provider, id_token: str, nonce: str) -> Veri
     )
 
 
-def _apple_client_secret() -> str | None:
+def _apple_client_secret(client_id: str | None = None) -> str | None:
     key = os.environ.get("APPLE_SIGNIN_PRIVATE_KEY", "").replace("\\n", "\n")
     team = os.environ.get("APPLE_TEAM_ID")
     key_id = os.environ.get("APPLE_SIGNIN_KEY_ID")
@@ -133,18 +133,23 @@ def _apple_client_secret() -> str | None:
         return None
     now = int(time.time())
     return jwt.encode(
-        {"iss": team, "iat": now, "exp": now + 300, "aud": APPLE_ISSUER, "sub": _bundle_id()},
+        {"iss": team, "iat": now, "exp": now + 300, "aud": APPLE_ISSUER, "sub": client_id or _bundle_id()},
         key,
         algorithm="ES256",
         headers={"kid": key_id},
     )
 
 
-async def exchange_apple_code(code: str) -> str | None:
+async def exchange_apple_code(code: str, client_id: str | None = None) -> str | None:
     """Apple's refresh token, sealed for storage. None if this can't be done now:
-    sign-in still works, and the failure is logged because deletion relies on it."""
+    sign-in still works, and the failure is logged because deletion relies on it.
+
+    `client_id` is the client the code was issued to: the app's bundle id (default), or
+    the website's Services ID. A token from another client is sealed with that client's
+    id ("<client> <token>"), because revoking it needs the same client."""
+    issued_to = client_id or _bundle_id()
     try:
-        secret = _apple_client_secret()
+        secret = _apple_client_secret(issued_to)
         if secret is None:
             log.error("Sign in with Apple key isn't configured; no token to revoke later.")
             return None
@@ -152,7 +157,7 @@ async def exchange_apple_code(code: str) -> str | None:
             response = await client.post(
                 f"{APPLE_ISSUER}/auth/token",
                 data={
-                    "client_id": _bundle_id(),
+                    "client_id": issued_to,
                     "client_secret": secret,
                     "code": code,
                     "grant_type": "authorization_code",
@@ -160,7 +165,9 @@ async def exchange_apple_code(code: str) -> str | None:
             )
             response.raise_for_status()
         refresh = response.json().get("refresh_token")
-        return mfa.encrypt(refresh) if refresh else None
+        if not refresh:
+            return None
+        return mfa.encrypt(refresh if issued_to == _bundle_id() else f"{issued_to} {refresh}")
     except Exception as exc:  # noqa: BLE001 — never fail a sign-in over this
         log.error("Apple code exchange failed: %r", exc)
         return None
@@ -169,7 +176,9 @@ async def exchange_apple_code(code: str) -> str | None:
 async def revoke_apple(sealed: str) -> None:
     """Apple requires revoking on account deletion. A failure mustn't stop deleting."""
     try:
-        secret = _apple_client_secret()
+        plain = mfa.decrypt(sealed)
+        issued_to, token = plain.split(" ", 1) if " " in plain else (_bundle_id(), plain)
+        secret = _apple_client_secret(issued_to)
         if secret is None:
             log.error("Sign in with Apple key isn't configured; token not revoked.")
             return
@@ -177,9 +186,9 @@ async def revoke_apple(sealed: str) -> None:
             response = await client.post(
                 f"{APPLE_ISSUER}/auth/revoke",
                 data={
-                    "client_id": _bundle_id(),
+                    "client_id": issued_to,
                     "client_secret": secret,
-                    "token": mfa.decrypt(sealed),
+                    "token": token,
                     "token_type_hint": "refresh_token",
                 },
             )
