@@ -169,12 +169,35 @@ async def _reminders(ctx: Ctx):
 
 # Workspace reminders: a task's goes to whoever it's assigned to, or to whoever added it when
 # nobody is; an event's goes to every member who shows that workspace in their calendar.
-def _task_reminder_owner(user_id: str) -> dict:
-    return {"OR": [
-        {"userId": user_id, "workspaceId": None},
-        {"workspaceId": {"not": None}, "assigneeId": user_id},
-        {"workspaceId": {"not": None}, "assigneeId": None, "createdById": user_id},
-    ]}
+def _task_reminder_owner(user_id: str, workspace_ids: list[str], owned_ids: list[str]) -> dict:
+    """Candidates; `_reminds_me` settles who an unassigned workspace task reminds."""
+    clauses: list[dict] = [{"userId": user_id, "workspaceId": None}]
+    if workspace_ids:
+        mine = {"workspaceId": {"in": workspace_ids}}
+        clauses += [
+            {**mine, "assigneeId": user_id},
+            {**mine, "assigneeId": None, "OR": [{"createdById": user_id}, {"userId": user_id}]},
+        ]
+    if owned_ids:
+        clauses.append({"workspaceId": {"in": owned_ids}, "assigneeId": None})
+    return {"OR": clauses}
+
+
+async def _reminds_me(t, user_id: str) -> bool:
+    """An unassigned workspace task reminds whoever added it while they're a member, else
+    its row owner if a member, else the workspace's owner: always exactly one current member,
+    never someone who left. Personal and assigned tasks were settled by the query."""
+    if t.workspaceId is None or t.assigneeId is not None:
+        return True
+
+    async def member(uid):
+        return bool(uid) and await db.workspacemember.count(where={"workspaceId": t.workspaceId, "userId": uid}) > 0
+
+    for candidate in (t.createdById, t.userId):
+        if await member(candidate):
+            return candidate == user_id
+    owner = await db.workspacemember.find_first(where={"workspaceId": t.workspaceId, "role": "OWNER"})
+    return owner is not None and owner.userId == user_id
 
 
 async def _shown_workspace_ids(user_id: str) -> list[str]:
@@ -186,8 +209,12 @@ def _space_link(link: str, workspace_id: str | None) -> str:
 
 
 async def _tasks(ctx: Ctx) -> list[dict]:
-    rows = await db.task.find_many(where={"AND": [_task_reminder_owner(ctx.user_id)], "status": {"not": "COMPLETED"},
-                                          "reminderAt": {"gte": ctx.now - LOOKBACK, "lte": ctx.now}}, take=500)
+    memberships = await db.workspacemember.find_many(where={"userId": ctx.user_id})
+    member_of = [m.workspaceId for m in memberships]
+    owned = [m.workspaceId for m in memberships if str(getattr(m.role, "value", m.role)) == "OWNER"]
+    found = await db.task.find_many(where={"AND": [_task_reminder_owner(ctx.user_id, member_of, owned)], "status": {"not": "COMPLETED"},
+                                           "reminderAt": {"gte": ctx.now - LOOKBACK, "lte": ctx.now}}, take=500)
+    rows = [t for t in found if await _reminds_me(t, ctx.user_id)]
     out, T = [], ctx.T
     for t in rows:
         body = T.t("taskReminder")
@@ -589,7 +616,10 @@ async def timed_candidate_users(now: datetime) -> set[str]:
     # workspace reminders reach assignees, creators, and the members who show the workspace
     for t in await db.task.find_many(where={"workspaceId": {"not": None}, "reminderAt": {"gte": now - timedelta(minutes=10), "lte": now},
                                             "status": {"not": "COMPLETED"}}):
-        ids |= {t.assigneeId or t.createdById} - {None}
+        ids |= {t.assigneeId or t.createdById, t.userId} - {None}
+        if not t.assigneeId:  # the owner stands in when whoever added it has left
+            owner = await db.workspacemember.find_first(where={"workspaceId": t.workspaceId, "role": "OWNER"})
+            ids |= {owner.userId} if owner else set()
     ws_events = await db.event.find_many(where={"workspaceId": {"not": None}, "reminderMinutes": {"not": None}, "OR": [
         {"rrule": None, "startAt": {"gte": now - DAY, "lte": now + timedelta(days=29)}},
         {"rrule": {"not": None}, "OR": [{"recurrenceEndAt": None}, {"recurrenceEndAt": {"gte": now}}]}]}, distinct=["workspaceId"])

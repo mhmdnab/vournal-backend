@@ -118,3 +118,11 @@ class WorkspaceReminders(WorkspaceCase):
             exported = await self.member_.get("/api/export")
         self.assertEqual(exported.status_code, 200, exported.text[:200])
         self.assertIn("my team task", exported.text)
+
+    async def test_removed_member_stops_getting_reminders(self):
+        now = datetime.now(timezone.utc)
+        await self.db.task.create(data={"userId": self.member_.user.id, "createdById": self.member_.user.id, "title": "Old idea",
+                                        "workspaceId": self.w, "reminderAt": now - timedelta(minutes=1)})
+        await self.owner.delete(f"/api/workspaces/{self.w}/members/{self.member_.user.id}")
+        self.assertNotIn("Old idea", await self.notified(self.member_))
+        self.assertIn("Old idea", await self.notified(self.owner))  # nobody added it who's still here: the owner

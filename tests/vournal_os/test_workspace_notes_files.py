@@ -53,3 +53,12 @@ class WorkspaceNotesFiles(WorkspaceCase):
     async def test_document_parent_refused_in_workspace(self):
         response = await self.upload(self.owner, "DOCUMENT", "anything", self.ws)
         self.assertEqual(response.status_code, 400, response.text)
+
+    async def test_a_plain_download_link_names_its_space(self):
+        # a browser link can't send the header: ?space= does the same, still checked
+        task = (await self.owner.post("/api/tasks", json={"title": "Linked"}, headers=self.ws)).json()
+        file_id = (await self.upload(self.owner, "TASK", task["id"], self.ws)).json()["id"]
+        ok = await self.member_.get(f"/api/attachments/{file_id}/download", params={"space": self.w})
+        self.assertEqual(ok.status_code, 200, ok.text)
+        stranger = await self.member()
+        self.assertEqual((await stranger.get(f"/api/attachments/{file_id}/download", params={"space": self.w})).status_code, 404)

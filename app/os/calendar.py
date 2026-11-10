@@ -98,6 +98,7 @@ class Ctx:
         self.user_id = user_id
         # Personal (with the workspaces' events and my assigned tasks laid over it), or one workspace
         self.space = space
+        self.overlay = True
         self.tz = tz
         self.titles = FEED_TITLES[lang]
         self.start = start
@@ -159,7 +160,7 @@ async def _events(ctx: Ctx) -> list[dict]:
         access = {"workspaceId": ctx.space.workspace_id}
     else:
         member = await db.householdmember.find_unique(where={"userId": ctx.user_id})
-        overlay = await _overlay_workspaces(ctx.user_id, calendar_only=True)
+        overlay = await _overlay_workspaces(ctx.user_id, calendar_only=True) if ctx.overlay else {}
         sources = [{"userId": ctx.user_id, "workspaceId": None}]
         if member:
             sources.append({"householdId": member.householdId})
@@ -254,7 +255,7 @@ async def _tasks(ctx: Ctx) -> list[dict]:
         where = {"workspaceId": ctx.space.workspace_id, "dueAt": {"gte": ctx.start, "lte": ctx.end}}
     else:
         # my Personal tasks, and the workspace tasks assigned to me (read-only here)
-        overlay = await _overlay_workspaces(ctx.user_id, calendar_only=False)
+        overlay = await _overlay_workspaces(ctx.user_id, calendar_only=False) if ctx.overlay else {}
         sources = [{"userId": ctx.user_id, "workspaceId": None}]
         if overlay:
             sources.append({"assigneeId": ctx.user_id, "workspaceId": {"in": list(overlay)}})
@@ -668,7 +669,10 @@ def _bound(value: str, tz: str, side: str) -> datetime:
 _FEED_FOR_QUERY = ("from", "to", "types", "includeCompleted")  # the NestJS query DTO's fields
 
 
-async def feed_for(user, request: Request, include_completed: bool | None = None, space: Space | None = None) -> dict:
+async def feed_for(user, request: Request, include_completed: bool | None = None, space: Space | None = None,
+                   overlay: bool = True) -> dict:
+    """overlay=False: Personal items only, with no workspace events or assigned tasks (the
+    assistant works on Personal items, and teammates' titles never go to the model)."""
     q = request.query_params
     errors = unknown_params(request, _FEED_FOR_QUERY)
     for name in ("from", "to"):
@@ -692,6 +696,7 @@ async def feed_for(user, request: Request, include_completed: bool | None = None
     wanted = {t for t in (types or SOURCE_TYPES) if SOURCE_SECTION[t] is None or SOURCE_SECTION[t] in enabled}
     space = space or personal_space(user)
     ctx = Ctx(user.id, tz, to_lang(settings.language), start, end, space)
+    ctx.overlay = overlay
     if not space.personal:
         # a workspace's calendar: its events and tasks only
         wanted &= {"event", "task"}

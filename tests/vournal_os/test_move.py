@@ -72,3 +72,10 @@ class Move(WorkspaceCase):
         self.assertEqual(response.status_code, 200, response.text)
         row = await self.db.task.find_unique(where={"id": task["id"]})
         self.assertEqual((row.workspaceId, row.assigneeId), (w2, None))
+
+    async def test_moving_a_project_ends_its_outside_shares(self):
+        project = (await self.member_.post("/api/projects", json={"name": "Side"})).json()
+        await self.db.projectshare.create(data={"projectId": project["id"], "email": "guest@example.test", "codeHash": "h-" + project["id"], "invitedById": self.member_.user.id})
+        response = await self.move(self.member_, "project", project["id"], self.w)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(await self.db.projectshare.count(where={"projectId": project["id"]}), 0)

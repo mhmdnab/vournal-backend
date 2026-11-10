@@ -176,6 +176,7 @@ async def settle_workspaces_for_deleted_user(user_id: str) -> None:
     so the user cascade doesn't take it (createdById still says who added it); its tasks
     there become unassigned. A workspace with no one left goes, with its files."""
     memberships = await db.workspacemember.find_many(where={"userId": user_id})
+    member_of = {m.workspaceId for m in memberships}
     for m in memberships:
         workspace_id = m.workspaceId
         async with db.tx() as tx:
@@ -190,6 +191,15 @@ async def settle_workspaces_for_deleted_user(user_id: str) -> None:
                     )
         if not alive:
             await delete_workspace(workspace_id)
+    # what it added to workspaces it had already left stays too, with each one's owner
+    for model in ("task", "event", "project", "note", "attachment"):
+        rows = await getattr(db, model).find_many(where={"userId": user_id, "workspaceId": {"not": None}})
+        for workspace_id in {r.workspaceId for r in rows} - member_of:
+            owner = await db.workspacemember.find_first(where={"workspaceId": workspace_id, "role": "OWNER"})
+            if owner is not None:
+                await getattr(db, model).update_many(
+                    where={"workspaceId": workspace_id, "userId": user_id}, data={"userId": owner.userId}
+                )
 
 
 # ----- views ---------------------------------------------------------------------------
@@ -291,7 +301,10 @@ async def members(id: str, user=Depends(plus_user)):
 
 @router.post("/workspaces/{id}/invites", status_code=201)
 async def invite(id: str, body: InviteBody, user=Depends(plus_user)):
-    await _admin(id, user.id)
+    me = await _admin(id, user.id)
+    # only the owner makes admins, by invite as by promotion
+    if body.role == "ADMIN" and _role(me.role) != "OWNER":
+        raise nest_error(404, NOT_FOUND)
     email = body.email.strip().lower()
     existing = await db.user.find_unique(where={"email": email})
     if existing and await member_role(id, existing.id):
@@ -358,6 +371,9 @@ async def remove_someone(id: str, member_user_id: str, user=Depends(plus_user)):
 @router.post("/workspaces/{id}/leave")
 async def leave(id: str, user=Depends(plus_user)):
     await _membership(id, user.id)
+    if await db.workspacemember.count(where={"workspaceId": id}) <= 1:
+        # leaving would end it, and everything in it: that's Delete, with its typed name
+        raise nest_error(400, "You're the only member. Delete the workspace instead.")
     await remove_member(id, user.id)
     return {"ok": True}
 

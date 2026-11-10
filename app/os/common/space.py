@@ -84,8 +84,10 @@ async def space_for(user, workspace_id: str | None) -> Space:
 
 
 async def current_space(request: Request, user=Depends(plus_user)) -> Space:
-    """The dependency: Plus (members need it, as households do), then membership."""
-    return await space_for(user, (request.headers.get(HEADER) or "").strip() or None)
+    """The dependency: Plus (members need it, as households do), then membership. A plain
+    browser link (a file download) can't send the header: `?space=` stands in for it."""
+    chosen = (request.headers.get(HEADER) or "").strip() or (request.query_params.get("space") or "").strip()
+    return await space_for(user, chosen or None)
 
 
 async def assert_in_space(model: str, id: str | None, space: Space) -> None:

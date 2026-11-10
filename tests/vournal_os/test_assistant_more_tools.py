@@ -144,3 +144,18 @@ class MoreTools(ChatBase):
         a = (await self.say("add walk"))["messages"][1]["actions"][0]
         self.assertEqual((a["status"], a["kind"], a["entityType"]), ("pending", "create", "habit"))
         self.assertEqual(await self.db.habit.count(where={"userId": self.client.user.id}), 0)
+
+
+class NoteTools(MoreTools):
+    async def test_add_note_then_delete_and_undo(self):
+        a = await self.act("add_note", {"title": "Ideas", "content": "a list"})
+        note_id = a["entityId"]
+        self.assertIsNotNone(await self.db.note.find_unique(where={"id": note_id}))
+        fm.script(fm.tools(("delete_item", {"type": "note", "id": note_id, "label": "Ideas"})), fm.message(fm.text("Confirm below.")))
+        card = (await self.say("delete the ideas note"))["messages"][1]["actions"][0]
+        if card["status"] == "pending":
+            card = (await self.client.post(f"/api/assistant/actions/{card['id']}/approve")).json()
+        self.assertEqual(card["status"], "done", card)
+        self.assertIsNone(await self.db.note.find_unique(where={"id": note_id}))
+        await self.undo(card)
+        self.assertIsNotNone(await self.db.note.find_unique(where={"id": note_id}))

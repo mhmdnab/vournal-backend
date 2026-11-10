@@ -329,7 +329,7 @@ async def _get_agenda(i: dict, ctx: Ctx) -> dict:
         raise ToolError('"to" is before "from"')
     if _days_between(start, end) > 62:
         raise ToolError("At most 62 days at a time")
-    feed = await calendar.feed_for(ctx.user, _req({"from": start, "to": end}))
+    feed = await calendar.feed_for(ctx.user, _req({"from": start, "to": end}), overlay=False)
     out = []
     for x in feed["items"][:150]:
         item = {"type": x["sourceType"], "id": x["sourceId"], "title": x["title"],
@@ -802,7 +802,7 @@ async def _add_debt_payment(i: dict, ctx: Ctx) -> dict:
 async def _add_note(i: dict, ctx: Ctx) -> dict:
     title = _req_str(i.get("title"), "title")
     plain = {"title": js_slice(title, 200), **({"content": i["content"].strip()} if isinstance(i.get("content"), str) and i["content"].strip() else {})}
-    n = await notes.create(_check(notes.CreateBody, plain), user=ctx.user)
+    n = await notes.create(_check(notes.CreateBody, plain), space=personal_space(ctx.user))
     return _done({"kind": "create", "entityType": "note", "entityId": n["id"], "label": n["title"], "link": f"/notes?id={n['id']}",
                   "undo": {"op": "delete", "type": "note", "id": n["id"]}}, {"id": n["id"], "title": n["title"]})
 
@@ -1146,7 +1146,7 @@ async def _save_focus_mode(i: dict, ctx: Ctx) -> dict:
             raise ToolError(f"No project named {', '.join(missing)}")
         project_ids = [mine[n.strip().lower()] for n in names]
     task_ids = _str_list(i.get("task_ids"), "task_ids")
-    if task_ids and await db.task.count(where={"id": {"in": task_ids}, "userId": ctx.user_id}) != len(task_ids):
+    if task_ids and await db.task.count(where={"id": {"in": task_ids}, "userId": ctx.user_id, "workspaceId": None}) != len(task_ids):
         raise ToolError("Task not found")
     before = await _focus_now(ctx)
     modes = before["focusModes"]
@@ -1512,6 +1512,9 @@ async def remove(user, kind: str, id: str) -> dict | None:
     async def remove_event(id: str, user):
         return await events.remove(id, space=personal_space(user))
 
+    async def remove_note(id: str, user):
+        return await notes.remove(id, space=personal_space(user))
+
     async def remove_gift(id: str, user):
         gift = await db.giftidea.find_first(where={"id": id, "person": {"is": {"userId": user.id}}})
         if gift is None:
@@ -1519,7 +1522,7 @@ async def remove(user, kind: str, id: str) -> dict | None:
         return await people.remove_gift(gift.personId, id, user=user)
 
     handlers = {"task": remove_task, "event": remove_event, "reminder": reminders.remove, "transaction": transactions.remove, "debt": debts.remove,
-                "note": notes.remove, "shopping_item": shopping.remove_item, "food_log": wellness.remove_food, "weight": wellness.remove_weight,
+                "note": remove_note, "shopping_item": shopping.remove_item, "food_log": wellness.remove_food, "weight": wellness.remove_weight,
                 "habit": habits.remove, "project": remove_project, "gift": remove_gift, "goal": goals.remove,
                 "important_date": important_dates.remove}
     if kind not in handlers:
@@ -1584,7 +1587,7 @@ async def describe(ctx: Ctx, kind, id: str) -> dict:
         d = await debts.get(id, user=user)
         return {"label": f"{d['title']} · {d['who']}" if d.get("who") and d["who"] != d["title"] else d["title"], "link": f"/finance/debts?id={id}"}
     if kind == "note":
-        n = await notes.get(id, user=user)
+        n = await notes.get(id, space=personal_space(user))
         return {"label": n["title"], "link": f"/notes?id={id}"}
     if kind == "shopping_item":
         s = await shopping.get_item(id, user=user)

@@ -674,6 +674,8 @@ async def get_focus(request: Request, space: Space = Depends(current_space)):
 
 async def _focus_view(space: Space, day: datetime, ctx: Ctx) -> dict:
     user_id = space.user.id
+    if not space.personal:
+        return {"date": dates.format_date_only(day), "items": [], "max": 3}
     rows = await db.task.find_many(
         where={**space.where, "focusDate": day},
         include=_INCLUDE,
@@ -685,6 +687,9 @@ async def _focus_view(space: Space, day: datetime, ctx: Ctx) -> dict:
 @router.put("/focus")
 async def set_focus(body: FocusBody, space: Space = Depends(current_space)):
     user = space.user
+    if not space.personal:
+        # the Top 3 is one person's day; on shared rows it would overwrite teammates' picks
+        raise nest_error(400, "Focus is for your Personal tasks")
     ctx = await task_ctx(user)
     day = _focus_date(body.date, ctx.tz)
     ids = list(dict.fromkeys(body.taskIds))

@@ -120,8 +120,16 @@ class Workspaces(WorkspaceCase):
         self.assertEqual(await self.roles(w), {admin.user.id: "OWNER", member.user.id: "MEMBER"})
         await admin.post(f"/api/workspaces/{w}/leave")
         self.assertEqual(await self.roles(w), {member.user.id: "OWNER"})
-        await member.post(f"/api/workspaces/{w}/leave")
-        self.assertIsNone(await self.db.workspace.find_unique(where={"id": w}))
+        last = await member.post(f"/api/workspaces/{w}/leave")
+        self.assertEqual(last.status_code, 400, last.text)  # the last one deletes it instead, typing its name
+        self.assertIsNotNone(await self.db.workspace.find_unique(where={"id": w}))
+
+    async def test_only_the_owner_invites_admins(self):
+        w, owner, admin, member = await self.team()
+        outsider = await self.member()
+        refused = await admin.post(f"/api/workspaces/{w}/invites", json={"email": outsider.user.email, "role": "ADMIN"})
+        self.assertEqual(refused.status_code, 404, refused.text)
+        await self.invite(owner, w, outsider, "ADMIN")
 
     async def test_transfer_ownership(self):
         w, owner, admin, member = await self.team()
@@ -206,3 +214,15 @@ class WorkspaceEndings(WorkspaceCase):
         task = (await owner.post("/api/tasks", json={"title": "T", "assigneeId": member.user.id}, headers={"X-Vournal-Space": w})).json()
         await delete_account(member.user)
         self.assertIsNone((await self.db.task.find_unique(where={"id": task["id"]})).assigneeId)
+
+    async def test_left_member_deleted_later_work_stays(self):
+        from app.auth import delete_account
+
+        w, owner, admin, member = await self.team()
+        ids = await self.items_by(member, w)
+        await member.post(f"/api/workspaces/{w}/leave")
+        await delete_account(member.user)
+        for model, id in ids.items():
+            row = await getattr(self.db, model).find_unique(where={"id": id})
+            self.assertIsNotNone(row, model)
+            self.assertEqual(row.userId, owner.user.id, model)

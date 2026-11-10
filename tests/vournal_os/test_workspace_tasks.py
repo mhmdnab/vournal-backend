@@ -85,3 +85,8 @@ class WorkspaceTasks(WorkspaceCase):
         personal_project = (await self.owner.post("/api/projects", json={"name": "Mine"})).json()
         cross = await self.owner.post("/api/tasks", json={"title": "X", "projectId": personal_project["id"]}, headers=self.ws)
         self.assertEqual(cross.status_code, 404, cross.text)
+
+    async def test_focus_is_personal(self):
+        task = await self.task(self.owner)
+        refused = await self.owner.put("/api/tasks/focus", json={"taskIds": [task["id"]]}, headers=self.ws)
+        self.assertEqual(refused.status_code, 400, refused.text)

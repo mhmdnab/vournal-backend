@@ -133,6 +133,10 @@ async def move(body: MoveBody, user=Depends(plus_user)):
         if attachment_ids:
             await tx.attachment.update_many(where={"id": {"in": attachment_ids}}, data=dict(common))
 
+    # a project that changes space loses its outside shares: in a workspace only its admins
+    # share it, and back in Personal its new owner decides
+    if moving_projects:
+        await db.projectshare.delete_many(where={"projectId": {"in": list(moving_projects)}})
     # links that would now point into another space are dropped
     for t in await db.task.find_many(where={"id": {"in": list(moving_tasks)}}):
         fix = {}
