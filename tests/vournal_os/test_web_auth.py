@@ -37,6 +37,7 @@ class WebAuth(unittest.IsolatedAsyncioTestCase):
         await db.connect()  # each test has its own event loop
         limiter.reset()
         self.emails: list[str] = []
+        self.codes: list[str] = []
         self.client = self._new_client()
 
     async def asyncTearDown(self):
@@ -96,12 +97,16 @@ class WebAuth(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json()["message"], "Invalid email or password")
 
-    async def test_unconfirmed_email_is_refused(self):
+    async def test_unconfirmed_login_sends_a_code(self):
         user = await self._user(emailConfirmRequired=True)
-        response = await self._login(user)
-        self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.json()["code"], "confirm_in_app")
-        self.assertEqual(response.json()["message"], "Confirm your email in the vournal app first.")
+        with patch("app.email.send_verification_code", self._capture):
+            response = await self._login(user)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["step"], "verify_email")
+        self.assertNotIn("life_at", response.headers.get("set-cookie", ""))
+        verified = await self._verify(response.json()["challengeToken"], self.codes[-1])
+        self.assertEqual(verified.status_code, 200, verified.text)
+        self.assertEqual(verified.json()["user"]["email"], user.email)
 
     async def test_refresh_rotates_cookie(self):
         user = await self._user()
@@ -201,33 +206,121 @@ class WebAuth(unittest.IsolatedAsyncioTestCase):
         with_header = await self.client.post("/api/auth/logout-all", headers=CSRF)
         self.assertEqual(with_header.status_code, 200, with_header.text)
 
-    async def test_register_is_refused(self):
-        before = await self.db.user.count()
-        response = await self.client.post(
-            "/api/auth/register",
-            json={"email": "new@example.test", "password": PASSWORD, "name": "New"},
-            headers=CSRF,
+    async def _capture(self, to, code, note=None):
+        self.codes.append(code)
+        return True
+
+    async def _register(self, email: str, password: str = PASSWORD) -> httpx.Response:
+        with patch("app.email.send_verification_code", self._capture):
+            return await self.client.post(
+                "/api/auth/register", json={"email": email, "password": password}, headers=CSRF
+            )
+
+    async def _verify(self, token: str, code: str) -> httpx.Response:
+        return await self.client.post(
+            "/api/auth/register/verify", json={"challengeToken": token, "code": code}, headers=CSRF
         )
-        self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.json()["code"], "create_in_app")
-        self.assertEqual(response.json()["message"], "Create your account in the vournal app.")
-        self.assertEqual(await self.db.user.count(), before)
 
-    async def test_unknown_oauth_identity_creates_nothing(self):
-        from app.oauth import APPLE_ISSUER, VerifiedIdentity
-
+    def _new_email(self) -> str:
         email = f"web-{uuid.uuid4().hex}@example.test"
         self.emails.append(email)
+        return email
+
+    async def test_register_sends_a_code_then_signs_in(self):
+        email = self._new_email()
+        response = await self._register(email)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["step"], "verify_email")
+        verified = await self._verify(response.json()["challengeToken"], self.codes[-1])
+        self.assertEqual(verified.status_code, 200, verified.text)
+        self.assertIn("life_at=", _cookie(verified, "life_at"))
+        self.assertEqual(verified.json()["user"]["email"], email)
+        stored = await self.db.user.find_unique(where={"email": email})
+        self.assertIsNotNone(stored.emailVerifiedAt)
+        self.assertTrue(stored.emailConfirmRequired)
+
+    async def test_register_wrong_code_is_400(self):
+        response = await self._register(self._new_email())
+        wrong = "000000" if self.codes[-1] != "000000" else "111111"
+        verified = await self._verify(response.json()["challengeToken"], wrong)
+        self.assertEqual(verified.status_code, 400, verified.text)
+
+    async def test_register_existing_confirmed_email_is_409(self):
+        user = await self._user(emailVerifiedAt=datetime.now(timezone.utc))
+        response = await self._register(user.email)
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual(response.json()["message"], "An account with that email already exists.")
+
+    async def test_register_never_takes_over_an_account_in_use(self):
+        # An older app build made accounts without the code step: unconfirmed, but in use.
+        user = await self._user()
+        response = await self._register(user.email, "another-pass-99")
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertEqual((await self._login(user)).status_code, 200)
+
+    async def test_register_again_before_confirming_sends_a_new_code(self):
+        email = self._new_email()
+        first = await self._register(email)
+        first_code = self.codes[-1]
+        second = await self._register(email, "second-pass-99")
+        self.assertEqual(second.status_code, 200, second.text)
+        stale = await self._verify(first.json()["challengeToken"], first_code)
+        self.assertEqual(stale.status_code, 400)
+        verified = await self._verify(second.json()["challengeToken"], self.codes[-1])
+        self.assertEqual(verified.status_code, 200, verified.text)
+        login = await self.client.post(
+            "/api/auth/login", json={"email": email, "password": "second-pass-99"}, headers=CSRF
+        )
+        self.assertEqual(login.status_code, 200, login.text)
+
+    async def test_register_rate_limited_per_email(self):
+        from app.rate_limit import rate_limited
+
+        email = self._new_email()
+        for _ in range(3):
+            rate_limited("web-register", email, 3, 3600)
+        response = await self._register(email)
+        self.assertEqual(response.status_code, 429, response.text)
+        self.assertIsNone(await self.db.user.find_unique(where={"email": email}))
+
+    async def test_trial_starts_on_web_sign_up(self):
+        when = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        with patch.dict(os.environ, {"PLUS_TRIAL_FROM": when}):
+            response = await self._register(self._new_email())
+            verified = await self._verify(response.json()["challengeToken"], self.codes[-1])
+            me = await self.client.get("/api/auth/me")
+        self.assertEqual(verified.status_code, 200, verified.text)
+        self.assertEqual(me.json()["user"]["plan"], "plus")
+        stored = await self.db.user.find_unique(where={"email": self.emails[-1]})
+        self.assertEqual(stored.planSource, "trial")
+
+    async def test_unknown_oauth_identity_creates_the_account(self):
+        from app.oauth import APPLE_ISSUER, VerifiedIdentity
+
+        email = self._new_email()
         identity = VerifiedIdentity(APPLE_ISSUER, f"sub-{uuid.uuid4().hex}", email, True, True)
-        users, identities = await self.db.user.count(), await self.db.externalidentity.count()
         with patch("app.oauth.verify_identity", return_value=identity):
             response = await self.client.post(
                 "/api/auth/oauth/apple", json={"idToken": "t", "nonce": "n"}, headers=CSRF
             )
-        self.assertEqual(response.status_code, 403, response.text)
-        self.assertEqual(response.json()["code"], "create_in_app")
-        self.assertEqual(await self.db.user.count(), users)
-        self.assertEqual(await self.db.externalidentity.count(), identities)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["user"]["email"], email)
+        user = await self.db.user.find_unique(where={"email": email})
+        self.assertIsNotNone(user.emailVerifiedAt)
+        linked = await self.db.externalidentity.find_first(where={"userId": user.id})
+        self.assertEqual(linked.subject, identity.subject)
+
+    async def test_unknown_oauth_identity_without_a_verified_email_is_409(self):
+        from app.oauth import APPLE_ISSUER, VerifiedIdentity
+
+        email = self._new_email()
+        identity = VerifiedIdentity(APPLE_ISSUER, f"sub-{uuid.uuid4().hex}", email, False, False)
+        with patch("app.oauth.verify_identity", return_value=identity):
+            response = await self.client.post(
+                "/api/auth/oauth/apple", json={"idToken": "t", "nonce": "n"}, headers=CSRF
+            )
+        self.assertEqual(response.status_code, 409, response.text)
+        self.assertIsNone(await self.db.user.find_unique(where={"email": email}))
 
     async def test_unlinked_oauth_for_existing_account_points_to_the_app(self):
         # The account exists; only this sign-in method isn't connected to it yet.
