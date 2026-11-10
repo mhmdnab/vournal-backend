@@ -170,6 +170,28 @@ async def remove_member(workspace_id: str, user_id: str) -> None:
         await delete_workspace(workspace_id)
 
 
+async def settle_workspaces_for_deleted_user(user_id: str) -> None:
+    """Before an account is deleted: the work it added stays in its workspaces. Ownership
+    passes on first if it owned one; what it created there is re-owned to the (new) owner,
+    so the user cascade doesn't take it (createdById still says who added it); its tasks
+    there become unassigned. A workspace with no one left goes, with its files."""
+    memberships = await db.workspacemember.find_many(where={"userId": user_id})
+    for m in memberships:
+        workspace_id = m.workspaceId
+        async with db.tx() as tx:
+            await tx.task.update_many(where={"workspaceId": workspace_id, "assigneeId": user_id}, data={"assigneeId": None})
+            await tx.workspacemember.delete(where={"id": m.id})
+            alive = await settle_workspace(tx, workspace_id)
+            if alive:
+                owner = await tx.workspacemember.find_first(where={"workspaceId": workspace_id, "role": "OWNER"})
+                for model in ("task", "event", "project", "note", "attachment"):
+                    await getattr(tx, model).update_many(
+                        where={"workspaceId": workspace_id, "userId": user_id}, data={"userId": owner.userId}
+                    )
+        if not alive:
+            await delete_workspace(workspace_id)
+
+
 # ----- views ---------------------------------------------------------------------------
 
 

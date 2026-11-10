@@ -152,3 +152,57 @@ class Workspaces(WorkspaceCase):
         mine = {x["id"]: x["showInCalendar"] for x in (await member.get("/api/workspaces")).json()}
         theirs = {x["id"]: x["showInCalendar"] for x in (await owner.get("/api/workspaces")).json()}
         self.assertEqual((mine[w], theirs[w]), (False, True))
+
+
+class WorkspaceEndings(WorkspaceCase):
+    async def items_by(self, client, w):
+        ws = {"X-Vournal-Space": w}
+        task = (await client.post("/api/tasks", json={"title": "T"}, headers=ws)).json()
+        note = (await client.post("/api/notes", json={"title": "N"}, headers=ws)).json()
+        project = (await client.post("/api/projects", json={"name": "P"}, headers=ws)).json()
+        event = (await client.post("/api/events", json={"title": "E", "startAt": "2027-01-05T09:00:00.000Z"}, headers=ws)).json()
+        return {"task": task["id"], "note": note["id"], "project": project["id"], "event": event["id"]}
+
+    async def test_deleted_member_work_stays(self):
+        from app.auth import delete_account
+
+        w, owner, admin, member = await self.team()
+        ids = await self.items_by(member, w)
+        await delete_account(member.user)
+        for model, id in ids.items():
+            row = await getattr(self.db, model).find_unique(where={"id": id})
+            self.assertIsNotNone(row, model)
+            self.assertEqual((row.workspaceId, row.userId, row.createdById), (w, owner.user.id, member.user.id), model)
+
+    async def test_deleted_owner_hands_on_and_work_stays(self):
+        from app.auth import delete_account
+
+        w, owner, admin, member = await self.team()
+        ids = await self.items_by(owner, w)
+        await delete_account(owner.user)
+        self.assertEqual(await self.roles(w), {admin.user.id: "OWNER", member.user.id: "MEMBER"})
+        row = await self.db.task.find_unique(where={"id": ids["task"]})
+        self.assertEqual(row.userId, admin.user.id)
+
+    async def test_last_member_deleted_removes_workspace_and_files(self):
+        from app.auth import delete_account
+
+        owner = await self.member()
+        w = await self.workspace(owner)
+        task = (await owner.post("/api/tasks", json={"title": "T"}, headers={"X-Vournal-Space": w})).json()
+        await self.db.attachment.create(
+            data={"userId": owner.user.id, "createdById": owner.user.id, "workspaceId": w, "entityType": "TASK", "entityId": task["id"],
+                  "fileName": "a.txt", "mimeType": "text/plain", "size": 1, "storageKey": f"os/attachments/ws/{w}/a"}
+        )
+        self.objects[f"os/attachments/ws/{w}/a"] = b"x"
+        await delete_account(owner.user)
+        self.assertIsNone(await self.db.workspace.find_unique(where={"id": w}))
+        self.assertNotIn(f"os/attachments/ws/{w}/a", self.objects)
+
+    async def test_deleted_assignee_is_unassigned(self):
+        from app.auth import delete_account
+
+        w, owner, admin, member = await self.team()
+        task = (await owner.post("/api/tasks", json={"title": "T", "assigneeId": member.user.id}, headers={"X-Vournal-Space": w})).json()
+        await delete_account(member.user)
+        self.assertIsNone((await self.db.task.find_unique(where={"id": task["id"]})).assigneeId)
