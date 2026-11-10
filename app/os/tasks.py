@@ -20,7 +20,7 @@ from app.os import attachments
 from app.os.common import dates, rrule, validators
 from app.os.common.dbnull import DB_NULL, pop_db_nulls, set_db_null
 from app.os.common.activity import log_activity
-from app.os.common.deps import plus_user
+from app.os.common.space import Space, assert_in_space, assert_personal_links_allowed, current_space, member_role
 from app.os.common.http import invalid_data, nest_error, nest_router
 from app.os.common.i18n import to_lang
 from app.os.common.ownership import assert_many_owned, assert_owned
@@ -95,11 +95,25 @@ def _pick(row, *fields) -> dict | None:
     return None if row is None else {f: getattr(row, f) for f in fields}
 
 
+async def people(user_ids) -> dict:
+    """{userId: {id, name, avatarColor}} for the assignees and creators a view shows."""
+    ids = [i for i in dict.fromkeys(user_ids) if i]
+    if not ids:
+        return {}
+    profiles = {s.userId: s for s in await db.usersettings.find_many(where={"userId": {"in": ids}})}
+    return {
+        i: {"id": i, "name": profiles[i].name if i in profiles else None, "avatarColor": profiles[i].avatarColor if i in profiles else None}
+        for i in ids
+    }
+
+
 async def task_views(user_id: str, rows, ctx: Ctx) -> list[dict]:
-    """List shape: the row, its links, overdue, subtask counts, isRecurring."""
+    """List shape: the row, its links, overdue, subtask counts, isRecurring, who it's assigned
+    to and who added it. (Subtasks share their parent's space, so they're found by parent.)"""
     counts: dict[str, list[int]] = {}
+    who = await people([r.assigneeId for r in rows] + [r.createdById for r in rows])
     if rows:
-        children = await db.task.find_many(where={"userId": user_id, "parentId": {"in": [r.id for r in rows]}})
+        children = await db.task.find_many(where={"parentId": {"in": [r.id for r in rows]}})
         for child in children:
             total_done = counts.setdefault(child.parentId, [0, 0])
             total_done[0] += 1
@@ -119,6 +133,9 @@ async def task_views(user_id: str, rows, ctx: Ctx) -> list[dict]:
             subtaskCount=total,
             subtaskDoneCount=done,
             isRecurring=bool(r.rrule),
+            workspaceId=r.workspaceId,
+            assignee=who.get(r.assigneeId),
+            createdBy=who.get(r.createdById),
         )
         out.append(view)
     return out
@@ -127,11 +144,11 @@ async def task_views(user_id: str, rows, ctx: Ctx) -> list[dict]:
 async def _detail(user_id: str, row, ctx: Ctx) -> dict:
     [view] = await task_views(user_id, [row], ctx)
     subtasks = await db.task.find_many(
-        where={"userId": user_id, "parentId": row.id}, order=[{"position": "asc"}, {"createdAt": "asc"}]
+        where={"parentId": row.id}, order=[{"position": "asc"}, {"createdAt": "asc"}]
     )
-    events = await db.event.find_many(where={"userId": user_id, "taskId": row.id}, order={"startAt": "asc"})
+    events = await db.event.find_many(where={"taskId": row.id, "workspaceId": row.workspaceId}, order={"startAt": "asc"})
     parent = (
-        await db.task.find_first(where={"id": row.parentId, "userId": user_id}) if row.parentId else None
+        await db.task.find_first(where={"id": row.parentId, "workspaceId": row.workspaceId}) if row.parentId else None
     )
     description = None
     if row.rrule:
@@ -150,11 +167,11 @@ async def _detail(user_id: str, row, ctx: Ctx) -> dict:
     }
 
 
-async def _get(user_id: str, id: str, ctx: Ctx) -> dict:
-    row = await db.task.find_first(where={"id": id, "userId": user_id}, include=_INCLUDE)
+async def _get(space: Space, id: str, ctx: Ctx) -> dict:
+    row = await db.task.find_first(where={"id": id, **space.where}, include=_INCLUDE)
     if row is None:
         raise nest_error(404, "Task not found")
-    return await _detail(user_id, row, ctx)
+    return await _detail(space.user.id, row, ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -201,6 +218,8 @@ class _TaskFields(BaseModel):
     tagIds: list[StrictStr] | None = Field(default=None, max_length=50)
     position: StrictInt | StrictFloat | None = None
     timeAnchor: TimeAnchor | None = None
+    # workspaces: a member of the space (Personal: only yourself)
+    assigneeId: StrictStr | None = None
 
     @field_validator("title")
     @classmethod
@@ -304,21 +323,65 @@ def _transition(prev: str, nxt: str | None) -> str | None:
     return "reopened" if prev == "COMPLETED" else None
 
 
-async def _owned(user_id: str, id: str):
-    row = await db.task.find_first(where={"id": id, "userId": user_id}, include={"tags": True})
+async def _owned(space: Space, id: str):
+    row = await db.task.find_first(where={"id": id, **space.where}, include={"tags": True})
     if row is None:
         raise nest_error(404, "Task not found")
     return row
 
 
-async def _assert_links(user_id: str, body: _TaskFields) -> None:
-    for model, field in (("category", "categoryId"), ("project", "projectId"), ("goal", "goalId"), ("course", "courseId"), ("trip", "tripId")):
-        await assert_owned(model, getattr(body, field), user_id)
-    await assert_many_owned("tag", body.tagIds, user_id)
+async def _assert_links(space: Space, body: _TaskFields) -> None:
+    # categories, tags, goals, courses and trips are personal; a project is in the same space
+    assert_personal_links_allowed(space, body)
+    for model, field in (("category", "categoryId"), ("goal", "goalId"), ("course", "courseId"), ("trip", "tripId")):
+        await assert_owned(model, getattr(body, field), space.user.id)
+    await assert_many_owned("tag", body.tagIds, space.user.id)
+    await assert_in_space("project", body.projectId, space)
+    await _assert_assignee(space, body.assigneeId)
 
 
-async def _valid_parent(user_id: str, parent_id: str):
-    parent = await db.task.find_first(where={"id": parent_id, "userId": user_id})
+async def _assert_assignee(space: Space, assignee_id: str | None) -> None:
+    if assignee_id is None:
+        return
+    ok = assignee_id == space.user.id if space.personal else await member_role(space.workspace_id, assignee_id) is not None
+    if not ok:
+        raise nest_error(404, "User not found")
+
+
+async def _notify_assigned(space: Space, task_id: str, title: str, assignee_id: str | None) -> None:
+    """In-app notification and web push for whoever was just given a task (not yourself)."""
+    if assignee_id is None or assignee_id == space.user.id or space.personal:
+        return
+    from app.os import push
+
+    who = (await people([space.user.id])).get(space.user.id) or {}
+    text = f"{who.get('name') or space.user.email} assigned you a task"
+    key = f"task:{task_id}:assigned:{datetime.now(timezone.utc).isoformat()}"
+    row = await db.notification.upsert(
+        where={"userId_dedupeKey": {"userId": assignee_id, "dedupeKey": key}},
+        data={
+            "create": {
+                "userId": assignee_id, "dedupeKey": key,
+                "title": title[:200], "body": text, "link": f"/tasks?id={task_id}&space={space.workspace_id}",
+                "entityType": "TASK", "entityId": task_id,
+            },
+            "update": {},
+        },
+    )
+    try:
+        await push.send_to_user(assignee_id, [{"title": row.title, "body": row.body, "link": row.link, "tag": row.id, "id": row.id}])
+    except Exception:  # noqa: BLE001 — a push never stops a save
+        log.warning("assignment push failed", exc_info=True)
+
+
+async def _assert_many_in_space(ids: list[str], space: Space) -> None:
+    unique = list(dict.fromkeys(ids))
+    if unique and await db.task.count(where={"id": {"in": unique}, **space.where}) != len(unique):
+        raise nest_error(404, "Task not found")
+
+
+async def _valid_parent(space: Space, parent_id: str):
+    parent = await db.task.find_first(where={"id": parent_id, **space.where})
     if parent is None:
         raise nest_error(404, "Task not found")
     if parent.parentId:
@@ -326,9 +389,9 @@ async def _valid_parent(user_id: str, parent_id: str):
     return parent
 
 
-async def _default_position(user_id: str, status: str, parent_id: str | None) -> float:
+async def _default_position(space: Space, status: str, parent_id: str | None) -> float:
     """New top-level tasks go to the top of their column; subtasks are appended."""
-    where = {"userId": user_id, "parentId": parent_id, **({} if parent_id else {"status": status})}
+    where = {**space.where, "parentId": parent_id, **({} if parent_id else {"status": status})}
     if parent_id:
         last = await db.task.find_first(where=where, order={"position": "desc"})
         return (last.position if last else -1) + 1
@@ -375,9 +438,10 @@ def _focus_date(value: str | None, tz: str) -> datetime:
 # Recurrence
 
 
-async def _after_completed(user_id: str, id: str, ctx: Ctx):
+async def _after_completed(space: Space, id: str, ctx: Ctx):
     """Logs task.completed and, for a repeating task, creates the next occurrence."""
-    task = await db.task.find_first(where={"id": id, "userId": user_id}, include={"tags": True})
+    user_id = space.user.id
+    task = await db.task.find_first(where={"id": id, **space.where}, include={"tags": True})
     if task is None:
         return None
     nxt = None
@@ -399,7 +463,7 @@ async def _spawn_next(user_id: str, task, ctx: Ctx):
     # Anchor on the series root's due date (keeps BYMONTHDAY and time of day stable).
     anchor = task.dueAt
     if task.recurrenceParentId:
-        root = await db.task.find_first(where={"id": task.recurrenceParentId, "userId": user_id})
+        root = await db.task.find_first(where={"id": task.recurrenceParentId, "workspaceId": task.workspaceId})
         if root is not None and root.dueAt:
             anchor = root.dueAt
     has_due = task.dueAt is not None
@@ -426,7 +490,7 @@ async def _spawn_next(user_id: str, task, ctx: Ctx):
     # Completing → reopening → completing must not create duplicates.
     dup = await db.task.find_first(
         where={
-            "userId": user_id,
+            "workspaceId": task.workspaceId,
             "OR": [{"id": root_id}, {"recurrenceParentId": root_id}],
             "dueAt": next_due,
             "NOT": [{"id": task.id}],
@@ -438,10 +502,13 @@ async def _spawn_next(user_id: str, task, ctx: Ctx):
     reminder_at = (
         next_due - (dates._utc(task.dueAt) - dates._utc(task.reminderAt)) if task.reminderAt and task.dueAt else None
     )
-    subtasks = await db.task.find_many(where={"userId": user_id, "parentId": task.id}, order={"position": "asc"})
+    subtasks = await db.task.find_many(where={"parentId": task.id}, order={"position": "asc"})
+    # the next repeat stays where the series is: same owner, space and assignee
+    owner = {"userId": task.userId, "createdById": task.createdById, "workspaceId": task.workspaceId}
     async with db.tx() as tx:
         data = {
-            "userId": user_id,
+            **owner,
+            "assigneeId": task.assigneeId,
             "title": task.title,
             "description": task.description,
             "notes": task.notes,
@@ -472,7 +539,7 @@ async def _spawn_next(user_id: str, task, ctx: Ctx):
             await tx.task.create_many(
                 data=[
                     {
-                        "userId": user_id,
+                        **owner,
                         "title": s.title,
                         "description": s.description,
                         "notes": s.notes,
@@ -503,12 +570,13 @@ async def _spawn_next(user_id: str, task, ctx: Ctx):
 _LIST_TASKS_QUERY = (  # the NestJS query DTO's fields
     "status", "overdue", "priority", "categoryId", "projectId", "goalId", "courseId", "tripId", "lifeArea",
     "tagId", "dueFrom", "dueTo", "hasDue", "completedFrom", "completedTo", "q", "parentId", "topLevel",
-    "sort", "order", "page", "pageSize",
+    "sort", "order", "page", "pageSize", "assignee",
 )
 
 
 @router.get("")
-async def list_tasks(request: Request, user=Depends(plus_user)):
+async def list_tasks(request: Request, space: Space = Depends(current_space)):
+    user = space.user
     ctx = await task_ctx(user)
     errors = unknown_params(request, _LIST_TASKS_QUERY)
     q = request.query_params
@@ -535,7 +603,9 @@ async def list_tasks(request: Request, user=Depends(plus_user)):
     if errors:
         raise nest_error(400, errors)
 
-    and_: list[dict] = [{"userId": user.id}]
+    and_: list[dict] = [space.where]
+    if q.get("assignee") == "me":
+        and_.append({"assigneeId": user.id})
     overdue_clause = overdue_where(ctx.now, ctx.start_of_today)
     if statuses:
         real = [s for s in statuses if s != "OVERDUE"]
@@ -590,7 +660,8 @@ async def list_tasks(request: Request, user=Depends(plus_user)):
 
 
 @router.get("/focus")
-async def get_focus(request: Request, user=Depends(plus_user)):
+async def get_focus(request: Request, space: Space = Depends(current_space)):
+    user = space.user
     errors = unknown_params(request, ("date",))
     value = request.query_params.get("date")
     if value is not None and not dates.is_iso_date_string(value):
@@ -598,12 +669,13 @@ async def get_focus(request: Request, user=Depends(plus_user)):
     if errors:
         raise nest_error(400, errors)
     ctx = await task_ctx(user)
-    return await _focus_view(user.id, _focus_date(value, ctx.tz), ctx)
+    return await _focus_view(space, _focus_date(value, ctx.tz), ctx)
 
 
-async def _focus_view(user_id: str, day: datetime, ctx: Ctx) -> dict:
+async def _focus_view(space: Space, day: datetime, ctx: Ctx) -> dict:
+    user_id = space.user.id
     rows = await db.task.find_many(
-        where={"userId": user_id, "focusDate": day},
+        where={**space.where, "focusDate": day},
         include=_INCLUDE,
         order=[{"priority": "desc"}, {"dueAt": {"sort": "asc", "nulls": "last"}}, {"createdAt": "asc"}],
     )
@@ -611,27 +683,29 @@ async def _focus_view(user_id: str, day: datetime, ctx: Ctx) -> dict:
 
 
 @router.put("/focus")
-async def set_focus(body: FocusBody, user=Depends(plus_user)):
+async def set_focus(body: FocusBody, space: Space = Depends(current_space)):
+    user = space.user
     ctx = await task_ctx(user)
     day = _focus_date(body.date, ctx.tz)
     ids = list(dict.fromkeys(body.taskIds))
-    await assert_many_owned("task", ids, user.id)
+    await _assert_many_in_space(ids, space)
     async with db.tx() as tx:
         await tx.task.update_many(
-            where={"userId": user.id, "focusDate": day, "id": {"not_in": ids}}, data={"focusDate": None}
+            where={**space.where, "focusDate": day, "id": {"not_in": ids}}, data={"focusDate": None}
         )
-        await tx.task.update_many(where={"userId": user.id, "id": {"in": ids}}, data={"focusDate": day})
+        await tx.task.update_many(where={**space.where, "id": {"in": ids}}, data={"focusDate": day})
     await log_activity(user.id, "task.focusSet", entity_id=None, date=dates.format_date_only(day), taskIds=ids)
-    return await _focus_view(user.id, day, ctx)
+    return await _focus_view(space, day, ctx)
 
 
 @router.post("/reorder")
-async def reorder(body: ReorderBody, user=Depends(plus_user)):
+async def reorder(body: ReorderBody, space: Space = Depends(current_space)):
+    user = space.user
     """Drag and drop: status and position in bulk; status changes run PATCH's side effects."""
     ctx = await task_ctx(user)
     ids = list(dict.fromkeys(i.id for i in body.items))
-    await assert_many_owned("task", ids, user.id)
-    existing = {t.id: t for t in await db.task.find_many(where={"userId": user.id, "id": {"in": ids}})}
+    await _assert_many_in_space(ids, space)
+    existing = {t.id: t for t in await db.task.find_many(where={**space.where, "id": {"in": ids}})}
     transitions = []
     async with db.tx() as tx:
         for item in body.items:
@@ -646,37 +720,40 @@ async def reorder(body: ReorderBody, user=Depends(plus_user)):
                 data["completedAt"] = ctx.now
             if kind == "reopened":
                 data["completedAt"] = None
-            await tx.task.update_many(where={"id": item.id, "userId": user.id}, data=data)
+            await tx.task.update_many(where={"id": item.id, **space.where}, data=data)
     for task_id, kind, title in transitions:
         if kind == "completed":
-            await _after_completed(user.id, task_id, ctx)
+            await _after_completed(space, task_id, ctx)
         else:
             await log_activity(user.id, "task.reopened", entity_id=task_id, title=title)
     return {"ok": True}
 
 
 @router.post("", status_code=201)
-async def create(body: CreateBody, user=Depends(plus_user)):
+async def create(body: CreateBody, space: Space = Depends(current_space)):
+    user = space.user
     ctx = await task_ctx(user)
-    await _assert_links(user.id, body)
-    parent = await _valid_parent(user.id, body.parentId) if body.parentId else None
+    await _assert_links(space, body)
+    parent = await _valid_parent(space, body.parentId) if body.parentId else None
     status = body.status or "TODO"
     due = _parse_due(body.dueAt, body.hasDueTime, ctx.tz)
     anchor = {"start": body.timeAnchor.start.model_dump()} if body.timeAnchor else None
     if anchor:
         due = (await _anchored_due(user.id, anchor, due[0] if due else ctx.now, ctx.tz), True)
     parent_id = parent.id if parent else None
-    position = body.position if body.position is not None else await _default_position(user.id, status, parent_id)
+    position = body.position if body.position is not None else await _default_position(space, status, parent_id)
     sent = body.model_fields_set
     async with db.tx() as tx:
         data = {
-            "userId": user.id,
+            **space.create_fields(),
+            "assigneeId": body.assigneeId,
             "title": body.title,
             "description": body.description,
             "notes": body.notes,
             "status": status,
             "priority": body.priority or "MEDIUM",
-            "lifeArea": body.lifeArea,
+            # work items: a workspace task is WORK unless it says otherwise
+            "lifeArea": body.lifeArea or (None if space.personal else "WORK"),
             "categoryId": body.categoryId,
             "dueAt": due[0] if due else None,
             "hasDueTime": due[1] if due else False,
@@ -701,7 +778,7 @@ async def create(body: CreateBody, user=Depends(plus_user)):
             await tx.task.create_many(
                 data=[
                     {
-                        "userId": user.id,
+                        **space.create_fields(),
                         "title": s.title,
                         "priority": s.priority or "MEDIUM",
                         "position": i,
@@ -716,25 +793,28 @@ async def create(body: CreateBody, user=Depends(plus_user)):
         user.id, "task.created", entity_id=created.id, title=created.title, projectId=created.projectId,
         parentId=parent_id,
     )
-    return await _get(user.id, created.id, ctx)
+    await _notify_assigned(space, created.id, created.title, body.assigneeId)
+    return await _get(space, created.id, ctx)
 
 
 @router.get("/{id}")
-async def get(id: str, user=Depends(plus_user)):
-    return await _get(user.id, id, await task_ctx(user))
+async def get(id: str, space: Space = Depends(current_space)):
+    user = space.user
+    return await _get(space, id, await task_ctx(user))
 
 
 @router.patch("/{id}")
-async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
+async def update(id: str, body: UpdateBody, space: Space = Depends(current_space)):
+    user = space.user
     ctx = await task_ctx(user)
-    existing = await _owned(user.id, id)
-    await _assert_links(user.id, body)
+    existing = await _owned(space, id)
+    await _assert_links(space, body)
     sent = body.model_fields_set
     if body.parentId:
         if body.parentId == id:
             raise nest_error(400, "A task cannot be its own parent")
-        await _valid_parent(user.id, body.parentId)
-        if await db.task.count(where={"userId": user.id, "parentId": id}) > 0:
+        await _valid_parent(space, body.parentId)
+        if await db.task.count(where={**space.where, "parentId": id}) > 0:
             raise nest_error(400, "A task with subtasks cannot become a subtask")
     # null on a column that can't be empty: NestJS failed in Prisma with 400 "Invalid data"
     if any(f in sent and getattr(body, f) is None for f in ("title", "priority", "position", "hasDueTime", "status")):
@@ -744,7 +824,7 @@ async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
         f: getattr(body, f)
         for f in (
             "title", "description", "notes", "priority", "lifeArea", "categoryId", "estimatedMinutes",
-            "parentId", "projectId", "goalId", "courseId", "tripId", "position",
+            "parentId", "projectId", "goalId", "courseId", "tripId", "position", "assigneeId",
         )
         if f in sent
     }
@@ -796,44 +876,51 @@ async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
         await set_db_null(tx, "Task", existing.id, nulls)
         # Subtasks stay in their parent's project (project progress counts them).
         if "projectId" in sent and existing.parentId is None and body.projectId != existing.projectId:
-            await tx.task.update_many(where={"userId": user.id, "parentId": id}, data={"projectId": body.projectId})
+            await tx.task.update_many(where={**space.where, "parentId": id}, data={"projectId": body.projectId})
     await log_activity(user.id, "task.updated", entity_id=id, title=body.title or existing.title)
+    if "assigneeId" in sent and body.assigneeId != existing.assigneeId:
+        await _notify_assigned(space, id, body.title or existing.title, body.assigneeId)
     if transition == "completed":
-        await _after_completed(user.id, id, ctx)
+        await _after_completed(space, id, ctx)
     if transition == "reopened":
         await log_activity(user.id, "task.reopened", entity_id=id, title=existing.title)
-    return await _get(user.id, id, ctx)
+    return await _get(space, id, ctx)
 
 
 @router.post("/{id}/complete")
-async def complete(id: str, user=Depends(plus_user)):
+async def complete(id: str, space: Space = Depends(current_space)):
+    user = space.user
     ctx = await task_ctx(user)
-    existing = await _owned(user.id, id)
+    existing = await _owned(space, id)
     nxt = None
     if existing.status != "COMPLETED":
         await db.task.update(where={"id": existing.id}, data={"status": "COMPLETED", "completedAt": ctx.now})
-        nxt = await _after_completed(user.id, id, ctx)
-    return {**await _get(user.id, id, ctx), "nextOccurrence": nxt}
+        nxt = await _after_completed(space, id, ctx)
+    return {**await _get(space, id, ctx), "nextOccurrence": nxt}
 
 
 @router.post("/{id}/reopen")
-async def reopen(id: str, user=Depends(plus_user)):
+async def reopen(id: str, space: Space = Depends(current_space)):
+    user = space.user
     ctx = await task_ctx(user)
-    existing = await _owned(user.id, id)
+    existing = await _owned(space, id)
     if existing.status == "COMPLETED":
         await db.task.update(where={"id": existing.id}, data={"status": "TODO", "completedAt": None})
         await log_activity(user.id, "task.reopened", entity_id=id, title=existing.title)
-    return await _get(user.id, id, ctx)
+    return await _get(space, id, ctx)
 
 
 @router.delete("/{id}")
-async def remove(id: str, user=Depends(plus_user)):
-    existing = await _owned(user.id, id)
-    children = await db.task.find_many(where={"userId": user.id, "parentId": id})
+async def remove(id: str, space: Space = Depends(current_space)):
+    user = space.user
+    existing = await _owned(space, id)
+    if not space.can_delete(existing):
+        raise nest_error(404, "Task not found")
+    children = await db.task.find_many(where={"parentId": id})
     ids = [id, *(c.id for c in children)]
     async with db.tx() as tx:
         # Attachments are linked by (entityType, entityId) with no foreign key: remove them here.
-        keys = await attachments.delete_rows(tx, user.id, "TASK", ids)
+        keys = await attachments.delete_rows(tx, None, "TASK", ids)
         await tx.task.delete(where={"id": existing.id})  # subtasks cascade
     await attachments.delete_objects(keys)
     await log_activity(user.id, "task.deleted", entity_id=id, title=existing.title)
