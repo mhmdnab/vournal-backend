@@ -142,6 +142,9 @@ model User {
   dayLogs           DayLog[]
   weekReviews       WeekReview[]
   householdMember   HouseholdMember?
+  workspaceMembers  WorkspaceMember[]
+  projectShares     ProjectShare[]
+  assignedTasks     Task[]            @relation("TaskAssignee")
   assistantChats    AssistantConversation[]
   debts             Debt[]
   debtPayments      DebtPayment[]
@@ -842,6 +845,16 @@ model Task {
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
 
+  // Workspaces (9n): the shared space this item is in (null = its creator's Personal space),
+  // and who added it (userId is re-owned to the workspace owner when its creator's account goes).
+  workspaceId        String?
+  workspace          Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdById        String?
+  assigneeId         String?
+  assignee           User?      @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([assigneeId])
   @@index([userId, status])
   @@index([userId, dueAt])
   @@index([userId, focusDate])
@@ -886,6 +899,13 @@ model Event {
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
+  // Workspaces (9n): the shared space this item is in (null = its creator's Personal space),
+  // and who added it (userId is re-owned to the workspace owner when its creator's account goes).
+  workspaceId        String?
+  workspace          Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdById        String?
+
+  @@index([workspaceId])
   @@index([userId, startAt])
   @@index([householdId, startAt])
 }
@@ -919,6 +939,14 @@ model Project {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
+  // Workspaces (9n): the shared space this item is in (null = its creator's Personal space),
+  // and who added it (userId is re-owned to the workspace owner when its creator's account goes).
+  workspaceId        String?
+  workspace          Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdById        String?
+
+  shares             ProjectShare[]
+  @@index([workspaceId])
   @@index([userId, status])
 }
 
@@ -937,6 +965,13 @@ model Attachment {
   storageKey String
   createdAt  DateTime   @default(now())
 
+  // Workspaces (9n): the shared space this item is in (null = its creator's Personal space),
+  // and who added it (userId is re-owned to the workspace owner when its creator's account goes).
+  workspaceId        String?
+  workspace          Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdById        String?
+
+  @@index([workspaceId])
   @@index([userId, entityType, entityId])
 }
 
@@ -1330,6 +1365,13 @@ model Note {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
+  // Workspaces (9n): the shared space this item is in (null = its creator's Personal space),
+  // and who added it (userId is re-owned to the workspace owner when its creator's account goes).
+  workspaceId        String?
+  workspace          Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdById        String?
+
+  @@index([workspaceId])
   @@index([userId, isArchived])
 }
 
@@ -1980,4 +2022,83 @@ model WorkoutSet {
   sortOrder  Int            @default(0)
 
   @@index([sessionId])
+}
+
+// =============================================================================
+// Workspaces (9n, spec 2026-11-09-workspaces-design): shared tasks, calendar,
+// projects, notes and files for work, next to each person's Personal space.
+// =============================================================================
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model Workspace {
+  id          String            @id @default(cuid())
+  name        String
+  icon        String?
+  color       String?
+  members     WorkspaceMember[]
+  invites     WorkspaceInvite[]
+  tasks       Task[]
+  events      Event[]
+  projects    Project[]
+  notes       Note[]
+  attachments Attachment[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+// Exactly one OWNER per workspace. showInCalendar: its events also show in this
+// member's Personal calendar (on by default).
+model WorkspaceMember {
+  id             String        @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           WorkspaceRole @default(MEMBER)
+  showInCalendar Boolean       @default(true)
+  joinedAt       DateTime      @default(now())
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+// Accepted by the signed-in account with this (confirmed) email. 14 days.
+model WorkspaceInvite {
+  id          String        @id @default(cuid())
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  email       String
+  role        WorkspaceRole @default(MEMBER)
+  codeHash    String        @unique
+  invitedById String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  usedById    String?
+  createdAt   DateTime      @default(now())
+
+  @@index([workspaceId])
+  @@index([email])
+}
+
+// One project shared view-only with someone outside its workspace (or with anyone,
+// for a Personal project). userId is set when the invite is accepted.
+model ProjectShare {
+  id          String    @id @default(cuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  email       String
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash    String    @unique
+  invitedById String
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([projectId, email])
+  @@index([userId])
 }
