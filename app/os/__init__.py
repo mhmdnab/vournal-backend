@@ -69,6 +69,7 @@ def include_os_routers() -> APIRouter:
             household,
             workspaces,
             move,
+            shared_projects,
             insights,
             journal,
             maintenance,
@@ -151,5 +152,6 @@ def include_os_routers() -> APIRouter:
         api_router.include_router(work.router)
         api_router.include_router(workspaces.router)
         api_router.include_router(move.router)
+        api_router.include_router(shared_projects.router)
         _included = True
     return api_router
