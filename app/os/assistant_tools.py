@@ -51,6 +51,7 @@ class Ctx:
         self.deletes_this_message = 0
         self.round_deletes = 0  # delete_item calls in the round being run
         self.entry_people: dict[str, str] = {}  # an app recording's new people: "proposal-person:<i>" → name
+        self.importing = False  # an import from other AI chats: it adds and updates, never deletes
 
 
 # ----- results ---------------------------------------------------------------------------
@@ -290,6 +291,9 @@ async def run(name: str, raw_input, ctx: Ctx) -> dict:
         tool = _TOOLS.get(name)
         if tool is None:
             return {"content": f"Unknown tool {name}", "isError": True}
+        if ctx.importing and name not in IMPORT_TOOLS:
+            # the file is someone else's text: an import only reads and adds
+            return {"content": "Error: an import only adds new things; it can't change, archive or delete what's there.", "isError": True}
         if ctx.mode == "manual" and name in WRITE_TOOLS and name != "delete_item":
             from app.os.assistant_pending import defer
 
@@ -783,6 +787,23 @@ async def _create_debt(i: dict, ctx: Ctx) -> dict:
                   "link": f"/finance/debts?id={d['id']}", "undo": {"op": "delete", "type": "debt", "id": d["id"]}},
                  {"id": d["id"], "who": d.get("who"), "amount": d["principal"], "currency": d["currency"],
                   "due": to_json(d["dueDate"])[:10] if d.get("dueDate") else None})
+
+
+async def _create_account(i: dict, ctx: Ctx) -> dict:
+    """A money account with its balance today (imports bring their accounts; the spending plan
+    starts from them)."""
+    plain = {"name": _req_str(i.get("name"), "name")}
+    if isinstance(i.get("type"), str) and i["type"]:
+        plain["type"] = i["type"].upper()
+    if isinstance(i.get("currency"), str) and i["currency"]:
+        plain["currency"] = i["currency"].upper()
+    if isinstance(i.get("balance"), (int, float)) and not isinstance(i.get("balance"), bool):
+        plain["initialBalance"] = i["balance"]
+    a = await accounts.create(_check(accounts.CreateBody, plain), user=ctx.user)
+    balance = js_to_string(float(a.get("initialBalance") or 0))
+    return _done({"kind": "create", "entityType": "account", "entityId": a["id"], "label": f"{a['name']} · {balance} {a['currency']}",
+                  "link": f"/finance/accounts?id={a['id']}", "undo": {"op": "delete", "type": "account", "id": a["id"]}},
+                 {"id": a["id"], "name": a["name"], "type": a.get("type"), "balance": a.get("initialBalance"), "currency": a["currency"]})
 
 
 async def _add_debt_payment(i: dict, ctx: Ctx) -> dict:
@@ -1373,7 +1394,7 @@ _TOOLS = {
     "list_transactions": _list_transactions, "list_debts": _list_debts, "get_health": _get_health, "update_health_profile": _update_health_profile,
     "get_prayer_times": _get_prayer_times, "create_task": _create_task, "update_task": _update_task, "create_event": _create_event,
     "update_event": _update_event, "create_reminder": _create_reminder, "add_transaction": _add_transaction, "update_transaction": _update_transaction,
-    "create_debt": _create_debt, "add_debt_payment": _add_debt_payment, "add_note": _add_note, "add_shopping_item": _add_shopping_item,
+    "create_debt": _create_debt, "create_account": _create_account, "add_debt_payment": _add_debt_payment, "add_note": _add_note, "add_shopping_item": _add_shopping_item,
     "log_food": _log_food, "log_water": _log_water, "log_weight": _log_weight, "delete_item": _delete_item,
     "update_habit": _update_habit, "log_habit": _log_habit, "create_project": _create_project,
     "update_project": _update_project, "update_person": _update_person, "add_gift": _add_gift, "add_important_date": _add_important_date,
@@ -1484,6 +1505,11 @@ async def _restore_fields(undo: dict, ctx: Ctx) -> None:
 READ_TOOLS = frozenset({"get_options", "search", "get_agenda", "list_tasks", "get_money", "list_transactions", "list_debts", "get_health",
                         "get_prayer_times", "get_dashboard"})
 WRITE_TOOLS = frozenset(_TOOLS) - READ_TOOLS
+# What an import (a file from another AI) may run: reads, and tools that only add something new.
+IMPORT_TOOLS = READ_TOOLS | frozenset({
+    "create_task", "create_event", "create_reminder", "add_transaction", "create_debt", "add_note", "add_shopping_item",
+    "create_habit", "create_project", "add_gift", "add_important_date", "create_goal", "create_account",
+})
 
 
 # ----- deleting (after the user confirms) and undoing ------------------------------------
@@ -1506,7 +1532,7 @@ async def remove(user, kind: str, id: str) -> dict | None:
     handlers = {"task": tasks.remove, "event": events.remove, "reminder": reminders.remove, "transaction": transactions.remove, "debt": debts.remove,
                 "note": notes.remove, "shopping_item": shopping.remove_item, "food_log": wellness.remove_food, "weight": wellness.remove_weight,
                 "habit": habits.remove, "project": remove_project, "gift": remove_gift, "goal": goals.remove,
-                "important_date": important_dates.remove}
+                "important_date": important_dates.remove, "account": accounts.remove}
     if kind not in handlers:
         return None
     snapshot = await assistant_snapshot.take(assistant_snapshot.MODELS[kind], id, user.id)

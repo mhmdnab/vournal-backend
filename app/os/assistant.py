@@ -217,7 +217,11 @@ async def _call(client, round_: int, messages: list, effort: str, system: str = 
     return raw.http_response.json()
 
 
-async def send(user, text: str, conversation_id: str | None = None) -> dict:
+async def send(user, text: str, conversation_id: str | None = None, display: str | None = None, importing: bool = False) -> dict:
+    """One message → the reply. `display` is what the chat shows for the user's turn when it
+    differs from what the model gets (an import part). `importing`: only creating tools run, and
+    the model gets this turn alone, not the chat's history (each import part stands alone, so
+    a long file neither replays everything before it nor runs into the chat's turn cap)."""
     s = await ensure_os_profile(user)
     lang = to_lang(s.language)
     left = await ai.remaining(user.id, s.timezone)
@@ -236,11 +240,13 @@ async def send(user, text: str, conversation_id: str | None = None) -> dict:
     if conversation_id:
         conversation = await _owned(user.id, conversation_id)
     else:
-        conversation = await db.assistantconversation.create(data={"userId": user.id, "channel": "APP", "title": title_from(text)})
+        conversation = await db.assistantconversation.create(data={"userId": user.id, "channel": "APP", "title": title_from(display or text)})
     if not conversation.title:
-        conversation = await db.assistantconversation.update(where={"id": conversation.id}, data={"title": title_from(text)})
+        conversation = await db.assistantconversation.update(where={"id": conversation.id}, data={"title": title_from(display or text)})
     conv = {"id": conversation.id, "title": conversation.title}
     history = await db.assistantmessage.find_many(where={"conversationId": conv["id"]}, order=_IN_ORDER)
+    if importing:
+        history = []
     if len(history) >= MAX_TURNS:
         return fail("too_long", conv)
 
@@ -255,10 +261,11 @@ async def send(user, text: str, conversation_id: str | None = None) -> dict:
     today = assistant_tools.local_day(now, tz)
     mode = s.assistantMode if s.assistantMode in MODE_LINE else "manual"
     ctx = assistant_tools.Ctx(user, tz, today, mode)
+    ctx.importing = importing
     weekday = ai.WEEKDAYS[(datetime.fromisoformat(f"{today}T12:00:00+00:00").weekday() + 1) % 7]
     block = context_block(f"{today} {assistant_tools.local_time(now, tz)}", weekday, s.timezone, lang, s.defaultCurrency, s.name, mode)
     first = [{"type": "text", "text": f"{block}\n{text}"}]
-    user_row = await _append(conv["id"], "user", first, text, False)
+    user_row = await _append(conv["id"], "user", first, display or text, False)
     messages = [{"role": h.role, "content": h.content} for h in history] + [{"role": "user", "content": first}]
 
     drafts: list[dict] = []
@@ -463,5 +470,10 @@ class ChatBody(RuleBody):
 @router.post("/chat")
 async def chat(body: ChatBody, user=Depends(plus_user)):
     """One message → the assistant's reply (after any tool calls)."""
+    from app.os.assistant_import import import_running
+
+    if body.conversationId and import_running(body.conversationId):
+        # its rows would interleave with the import's: wait, or chat in a new conversation
+        raise nest_error(409, "This chat is importing a file. Wait for it to finish, or start a new chat.")
     ai.throttle("assistant-chat", user.id)
     return await send(user, body.message, body.conversationId)
