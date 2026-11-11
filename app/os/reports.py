@@ -117,7 +117,7 @@ async def _task_stats(ctx, r: dict) -> dict:
     def lite(t) -> dict:
         return {"id": t.id, "title": t.title, "status": t.status, "priority": t.priority, "dueAt": life.iso_ms(t.dueAt) if t.dueAt else None,
                 "completedAt": life.iso_ms(t.completedAt) if t.completedAt else None, "isOverdue": t.status != "COMPLETED" and late(t),
-                "link": f"/tasks?id={t.id}"}
+                "link": _task_link(t)}
 
     return {
         "completed": len(completed), "dueTotal": len(due), "overdue": len(overdue), "overdueNow": overdue_now, "pending": len(pending),
@@ -203,6 +203,12 @@ async def _goal_stats(ctx, r: dict) -> dict:
     }
 
 
+def _task_link(t) -> str:
+    """A workspace task opens in its workspace (the dashboard reads ?space=)."""
+    space = getattr(t, "workspaceId", None)
+    return f"/tasks?id={t.id}&space={space}" if space else f"/tasks?id={t.id}"
+
+
 async def _upcoming_deadlines(ctx, r: dict) -> list[dict]:
     """Deadlines in a (future) range: tasks, projects, assessments, bills, documents, maintenance."""
     on, uid = ctx.sections.__contains__, ctx.user_id
@@ -212,7 +218,7 @@ async def _upcoming_deadlines(ctx, r: dict) -> list[dict]:
         for t in await db.task.find_many(where={"OR": [{"userId": uid}, {"assigneeId": uid}], "status": {"not": "COMPLETED"}, "dueAt": {"gte": r["from"], "lte": r["to"]}},
                                          order={"dueAt": "asc"}, take=30):
             out.append({"kind": "task", "id": t.id, "title": t.title, "subtitle": None, "date": day_key(t.dueAt, ctx.tz), "priority": t.priority,
-                        "link": f"/tasks?id={t.id}"})
+                        "link": _task_link(t)})
     if on("projects"):
         for p in await db.project.find_many(where={"userId": uid, "workspaceId": None, "status": {"in": ["PLANNING", "ACTIVE", "ON_HOLD"]}, "deadline": {"gte": d_from, "lte": d_to}}):
             out.append({"kind": "project", "id": p.id, "title": p.name, "subtitle": shared(ctx.lang, "projectDeadline"), "date": date_only_key(p.deadline),

@@ -367,7 +367,9 @@ async def remove(id: str, request: Request, space: Space = Depends(current_space
     async with db.tx() as tx:
         keys = await attachments.delete_rows(tx, None, "PROJECT", [id])
         if delete_tasks:
-            task_ids = [t.id for t in await tx.task.find_many(where={"projectId": id})]
+            # in a workspace, only your own tasks go; colleagues' tasks stay, without the project
+            mine = {"userId": user.id} if existing.workspaceId else {}
+            task_ids = [t.id for t in await tx.task.find_many(where={"projectId": id, **mine})]
             keys += await attachments.delete_rows(tx, None, "TASK", task_ids)
             if task_ids:
                 await tx.task.delete_many(where={"id": {"in": task_ids}})

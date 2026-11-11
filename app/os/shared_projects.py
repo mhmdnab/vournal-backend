@@ -8,7 +8,7 @@
 - Anything not shared with the caller answers 404.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
 from fastapi import Depends, Response
@@ -100,9 +100,13 @@ async def unshare(id: str, share_id: str, space: Space = Depends(current_space))
 # ----- the guest -----------------------------------------------------------------------
 
 
+SHARE_DAYS = 14  # as long as a workspace invite
+
+
 async def _live_share(code: str):
     row = await db.projectshare.find_unique(where={"codeHash": hash_code(code.strip())}, include={"project": True})
-    if row is None or row.acceptedAt is not None:
+    expired = row is not None and row.createdAt < datetime.now(timezone.utc) - timedelta(days=SHARE_DAYS)
+    if row is None or row.acceptedAt is not None or expired:
         raise nest_error(404, "This invite is not valid or has been used")
     return row
 
