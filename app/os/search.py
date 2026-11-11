@@ -8,7 +8,7 @@ from fastapi import Depends, Request
 
 from app.db import db
 from app.os.common.currency import to_number
-from app.os.common.deps import plus_user
+from app.os.common.space import Space, current_space
 from app.os.common.http import nest_error, nest_router
 from app.os.common.i18n import fmt, to_lang
 from app.os.common.jsparse import _JS_SPACE
@@ -91,7 +91,12 @@ def _joined(*parts) -> str:
     return " · ".join(p for p in parts if p)
 
 
-async def search(user, q_raw: str | None, types: list[str] | None, limit: int | None) -> dict:
+async def search(user, q_raw: str | None, types: list[str] | None, limit: int | None, space=None) -> dict:
+    """In Personal: everything personal, plus the projects shared with me. In a workspace:
+    its tasks, projects, events and notes only."""
+    from app.os.common.space import personal
+
+    space = space or personal(user)
     q = _SPACES.sub(" ", (q_raw or "").strip(_JS_SPACE))
     if _len16(q) < 2:
         return {"results": []}
@@ -102,6 +107,8 @@ async def search(user, q_raw: str | None, types: list[str] | None, limit: int | 
     wanted = set(types or SEARCH_TYPES)
 
     def want(t: str) -> bool:
+        if not space.personal:
+            return t in wanted and t in ("task", "project", "event", "note")
         return t in wanted and TYPE_SECTION[t] in enabled
 
     like = {"contains": q, "mode": "insensitive"}
@@ -114,18 +121,26 @@ async def search(user, q_raw: str | None, types: list[str] | None, limit: int | 
         out.append({"type": kind, "id": id, "title": title, "subtitle": subtitle, "link": link, "date": date, "section": section})
 
     if want("task"):
-        for t in await db.task.find_many(where={"userId": uid, "OR": [{"title": like}, {"description": like}, {"notes": like}]},
+        for t in await db.task.find_many(where={**space.where, "OR": [{"title": like}, {"description": like}, {"notes": like}]},
                                          include={"project": True}, order=[{"status": "asc"}, {"updatedAt": "desc"}], take=per_type):
             add("task", t.id, t.title, _joined(enum_label(lang, "taskStatus", t.status),
                                                enum_label(lang, "priority", t.priority) if t.priority != "MEDIUM" else None, t.project.name if t.project else None),
                 f"/tasks?id={t.id}", iso_ms(t.dueAt) if t.dueAt else None, "tasks")
     if want("project"):
-        for p in await db.project.find_many(where={"userId": uid, "OR": [{"name": like}, {"description": like}, {"notes": like}]},
+        for p in await db.project.find_many(where={**space.where, "OR": [{"name": like}, {"description": like}, {"notes": like}]},
                                             order={"updatedAt": "desc"}, take=per_type):
             add("project", p.id, p.name, fmt(M["project"], status=enum_label(lang, "projectStatus", p.status)), f"/projects/{p.id}",
                 iso_ms(p.deadline) if p.deadline else None, "projects")
+        if space.personal:
+            # projects shared with me (view-only)
+            for share in await db.projectshare.find_many(
+                where={"userId": uid, "acceptedAt": {"not": None}, "project": {"is": {"OR": [{"name": like}, {"description": like}]}}},
+                include={"project": True}, take=per_type,
+            ):
+                add("sharedProject", share.project.id, share.project.name, M.get("sharedProject", "Shared with you"),
+                    f"/shared/projects/{share.project.id}", None, "projects")
     if want("event"):
-        for e in await db.event.find_many(where={"userId": uid, "OR": [{"title": like}, {"description": like}, {"location": like}]},
+        for e in await db.event.find_many(where={**space.where, "OR": [{"title": like}, {"description": like}, {"location": like}]},
                                           order={"startAt": "desc"}, take=per_type):
             add("event", e.id, e.title, _joined(enum_label(lang, "eventType", e.type), M["repeats"] if e.rrule else None, e.location),
                 f"/calendar?id={e.id}&date={day_key(e.startAt, tz)}", iso_ms(e.startAt), "calendar")
@@ -160,7 +175,7 @@ async def search(user, q_raw: str | None, types: list[str] | None, limit: int | 
             add("habit", h.id, h.name, fmt(M["habitArchived" if h.isArchived else "habit"], frequency=enum_label(lang, "habitFrequency", h.frequency)),
                 f"/habits?id={h.id}", None, "habits")
     if want("note"):
-        for n in await db.note.find_many(where={"userId": uid, "OR": [{"title": like}, {"content": like}]},
+        for n in await db.note.find_many(where={**space.where, "OR": [{"title": like}, {"content": like}]},
                                          order=[{"isArchived": "asc"}, {"updatedAt": "desc"}], take=per_type):
             add("note", n.id, n.title, snippet(n.content, q) or (M["noteArchived"] if n.isArchived else M["note"]), f"/notes?id={n.id}",
                 iso_ms(n.updatedAt), "notes")
@@ -238,7 +253,8 @@ async def search(user, q_raw: str | None, types: list[str] | None, limit: int | 
 
 
 @router.get("")
-async def find(request: Request, user=Depends(plus_user)):
+async def find(request: Request, space: Space = Depends(current_space)):
+    user = space.user
     errors = unknown_params(request, ("q", "types", "limit"))
     q = request.query_params.get("q")
     if q is not None and _len16(q) > 100:
@@ -247,4 +263,4 @@ async def find(request: Request, user=Depends(plus_user)):
     limit = _query_int(request, "limit", errors, maximum=100, minimum=1)
     if errors:
         raise nest_error(400, errors)
-    return await search(user, q, types, limit)
+    return await search(user, q, types, limit, space)

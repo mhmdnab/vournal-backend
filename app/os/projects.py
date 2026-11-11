@@ -15,7 +15,7 @@ from app.os.common import dates, validators
 from app.os.common.activity import log_activity
 from app.os.common.currency import get_converter, round_money, to_number
 from app.os.common.defaults import SUPPORTED_CURRENCIES
-from app.os.common.deps import plus_user
+from app.os.common.space import Space, assert_personal_links_allowed, current_space
 from app.os.common.http import invalid_data, nest_error, nest_router
 from app.os.common.jsparse import _JS_SPACE, js_sum
 from app.os.common.ownership import assert_owned
@@ -57,7 +57,8 @@ async def with_computed(user_id: str, rows, ctx) -> list[dict]:
     if not rows:
         return []
     ids = [r.id for r in rows]
-    mine = {"userId": user_id, "projectId": {"in": ids}}
+    # a project's tasks are in its space (links never cross spaces), so they're found by project
+    mine = {"projectId": {"in": ids}}
     status_groups = await db.task.group_by(by=["projectId", "status"], where=mine, count={"_all": True})
     overdue_groups = await db.task.group_by(
         by=["projectId"], where={"AND": [mine, overdue_where(ctx.now, ctx.start_of_today)]}, count={"_all": True}
@@ -65,13 +66,13 @@ async def with_computed(user_id: str, rows, ctx) -> list[dict]:
     next_groups = await db.task.group_by(
         by=["projectId"], where={**mine, "status": {"not": "COMPLETED"}, "dueAt": {"gte": ctx.start_of_today}}, min={"dueAt": True}
     )
-    spend_groups = await db.transaction.group_by(by=["projectId", "currency"], where={**mine, "type": "EXPENSE"}, sum={"amount": True})
+    spend_groups = await db.transaction.group_by(by=["projectId", "currency"], where={**mine, "userId": user_id, "type": "EXPENSE"}, sum={"amount": True})
 
     # the task behind each project's earliest upcoming due date
     pairs = [(g["projectId"], fu.group_instant(g["_min"]["dueAt"])) for g in next_groups if g.get("projectId") and g["_min"]["dueAt"]]
     next_tasks = (
         await db.task.find_many(
-            where={"userId": user_id, "status": {"not": "COMPLETED"}, "OR": [{"projectId": p, "dueAt": d} for p, d in pairs]},
+            where={"status": {"not": "COMPLETED"}, "OR": [{"projectId": p, "dueAt": d} for p, d in pairs]},
             order=[{"parentId": {"sort": "asc", "nulls": "first"}}, {"priority": "desc"}],
         )
         if pairs
@@ -186,13 +187,14 @@ class UpdateBody(_Fields):
     pass
 
 
-async def _assert_links(user_id: str, body: _Fields) -> None:
-    await assert_owned("category", body.categoryId, user_id)
-    await assert_owned("goal", body.goalId, user_id)
+async def _assert_links(space: Space, body: _Fields) -> None:
+    assert_personal_links_allowed(space, body)
+    await assert_owned("category", body.categoryId, space.user.id)
+    await assert_owned("goal", body.goalId, space.user.id)
 
 
-async def _owned(user_id: str, id: str):
-    row = await db.project.find_first(where={"id": id, "userId": user_id})
+async def _owned(space: Space, id: str):
+    row = await db.project.find_first(where={"id": id, **space.where})
     if row is None:
         raise nest_error(404, "Project not found")
     return row
@@ -202,7 +204,8 @@ _LIST_QUERY = ("status", "goalId", "lifeArea", "categoryId", "q", "sort")  # the
 
 
 @router.get("")
-async def list_projects(request: Request, user=Depends(plus_user)):
+async def list_projects(request: Request, space: Space = Depends(current_space)):
+    user = space.user
     q = request.query_params
     errors = unknown_params(request, _LIST_QUERY)
     statuses = _query_list(request, "status", STATUSES, errors)
@@ -216,7 +219,7 @@ async def list_projects(request: Request, user=Depends(plus_user)):
         errors.append(f"sort must be one of the following values: {', '.join(SORTS)}")
     if errors:
         raise nest_error(400, errors)
-    where: dict = {"userId": user.id}
+    where: dict = dict(space.where)
     if statuses:
         where["status"] = {"in": statuses}
     if areas:
@@ -237,24 +240,25 @@ async def list_projects(request: Request, user=Depends(plus_user)):
 
 
 @router.get("/{id}")
-async def get(id: str, user=Depends(plus_user)):
+async def get(id: str, space: Space = Depends(current_space)):
+    user = space.user
     ctx = await _ctx(user)
-    row = await db.project.find_first(where={"id": id, "userId": user.id}, include=_INCLUDE)
+    row = await db.project.find_first(where={"id": id, **space.where}, include=_INCLUDE)
     if row is None:
         raise nest_error(404, "Project not found")
     (view,) = await with_computed(user.id, [row], ctx)
-    top = {"userId": user.id, "projectId": id, "parentId": None}
+    top = {"projectId": id, "parentId": None}
     by_status = await db.task.group_by(by=["status"], where=top, count={"_all": True})
     upcoming_rows = await db.task.find_many(
         where={**top, "status": {"not": "COMPLETED"}, "dueAt": {"not": None}},
         include=TASK_INCLUDE, order=[{"dueAt": "asc"}, {"priority": "desc"}], take=5,
     )
-    events = await db.event.find_many(where={"userId": user.id, "projectId": id}, order={"startAt": "asc"}, take=200)
-    notes = await db.note.find_many(where={"userId": user.id, "projectId": id}, order=[{"isPinned": "desc"}, {"updatedAt": "desc"}], take=100)
+    events = await db.event.find_many(where={"projectId": id, "workspaceId": row.workspaceId}, order={"startAt": "asc"}, take=200)
+    notes = await db.note.find_many(where={"projectId": id, "workspaceId": row.workspaceId}, order=[{"isPinned": "desc"}, {"updatedAt": "desc"}], take=100)
     transactions = await db.transaction.find_many(
         where={"userId": user.id, "projectId": id}, include={"category": True}, order={"date": "desc"}, take=20
     )
-    attachment_count = await db.attachment.count(where={"userId": user.id, "entityType": "PROJECT", "entityId": id})
+    attachment_count = await db.attachment.count(where={"entityType": "PROJECT", "entityId": id})
 
     def ends(e):
         return dates._utc(e.endAt or e.startAt)
@@ -284,18 +288,19 @@ async def get(id: str, user=Depends(plus_user)):
 
 
 @router.post("", status_code=201)
-async def create(body: CreateBody, user=Depends(plus_user)):
-    await _assert_links(user.id, body)
+async def create(body: CreateBody, space: Space = Depends(current_space)):
+    user = space.user
+    await _assert_links(space, body)
     ctx = await _ctx(user)
     status = body.status or "ACTIVE"
     row = await db.project.create(
         data={
-            "userId": user.id,
+            **space.create_fields(),
             "name": body.name,
             "description": body.description,
             "notes": body.notes,
             "status": status,
-            "lifeArea": body.lifeArea,
+            "lifeArea": body.lifeArea or (None if space.personal else "WORK"),
             "color": body.color,
             "icon": body.icon,
             "startDate": dates.parse_date_only(body.startDate),
@@ -315,9 +320,10 @@ async def create(body: CreateBody, user=Depends(plus_user)):
 
 
 @router.patch("/{id}")
-async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
-    existing = await _owned(user.id, id)
-    await _assert_links(user.id, body)
+async def update(id: str, body: UpdateBody, space: Space = Depends(current_space)):
+    user = space.user
+    existing = await _owned(space, id)
+    await _assert_links(space, body)
     ctx = await _ctx(user)
     sent = body.model_fields_set
     if any(f in sent and getattr(body, f) is None for f in ("name", "status")):
@@ -349,19 +355,22 @@ async def update(id: str, body: UpdateBody, user=Depends(plus_user)):
 
 
 @router.delete("/{id}")
-async def remove(id: str, request: Request, user=Depends(plus_user)):
+async def remove(id: str, request: Request, space: Space = Depends(current_space)):
+    user = space.user
     errors = unknown_params(request, ("deleteTasks",))
     delete_tasks = _query_bool(request, "deleteTasks", errors)
     if errors:
         raise nest_error(400, errors)
-    existing = await _owned(user.id, id)
+    existing = await _owned(space, id)
+    if not space.can_delete(existing):
+        raise nest_error(404, "Project not found")
     async with db.tx() as tx:
-        keys = await attachments.delete_rows(tx, user.id, "PROJECT", [id])
+        keys = await attachments.delete_rows(tx, None, "PROJECT", [id])
         if delete_tasks:
-            task_ids = [t.id for t in await tx.task.find_many(where={"userId": user.id, "projectId": id})]
-            keys += await attachments.delete_rows(tx, user.id, "TASK", task_ids)
+            task_ids = [t.id for t in await tx.task.find_many(where={"projectId": id})]
+            keys += await attachments.delete_rows(tx, None, "TASK", task_ids)
             if task_ids:
-                await tx.task.delete_many(where={"userId": user.id, "id": {"in": task_ids}})
+                await tx.task.delete_many(where={"id": {"in": task_ids}})
         await tx.project.delete(where={"id": existing.id})
     await attachments.delete_objects(keys)
     await log_activity(user.id, "project.deleted", entity_id=id, name=existing.name, deletedTasks=bool(delete_tasks))

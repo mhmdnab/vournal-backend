@@ -56,9 +56,16 @@ _PARENT_SCOPE = {
 }
 
 
+# The workspace-shared models: an id checked here is a Personal one (workspace items go
+# through app.os.common.space).
+_SHARED = ("task", "event", "project", "note", "attachment")
+
+
 def _scope(model: str, user_id: str) -> dict:
     parent = _PARENT_SCOPE.get(model)
-    return {parent: {"is": {"userId": user_id}}} if parent else {"userId": user_id}
+    if parent:
+        return {parent: {"is": {"userId": user_id}}}
+    return {"userId": user_id, "workspaceId": None} if model in _SHARED else {"userId": user_id}
 
 
 def _not_found(model: str):

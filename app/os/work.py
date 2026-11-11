@@ -9,7 +9,7 @@ from fastapi import Depends
 
 from app.db import db
 from app.os.common import dates
-from app.os.common.deps import plus_user
+from app.os.common.space import Space, current_space
 from app.os.common.http import nest_router
 from app.os.common.i18n import fmt, to_lang
 from app.os.insight_text import js_round
@@ -43,7 +43,9 @@ def _ms(moment: datetime | None) -> float:
 
 
 @router.get("/overview")
-async def overview(user=Depends(plus_user)):
+async def overview(space: Space = Depends(current_space)):
+    """In Personal: the WORK life area. In a workspace: everything in it is work."""
+    user = space.user
     s = await ensure_os_profile(user)
     tz, lang = s.timezone, to_lang(s.language)
     now = datetime.now(timezone.utc)
@@ -54,15 +56,22 @@ async def overview(user=Depends(plus_user)):
     today_date_only = dates.today_date_only(tz)
 
     # a task belongs to work when its life area is WORK or it sits in a WORK project
-    work_task = {"userId": user.id, "OR": [{"lifeArea": "WORK"}, {"project": {"is": {"lifeArea": "WORK"}}}]}
+    if space.personal:
+        work_task = {**space.where, "OR": [{"lifeArea": "WORK"}, {"project": {"is": {"lifeArea": "WORK"}}}]}
+        meeting = {**space.where, "type": "MEETING"}
+        work_project = {**space.where, "lifeArea": "WORK"}
+    else:
+        work_task = dict(space.where)
+        meeting = dict(space.where)
+        work_project = dict(space.where)
     open_rows = await db.task.find_many(where={**work_task, "status": {"not": "COMPLETED"}}, include={"project": True},
                                         order=[{"dueAt": {"sort": "asc", "nulls": "last"}}, {"createdAt": "desc"}], take=300)
     completed_this_week = await db.task.count(where={**work_task, "status": "COMPLETED", "completedAt": {"gte": week["from"], "lte": week["to"]}})
-    meeting_rows = await db.event.find_many(where={"userId": user.id, "type": "MEETING", **events_overlapping(today["from"], meetings_to)},
+    meeting_rows = await db.event.find_many(where={**meeting, **events_overlapping(today["from"], meetings_to)},
                                             include={"project": True})
-    week_meeting_rows = await db.event.find_many(where={"userId": user.id, "type": "MEETING", **events_overlapping(week["from"], week["to"])},
+    week_meeting_rows = await db.event.find_many(where={**meeting, **events_overlapping(week["from"], week["to"])},
                                                  include={"project": True})
-    projects = await db.project.find_many(where={"userId": user.id, "lifeArea": "WORK", "status": {"not_in": ["CANCELLED"]}},
+    projects = await db.project.find_many(where={**work_project, "status": {"not_in": ["CANCELLED"]}},
                                           order=[{"deadline": {"sort": "asc", "nulls": "last"}}, {"updatedAt": "desc"}])
 
     # ----- tasks grouped -----
@@ -102,7 +111,7 @@ async def overview(user=Depends(plus_user)):
 
     # ----- projects with progress (top-level tasks only) -----
     ids = [p.id for p in projects]
-    counted = await db.task.find_many(where={"userId": user.id, "projectId": {"in": ids}, "parentId": None}) if ids else []
+    counted = await db.task.find_many(where={"projectId": {"in": ids}, "parentId": None}) if ids else []
     views = []
     for p in projects:
         own = [t for t in counted if t.projectId == p.id]

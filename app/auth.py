@@ -579,6 +579,11 @@ async def delete_account(current) -> None:
     ):
         oauth_log.error("Apple account %s deleted with no token to revoke.", current.id)
 
+    # 0) Workspaces keep the work this account added there (re-owned to their owners).
+    from app.os.workspaces import settle_workspaces_for_deleted_user
+
+    await settle_workspaces_for_deleted_user(current.id)
+
     # 1) External storage first — best-effort per object (a missing one is fine).
     entries = await db.entry.find_many(where={"userId": current.id})
     for entry in entries:
@@ -587,7 +592,9 @@ async def delete_account(current) -> None:
     # vournal OS attachments live in the same bucket, under their own prefix.
     from app import storage
 
-    await storage.delete_objects([a.storageKey for a in await db.attachment.find_many(where={"userId": current.id})])
+    await storage.delete_objects(
+        [a.storageKey for a in await db.attachment.find_many(where={"userId": current.id, "workspaceId": None})]
+    )
 
     # 2) Then the account. Cascade (schema onDelete) removes everything else; a vournal
     #    OS household it was in must not be left empty or without an owner.

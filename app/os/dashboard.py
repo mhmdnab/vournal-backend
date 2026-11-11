@@ -59,7 +59,8 @@ def _task(t, ctx) -> dict:
         "isRecurring": bool(t.rrule), "isSubtask": bool(t.parentId),
         "isOverdue": t.status != "COMPLETED" and bool(t.dueAt) and (t.dueAt < ctx.now if t.hasDueTime else day_key(t.dueAt, ctx.tz) < ctx.today),
         "category": _brief(t.category, "id", "name", "color", "icon"), "project": _brief(t.project, "id", "name", "color"),
-        "link": f"/tasks?id={t.id}",
+        "link": f"/tasks?id={t.id}" + (f"&space={t.workspaceId}" if t.workspaceId else ""),
+        "workspaceId": t.workspaceId,
     }
 
 
@@ -74,15 +75,17 @@ async def _tasks(ctx) -> dict:
     uid, tz, now = ctx.user_id, ctx.tz, ctx.now
     today_from, today_to = dates.start_of_day(now, tz), dates.end_of_day(now, tz)
     today_d = key_to_date(ctx.today)
-    today = await db.task.find_many(where={"userId": uid, "dueAt": {"gte": today_from, "lte": today_to},
+    # my day: my Personal tasks and the workspace tasks assigned to me
+    mine_or_assigned = {"OR": [{"userId": uid, "workspaceId": None}, {"assigneeId": uid, "workspaceId": {"not": None}}]}
+    today = await db.task.find_many(where={"AND": [mine_or_assigned], "dueAt": {"gte": today_from, "lte": today_to},
                                            "OR": [{"status": {"not": "COMPLETED"}}, {"completedAt": {"gte": today_from}}]},
                                     include=_TASK_INCLUDE, order={"dueAt": "asc"}, take=50)
     overdue_where = life.overdue_task_where(uid, now, today_from)
     overdue = await db.task.find_many(where=overdue_where, include=_TASK_INCLUDE, order={"dueAt": "asc"}, take=30)
     overdue_count = await db.task.count(where=overdue_where)
-    focus = await db.task.find_many(where={"userId": uid, "focusDate": today_d}, include=_TASK_INCLUDE,
+    focus = await db.task.find_many(where={"userId": uid, "workspaceId": None, "focusDate": today_d}, include=_TASK_INCLUDE,
                                     order=[{"position": "asc"}, {"createdAt": "asc"}], take=3)
-    candidates = await db.task.find_many(where={"userId": uid, "status": {"not": "COMPLETED"}, "dueAt": {"lte": today_to},
+    candidates = await db.task.find_many(where={"userId": uid, "workspaceId": None, "status": {"not": "COMPLETED"}, "dueAt": {"lte": today_to},
                                                 "OR": [{"focusDate": None}, {"focusDate": {"not": today_d}}]},
                                          include=_TASK_INCLUDE, order={"dueAt": "asc"}, take=60)
     # the app's to-dos list with the web's own tasks (a to-do counts on its own day)
@@ -113,7 +116,7 @@ async def _tasks(ctx) -> dict:
 async def _upcoming_events(ctx) -> dict:
     start = dates.start_of_day(ctx.now, ctx.tz)
     end = life.end_of_day_key(add_days_key(ctx.today, 7), ctx.tz)
-    every = await life.events_between(ctx, start, end, 500)
+    every = await life.events_between(ctx, start, end, 500, overlay=True)
     now_ms = ctx.now.timestamp() * 1000
 
     def ms(iso: str) -> float:
@@ -199,7 +202,7 @@ async def _deadlines(ctx) -> list[dict]:
     today_from = dates.start_of_day(ctx.now, tz)
     out = []
     if on("tasks"):
-        for t in await db.task.find_many(where={"userId": uid, "status": {"not": "COMPLETED"}, "priority": {"in": ["HIGH", "URGENT"]},
+        for t in await db.task.find_many(where={"userId": uid, "workspaceId": None, "status": {"not": "COMPLETED"}, "priority": {"in": ["HIGH", "URGENT"]},
                                                 "dueAt": {"gte": today_from, "lte": life.end_of_day_key(add_days_key(today, 7), tz)}},
                                          include={"project": True}, order={"dueAt": "asc"}, take=10):
             k = day_key(t.dueAt, tz)
@@ -207,7 +210,7 @@ async def _deadlines(ctx) -> list[dict]:
                         "date": life.iso_ms(t.dueAt) if t.hasDueTime else k, "daysUntil": diff_days_key(today, k), "priority": t.priority,
                         "link": f"/tasks?id={t.id}"})
     if on("projects"):
-        for p in await db.project.find_many(where={"userId": uid, "status": {"in": ["PLANNING", "ACTIVE", "ON_HOLD"]}, "deadline": {"gte": d(0), "lte": d(30)}}, take=10):
+        for p in await db.project.find_many(where={"userId": uid, "workspaceId": None, "status": {"in": ["PLANNING", "ACTIVE", "ON_HOLD"]}, "deadline": {"gte": d(0), "lte": d(30)}}, take=10):
             k = date_only_key(p.deadline)
             out.append({"id": f"project:{p.id}", "kind": "project", "title": p.name, "subtitle": shared(ctx.lang, "projectDeadline"), "date": k,
                         "daysUntil": diff_days_key(today, k), "priority": None, "link": f"/projects/{p.id}"})

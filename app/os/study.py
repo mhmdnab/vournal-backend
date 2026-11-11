@@ -156,7 +156,7 @@ async def course_stats(user_id: str, ids: list[str]) -> dict:
         return stats
     for a in await db.assessment.find_many(where={"userId": user_id, "courseId": {"in": ids}}, order={"dueAt": "asc"}):
         stats["assessments"].setdefault(a.courseId, []).append(a)
-    for g in await db.task.group_by(by=["courseId"], where={"userId": user_id, "courseId": {"in": ids}, "status": {"not": "COMPLETED"}},
+    for g in await db.task.group_by(by=["courseId"], where={"userId": user_id, "workspaceId": None, "courseId": {"in": ids}, "status": {"not": "COMPLETED"}},
                                     count={"_all": True}):
         stats["openTasks"][g["courseId"]] = g["_count"]["_all"]
     for g in await db.studysession.group_by(by=["courseId"], where={"userId": user_id, "courseId": {"in": ids}},
@@ -346,9 +346,9 @@ async def overview(user=Depends(plus_user)):
     overdue = await db.assessment.find_many(where={**open_where, "dueAt": {"lt": now}}, include={"course": True},
                                             order={"dueAt": "asc"}, take=50)
     week_sessions = await db.studysession.find_many(where={"userId": user.id, "startAt": {"gte": week["from"], "lte": week["to"]}})
-    class_events = await db.event.find_many(where={"userId": user.id, "type": "CLASS", **events_overlapping(today["from"], today["to"])},
+    class_events = await db.event.find_many(where={"userId": user.id, "workspaceId": None, "type": "CLASS", **events_overlapping(today["from"], today["to"])},
                                             include={"course": True})
-    course_tasks = await db.task.find_many(where={"userId": user.id, **active, "status": {"not": "COMPLETED"}}, include={"course": True},
+    course_tasks = await db.task.find_many(where={"userId": user.id, "workspaceId": None, **active, "status": {"not": "COMPLETED"}}, include={"course": True},
                                            order=[{"dueAt": "asc"}, {"createdAt": "desc"}], take=30)
 
     stats = await course_stats(user.id, [c.id for c in courses])
@@ -446,10 +446,10 @@ async def get_course(id: str, user=Depends(plus_user)):
     stats = await course_stats(user.id, [id])
     assessments = await db.assessment.find_many(where={"userId": user.id, "courseId": id}, order=_ASSESSMENT_ORDER)
     sessions = await db.studysession.find_many(where={"userId": user.id, "courseId": id}, order={"startAt": "desc"}, take=30)
-    class_events = await db.event.find_many(where={"userId": user.id, "courseId": id, "type": "CLASS"}, include={"course": True},
+    class_events = await db.event.find_many(where={"userId": user.id, "workspaceId": None, "courseId": id, "type": "CLASS"}, include={"course": True},
                                             order={"startAt": "asc"})
-    tasks = await db.task.find_many(where={"userId": user.id, "courseId": id}, order=[{"status": "asc"}, {"dueAt": "asc"}], take=100)
-    notes = await db.note.find_many(where={"userId": user.id, "courseId": id, "isArchived": False}, order={"updatedAt": "desc"}, take=50)
+    tasks = await db.task.find_many(where={"userId": user.id, "workspaceId": None, "courseId": id}, order=[{"status": "asc"}, {"dueAt": "asc"}], take=100)
+    notes = await db.note.find_many(where={"userId": user.id, "workspaceId": None, "courseId": id, "isArchived": False}, order={"updatedAt": "desc"}, take=50)
     lang = to_lang(settings.language)
     classes = []
     for ev in class_events:
@@ -500,7 +500,7 @@ async def remove_course(id: str, user=Depends(plus_user)):
     notes are kept, unlinked."""
     existing = await find_course(user.id, id)
     async with db.tx() as tx:
-        await tx.event.delete_many(where={"userId": user.id, "courseId": id, "type": "CLASS"})
+        await tx.event.delete_many(where={"userId": user.id, "workspaceId": None, "courseId": id, "type": "CLASS"})
         await tx.course.delete(where={"id": existing.id})
     await log_activity(user.id, "course.deleted", entity_id=id, name=existing.name)
     return {"ok": True}

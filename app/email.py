@@ -108,3 +108,45 @@ async def send_trial_ending(to: str, ends_at) -> bool:
     ]
     html = "".join(f"<p>{line}</p>" for line in lines)
     return await _send(to, f"Your free vournal Plus ends on {day}", html, "\n\n".join(lines))
+
+
+def _esc(value: str) -> str:
+    import html
+
+    return html.escape(value or "", quote=True)
+
+
+async def send_workspace_invite(to: str, workspace_name: str, inviter: str, url: str) -> bool:
+    """An invitation to a vournal OS workspace (accepted on life.vournal.app)."""
+    who = inviter or "Someone"
+    text = (
+        f"{who} invited you to the workspace \"{workspace_name}\" in vournal OS.\n\n"
+        f"Open the invitation: {url}\n\nIt works for 14 days, with the account for this email address."
+    )
+    html_body = (
+        f"<p>{_esc(who)} invited you to the workspace “{_esc(workspace_name)}” in vournal OS.</p>"
+        f'<p><a href="{_esc(url)}">Open the invitation</a></p>'
+        "<p>It works for 14 days, with the account for this email address.</p>"
+    )
+    return await _send(to, f"Join {workspace_name} on vournal", html_body, text)
+
+
+async def send_invite_accepted(to: str, who: str, workspace_name: str) -> bool:
+    """To the person who invited them."""
+    text = f"{who} joined \"{workspace_name}\" in vournal OS."
+    return await _send(to, f"{who} joined {workspace_name}", f"<p>{_esc(text)}</p>", text)
+
+
+async def send_project_share(to: str, project_name: str, inviter: str, url: str) -> bool:
+    """A project shared view-only."""
+    who = inviter or "Someone"
+    text = (
+        f"{who} shared the project \"{project_name}\" with you in vournal OS (view only).\n\n"
+        f"Open it: {url}\n\nUse the account for this email address. You don't need vournal Plus to view it."
+    )
+    html_body = (
+        f"<p>{_esc(who)} shared the project “{_esc(project_name)}” with you in vournal OS (view only).</p>"
+        f'<p><a href="{_esc(url)}">Open the project</a></p>'
+        "<p>Use the account for this email address. You don't need vournal Plus to view it.</p>"
+    )
+    return await _send(to, f"{who} shared {project_name} with you", html_body, text)

@@ -167,9 +167,54 @@ async def _reminders(ctx: Ctx):
     return out, apply
 
 
+# Workspace reminders: a task's goes to whoever it's assigned to, or to whoever added it when
+# nobody is; an event's goes to every member who shows that workspace in their calendar.
+def _task_reminder_owner(user_id: str, workspace_ids: list[str], owned_ids: list[str]) -> dict:
+    """Candidates; `_reminds_me` settles who an unassigned workspace task reminds."""
+    clauses: list[dict] = [{"userId": user_id, "workspaceId": None}]
+    if workspace_ids:
+        mine = {"workspaceId": {"in": workspace_ids}}
+        clauses += [
+            {**mine, "assigneeId": user_id},
+            {**mine, "assigneeId": None, "OR": [{"createdById": user_id}, {"userId": user_id}]},
+        ]
+    if owned_ids:
+        clauses.append({"workspaceId": {"in": owned_ids}, "assigneeId": None})
+    return {"OR": clauses}
+
+
+async def _reminds_me(t, user_id: str) -> bool:
+    """An unassigned workspace task reminds whoever added it while they're a member, else
+    its row owner if a member, else the workspace's owner: always exactly one current member,
+    never someone who left. Personal and assigned tasks were settled by the query."""
+    if t.workspaceId is None or t.assigneeId is not None:
+        return True
+
+    async def member(uid):
+        return bool(uid) and await db.workspacemember.count(where={"workspaceId": t.workspaceId, "userId": uid}) > 0
+
+    for candidate in (t.createdById, t.userId):
+        if await member(candidate):
+            return candidate == user_id
+    owner = await db.workspacemember.find_first(where={"workspaceId": t.workspaceId, "role": "OWNER"})
+    return owner is not None and owner.userId == user_id
+
+
+async def _shown_workspace_ids(user_id: str) -> list[str]:
+    return [m.workspaceId for m in await db.workspacemember.find_many(where={"userId": user_id, "showInCalendar": True})]
+
+
+def _space_link(link: str, workspace_id: str | None) -> str:
+    return f"{link}{'&' if '?' in link else '?'}space={workspace_id}" if workspace_id else link
+
+
 async def _tasks(ctx: Ctx) -> list[dict]:
-    rows = await db.task.find_many(where={"userId": ctx.user_id, "status": {"not": "COMPLETED"},
-                                          "reminderAt": {"gte": ctx.now - LOOKBACK, "lte": ctx.now}}, take=500)
+    memberships = await db.workspacemember.find_many(where={"userId": ctx.user_id})
+    member_of = [m.workspaceId for m in memberships]
+    owned = [m.workspaceId for m in memberships if str(getattr(m.role, "value", m.role)) == "OWNER"]
+    found = await db.task.find_many(where={"AND": [_task_reminder_owner(ctx.user_id, member_of, owned)], "status": {"not": "COMPLETED"},
+                                           "reminderAt": {"gte": ctx.now - LOOKBACK, "lte": ctx.now}}, take=500)
+    rows = [t for t in found if await _reminds_me(t, ctx.user_id)]
     out, T = [], ctx.T
     for t in rows:
         body = T.t("taskReminder")
@@ -179,13 +224,16 @@ async def _tasks(ctx: Ctx) -> list[dict]:
             due = (T.t("dueToday") if days == 0 else T.t("dueTomorrow") if days == 1 else T.t("dueYesterday") if days == -1
                    else T.t("dueOn", date=T.date(day)))
             body = T.t("dueWithTime", due=due, time=ctx.time(t.dueAt)) if t.hasDueTime else due
-        out.append(_candidate(f"task:{t.id}:reminder:{_iso(t.reminderAt)}", t.title, body, ENTITY_LINKS["TASK"](t.id), "TASK", t.id))
+        out.append(_candidate(f"task:{t.id}:reminder:{_iso(t.reminderAt)}", t.title, body,
+                              _space_link(ENTITY_LINKS["TASK"](t.id), t.workspaceId), "TASK", t.id))
     return out
 
 
 async def _events(ctx: Ctx) -> list[dict]:
+    shown = await _shown_workspace_ids(ctx.user_id)
+    owner = {"OR": [{"userId": ctx.user_id, "workspaceId": None}, *([{"workspaceId": {"in": shown}}] if shown else [])]}
     rows = await db.event.find_many(where={
-        "userId": ctx.user_id, "reminderMinutes": {"not": None}, "startAt": {"lte": ctx.now + timedelta(days=29)},
+        "AND": [owner], "reminderMinutes": {"not": None}, "startAt": {"lte": ctx.now + timedelta(days=29)},
         "OR": [{"rrule": None, "OR": [{"startAt": {"gte": ctx.now - LOOKBACK}}, {"endAt": {"gte": ctx.now}}]},
                {"rrule": {"not": None}, "OR": [{"recurrenceEndAt": None}, {"recurrenceEndAt": {"gte": ctx.now}}]}],
     }, take=1000)
@@ -212,7 +260,7 @@ async def _events(ctx: Ctx) -> list[dict]:
                     else T.t("eventTimed", startsIn=ctx.starts_in(o.start), day=ctx.day_title(day), time=ctx.time(o.start)))
             out.append(_candidate(f"event:{ev.id}:{_iso(o.start)}:r{ev.reminderMinutes}", ev.title,
                                   T.t("withLocation", when=when, location=ev.location) if ev.location else when,
-                                  f"/calendar?id={ev.id}&date={day}", "EVENT", ev.id))
+                                  _space_link(f"/calendar?id={ev.id}&date={day}", ev.workspaceId), "EVENT", ev.id))
     return out
 
 
@@ -237,10 +285,10 @@ async def _digest(ctx: Ctx) -> list[dict]:
     if await db.notification.count(where={"userId": ctx.user_id, "dedupeKey": key}):
         return []
     start, end = local_midnight(ctx.today, ctx.tz), local_midnight(add_days_str(ctx.today, 1), ctx.tz)
-    open_tasks = {"userId": ctx.user_id, "status": {"not": "COMPLETED"}, "parentId": None}
+    open_tasks = {"userId": ctx.user_id, "workspaceId": None, "status": {"not": "COMPLETED"}, "parentId": None}
     tasks_today = await db.task.count(where={**open_tasks, "dueAt": {"gte": start, "lt": end}})
     overdue = await db.task.count(where={**open_tasks, "dueAt": {"lt": start}})
-    events = await db.event.find_many(where={"userId": ctx.user_id, "startAt": {"lt": end}, "OR": [
+    events = await db.event.find_many(where={"userId": ctx.user_id, "workspaceId": None, "startAt": {"lt": end}, "OR": [
         {"rrule": None, "OR": [{"startAt": {"gte": start}}, {"endAt": {"gte": start}}]},
         {"rrule": {"not": None}, "OR": [{"recurrenceEndAt": None}, {"recurrenceEndAt": {"gte": start}}]}]}, take=1000)
     bills = await db.recurringpayment.count(where={"userId": ctx.user_id, "status": "ACTIVE", "nextDate": {"lte": date_only_value(add_days_str(ctx.today, 3))}})
@@ -565,6 +613,19 @@ async def timed_candidate_users(now: datetime) -> set[str]:
         await db.healthprofile.find_many(where={"logReminderTime": {"not": None}}),
     ):
         ids |= {r.userId for r in rows}
+    # workspace reminders reach assignees, creators, and the members who show the workspace
+    for t in await db.task.find_many(where={"workspaceId": {"not": None}, "reminderAt": {"gte": now - timedelta(minutes=10), "lte": now},
+                                            "status": {"not": "COMPLETED"}}):
+        ids |= {t.assigneeId or t.createdById, t.userId} - {None}
+        if not t.assigneeId:  # the owner stands in when whoever added it has left
+            owner = await db.workspacemember.find_first(where={"workspaceId": t.workspaceId, "role": "OWNER"})
+            ids |= {owner.userId} if owner else set()
+    ws_events = await db.event.find_many(where={"workspaceId": {"not": None}, "reminderMinutes": {"not": None}, "OR": [
+        {"rrule": None, "startAt": {"gte": now - DAY, "lte": now + timedelta(days=29)}},
+        {"rrule": {"not": None}, "OR": [{"recurrenceEndAt": None}, {"recurrenceEndAt": {"gte": now}}]}]}, distinct=["workspaceId"])
+    if ws_events:
+        ids |= {m.userId for m in await db.workspacemember.find_many(
+            where={"workspaceId": {"in": [e.workspaceId for e in ws_events]}, "showInCalendar": True})}
     # accounts with a daily digest set (the digest itself is made once a day)
     ids |= {s.userId for s in await db.usersettings.find_many() if isinstance(s.notificationPrefs, dict) and s.notificationPrefs.get("dailyDigestTime")}
     return ids

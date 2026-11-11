@@ -86,9 +86,9 @@ def _day_habit_percent(habits, idx, k: str) -> int | None:
 
 async def _task_stats(ctx, r: dict) -> dict:
     uid, tz, now = ctx.user_id, ctx.tz, ctx.now
-    completed = await db.task.find_many(where={"userId": uid, "status": "COMPLETED", "completedAt": {"gte": r["from"], "lte": r["to"]}},
+    completed = await db.task.find_many(where={"OR": [{"userId": uid}, {"assigneeId": uid}], "status": "COMPLETED", "completedAt": {"gte": r["from"], "lte": r["to"]}},
                                         include={"category": True}, order={"completedAt": "desc"}, take=2000)
-    due = await db.task.find_many(where={"userId": uid, "dueAt": {"gte": r["from"], "lte": r["to"]}}, include={"category": True},
+    due = await db.task.find_many(where={"OR": [{"userId": uid}, {"assigneeId": uid}], "dueAt": {"gte": r["from"], "lte": r["to"]}}, include={"category": True},
                                   order={"dueAt": "asc"}, take=2000)
     start_today = life.start_of_day_key(ctx.today, tz)
     overdue_now = await db.task.count(where=life.overdue_task_where(uid, now, start_today))
@@ -209,12 +209,12 @@ async def _upcoming_deadlines(ctx, r: dict) -> list[dict]:
     d_from, d_to = key_to_date(r["fromKey"]), key_to_date(r["toKey"])
     out = []
     if on("tasks"):
-        for t in await db.task.find_many(where={"userId": uid, "status": {"not": "COMPLETED"}, "dueAt": {"gte": r["from"], "lte": r["to"]}},
+        for t in await db.task.find_many(where={"OR": [{"userId": uid}, {"assigneeId": uid}], "status": {"not": "COMPLETED"}, "dueAt": {"gte": r["from"], "lte": r["to"]}},
                                          order={"dueAt": "asc"}, take=30):
             out.append({"kind": "task", "id": t.id, "title": t.title, "subtitle": None, "date": day_key(t.dueAt, ctx.tz), "priority": t.priority,
                         "link": f"/tasks?id={t.id}"})
     if on("projects"):
-        for p in await db.project.find_many(where={"userId": uid, "status": {"in": ["PLANNING", "ACTIVE", "ON_HOLD"]}, "deadline": {"gte": d_from, "lte": d_to}}):
+        for p in await db.project.find_many(where={"userId": uid, "workspaceId": None, "status": {"in": ["PLANNING", "ACTIVE", "ON_HOLD"]}, "deadline": {"gte": d_from, "lte": d_to}}):
             out.append({"kind": "project", "id": p.id, "title": p.name, "subtitle": shared(ctx.lang, "projectDeadline"), "date": date_only_key(p.deadline),
                         "priority": "HIGH", "link": f"/projects/{p.id}"})
     if on("study"):
@@ -299,7 +299,7 @@ async def weekly(user, day: str | None = None) -> dict:
     nxt = _range(ctx, ctx.today, add_days_key(start_key, 13)) if current else _range(ctx, add_days_key(start_key, 7), add_days_key(start_key, 13))
     on = ctx.sections.__contains__
     tasks = await _task_stats(ctx, r) if on("tasks") else None
-    prev_done = await db.task.count(where={"userId": ctx.user_id, "status": "COMPLETED", "completedAt": {"gte": prev["from"], "lte": prev["to"]}}) \
+    prev_done = await db.task.count(where={"OR": [{"userId": ctx.user_id}, {"assigneeId": ctx.user_id}], "status": "COMPLETED", "completedAt": {"gte": prev["from"], "lte": prev["to"]}}) \
         if on("tasks") else 0
     events = await life.events_between(ctx, r["from"], r["to"], 1000) if on("calendar") else None
     finance = await _finance_stats(ctx, r) if on("finance") else None
@@ -446,13 +446,13 @@ async def yearly(user, year: str | None = None) -> dict:
     txs = await life.transactions_in_range(ctx, r["from"], r["to"]) if on("finance") else None
     by_category = await life.spending_by_category(ctx, r["from"], r["to"]) if on("finance") else None
     income_by_category = await life.spending_by_category(ctx, r["from"], r["to"], "INCOME") if on("finance") else None
-    tasks_done = await db.task.find_many(where={"userId": uid, "status": "COMPLETED", "completedAt": {"gte": r["from"], "lte": r["to"]}}) \
+    tasks_done = await db.task.find_many(where={"OR": [{"userId": uid}, {"assigneeId": uid}], "status": "COMPLETED", "completedAt": {"gte": r["from"], "lte": r["to"]}}) \
         if on("tasks") else None
     habit_data = await life.habits_with_logs(ctx, start_key, end_key) if on("habits") else None
     events = await life.events_between(ctx, r["from"], r["to"], 5000) if on("calendar") else None
     goals_done = await db.goal.find_many(where={"userId": uid, "status": "COMPLETED", "completedAt": {"gte": r["from"], "lte": r["to"]}},
                                          order={"completedAt": "asc"}) if on("goals") else None
-    projects_done = await db.project.find_many(where={"userId": uid, "status": "COMPLETED", "completedAt": {"gte": r["from"], "lte": r["to"]}},
+    projects_done = await db.project.find_many(where={"userId": uid, "workspaceId": None, "status": "COMPLETED", "completedAt": {"gte": r["from"], "lte": r["to"]}},
                                                order={"completedAt": "asc"}) if on("projects") else None
     trips = await db.trip.find_many(where={"userId": uid, "status": {"not": "CANCELLED"}, "startDate": {"gte": key_to_date(start_key), "lte": key_to_date(end_key)}},
                                     order={"startDate": "asc"}) if on("travel") else None

@@ -30,7 +30,8 @@ from app.os.calendar_utils import (
 )
 from app.os.common import dates, rrule
 from app.os.common.collation import locale_key
-from app.os.common.deps import plus_user
+from app.os.common.space import Space, current_space
+from app.os.common.space import personal as personal_space
 from app.os.common.http import nest_error, nest_router
 from app.os.common.i18n import to_lang
 from app.os.common.query import _query_bool, string_list, unknown_params
@@ -93,8 +94,11 @@ def _fmt(template: str, **values) -> str:
 
 
 class Ctx:
-    def __init__(self, user_id, tz, lang, start, end):
+    def __init__(self, user_id, tz, lang, start, end, space: Space | None = None):
         self.user_id = user_id
+        # Personal (with the workspaces' events and my assigned tasks laid over it), or one workspace
+        self.space = space
+        self.overlay = True
         self.tz = tz
         self.titles = FEED_TITLES[lang]
         self.start = start
@@ -143,9 +147,26 @@ def _years(start_date: str, end_date: str) -> range:
 # Sources
 
 
+async def _overlay_workspaces(user_id: str, calendar_only: bool) -> dict:
+    """{workspaceId: {id, name, color}} of my workspaces (only those I show in my calendar)."""
+    where = {"userId": user_id, **({"showInCalendar": True} if calendar_only else {})}
+    rows = await db.workspacemember.find_many(where=where, include={"workspace": True})
+    return {m.workspaceId: {"id": m.workspaceId, "name": m.workspace.name, "color": m.workspace.color} for m in rows}
+
+
 async def _events(ctx: Ctx) -> list[dict]:
-    member = await db.householdmember.find_unique(where={"userId": ctx.user_id})
-    access = {"OR": [{"userId": ctx.user_id}, {"householdId": member.householdId}]} if member else {"userId": ctx.user_id}
+    overlay: dict = {}
+    if ctx.space is not None and not ctx.space.personal:
+        access = {"workspaceId": ctx.space.workspace_id}
+    else:
+        member = await db.householdmember.find_unique(where={"userId": ctx.user_id})
+        overlay = await _overlay_workspaces(ctx.user_id, calendar_only=True) if ctx.overlay else {}
+        sources = [{"userId": ctx.user_id, "workspaceId": None}]
+        if member:
+            sources.append({"householdId": member.householdId})
+        if overlay:
+            sources.append({"workspaceId": {"in": list(overlay)}})
+        access = {"OR": sources}
     rows = await db.event.find_many(
         where={
             "AND": [access],
@@ -168,8 +189,10 @@ async def _events(ctx: Ctx) -> list[dict]:
     resolve = await resolver(ctx.user_id)
     out = []
     for ev in rows:
-        # Someone else's shared event: visible, never editable, without their private links.
-        mine = ev.userId == ctx.user_id
+        # Someone else's shared event, or a workspace's laid over Personal: visible, never
+        # editable here, without private links. Inside a workspace every member edits.
+        in_workspace = ctx.space is not None and not ctx.space.personal
+        mine = in_workspace or (ev.userId == ctx.user_id and ev.workspaceId is None)
         recurring = bool(ev.rrule)
         for o in expand_event(ev, ctx.start, ctx.end, ctx.tz, resolve):
             if ev.allDay:
@@ -212,7 +235,8 @@ async def _events(ctx: Ctx) -> list[dict]:
                         "courseName": (ev.course.name if ev.course else None) if mine else None,
                         "shared": bool(ev.householdId),
                         "readOnly": not mine,
-                        "sharedBy": None if mine else names.get(ev.userId),  # ev.user.name: null without one
+                        "sharedBy": None if mine or ev.workspaceId else names.get(ev.userId),  # ev.user.name: null without one
+                        "workspace": overlay.get(ev.workspaceId) if not in_workspace else None,
                     },
                 )
             )
@@ -226,7 +250,16 @@ async def _app_todos(ctx: Ctx) -> list[dict]:
 
 
 async def _tasks(ctx: Ctx) -> list[dict]:
-    where = {"userId": ctx.user_id, "dueAt": {"gte": ctx.start, "lte": ctx.end}}
+    overlay: dict = {}
+    if ctx.space is not None and not ctx.space.personal:
+        where = {"workspaceId": ctx.space.workspace_id, "dueAt": {"gte": ctx.start, "lte": ctx.end}}
+    else:
+        # my Personal tasks, and the workspace tasks assigned to me (read-only here)
+        overlay = await _overlay_workspaces(ctx.user_id, calendar_only=False) if ctx.overlay else {}
+        sources = [{"userId": ctx.user_id, "workspaceId": None}]
+        if overlay:
+            sources.append({"assigneeId": ctx.user_id, "workspaceId": {"in": list(overlay)}})
+        where = {"OR": sources, "dueAt": {"gte": ctx.start, "lte": ctx.end}}
     if not ctx.include_completed:
         where["status"] = {"not": "COMPLETED"}
     rows = await db.task.find_many(where=where, include={"project": True, "category": True}, order={"dueAt": "asc"}, take=5000)
@@ -256,6 +289,9 @@ async def _tasks(ctx: Ctx) -> list[dict]:
                     "projectName": t.project.name if t.project else None,
                     "categoryName": t.category.name if t.category else None,
                     "categoryColor": t.category.color if t.category else None,
+                    # a workspace task laid over Personal: opened (and ticked) in its workspace
+                    "workspace": overlay.get(t.workspaceId) if t.workspaceId else None,
+                    "readOnly": bool(t.workspaceId and overlay),
                 },
             )
         )
@@ -633,7 +669,10 @@ def _bound(value: str, tz: str, side: str) -> datetime:
 _FEED_FOR_QUERY = ("from", "to", "types", "includeCompleted")  # the NestJS query DTO's fields
 
 
-async def feed_for(user, request: Request, include_completed: bool | None = None) -> dict:
+async def feed_for(user, request: Request, include_completed: bool | None = None, space: Space | None = None,
+                   overlay: bool = True) -> dict:
+    """overlay=False: Personal items only, with no workspace events or assigned tasks (the
+    assistant works on Personal items, and teammates' titles never go to the model)."""
     q = request.query_params
     errors = unknown_params(request, _FEED_FOR_QUERY)
     for name in ("from", "to"):
@@ -655,7 +694,12 @@ async def feed_for(user, request: Request, include_completed: bool | None = None
         raise nest_error(400, f"Range too large (max {MAX_RANGE_DAYS} days)")
     enabled = set(settings.enabledSections or [])
     wanted = {t for t in (types or SOURCE_TYPES) if SOURCE_SECTION[t] is None or SOURCE_SECTION[t] in enabled}
-    ctx = Ctx(user.id, tz, to_lang(settings.language), start, end)
+    space = space or personal_space(user)
+    ctx = Ctx(user.id, tz, to_lang(settings.language), start, end, space)
+    ctx.overlay = overlay
+    if not space.personal:
+        # a workspace's calendar: its events and tasks only
+        wanted &= {"event", "task"}
     choice = include_completed if include_completed is not None else completed
     ctx.include_completed = True if choice is None else choice
 
@@ -693,14 +737,16 @@ async def feed_for(user, request: Request, include_completed: bool | None = None
 
 
 @router.get("/feed")
-async def feed(request: Request, user=Depends(plus_user)):
-    return await feed_for(user, request)
+async def feed(request: Request, space: Space = Depends(current_space)):
+    user = space.user
+    return await feed_for(user, request, space=space)
 
 
 @router.get("/summary")
-async def summary(request: Request, user=Depends(plus_user)):
+async def summary(request: Request, space: Space = Depends(current_space)):
+    user = space.user
     """Per-day counts (year heatmap, busy days); completed tasks and done reminders don't count."""
-    data = await feed_for(user, request, include_completed=False)
+    data = await feed_for(user, request, include_completed=False, space=space)
     tz = data["timezone"]
     start_date = local_date_str(dates.parse_instant(data["from"]), tz)
     end_date = local_date_str(dates.parse_instant(data["to"]), tz)

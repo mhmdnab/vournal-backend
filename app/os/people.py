@@ -306,7 +306,7 @@ async def get_person(id: str, user=Depends(plus_user)):
     tz = (await ensure_os_profile(user)).timezone
     gifts = await db.giftidea.find_many(where={"personId": row.id}, order=_GIFT_ORDER)
     important = await db.importantdate.find_many(where={"userId": user.id, "personId": row.id}, include={"person": True})
-    notes = await db.note.find_many(where={"userId": user.id, "personId": row.id}, order={"updatedAt": "desc"}, take=100)
+    notes = await db.note.find_many(where={"userId": user.id, "workspaceId": None, "personId": row.id}, order={"updatedAt": "desc"}, take=100)
     return {
         **await _view_one(user.id, row, tz),
         "gifts": [gift_view(g) for g in gifts],

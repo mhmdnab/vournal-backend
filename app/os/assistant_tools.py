@@ -17,6 +17,7 @@ from starlette.requests import Request
 
 from app.db import db
 from app import todo_rules
+from app.os.common.space import personal as personal_space
 from app.os import accounts, app_todos, calendar, debts, events, notes, reminders, search, shopping, spending_plan, tasks, transactions, wellness
 from app.os import goals, habits, important_dates, people, projects
 from app.os.ai import _round
@@ -332,7 +333,7 @@ async def _get_agenda(i: dict, ctx: Ctx) -> dict:
         raise ToolError('"to" is before "from"')
     if _days_between(start, end) > 62:
         raise ToolError("At most 62 days at a time")
-    feed = await calendar.feed_for(ctx.user, _req({"from": start, "to": end}))
+    feed = await calendar.feed_for(ctx.user, _req({"from": start, "to": end}), overlay=False)
     out = []
     for x in feed["items"][:150]:
         item = {"type": x["sourceType"], "id": x["sourceId"], "title": x["title"],
@@ -352,7 +353,7 @@ async def _list_tasks(i: dict, ctx: Ctx) -> dict:
     query = i["query"].strip() if isinstance(i.get("query"), str) and i["query"].strip() else None
     res = await tasks.list_tasks(_req({"status": status, "dueFrom": opt_date(i.get("due_from")), "dueTo": opt_date(i.get("due_to")),
                                        "overdue": True if i.get("overdue") is True else None, "q": query,
-                                       "sort": "dueAt", "order": "asc", "page": 1, "pageSize": _limit(i.get("limit"))}), user=ctx.user)
+                                       "sort": "dueAt", "order": "asc", "page": 1, "pageSize": _limit(i.get("limit"))}), space=personal_space(ctx.user))
     items = [{"id": t["id"], "title": t["title"], "status": t["status"], "priority": t["priority"], "due": _due_text(t, ctx.tz)} for t in res["items"]]
     found = await _app_todos(i, ctx, query)
     out = {"total": res["total"] + len(found), "items": items + [_app_todo_item(t, ctx.tz) for t in found[:_limit(i.get("limit"))]]}
@@ -575,7 +576,7 @@ async def _create_task(i: dict, ctx: Ctx) -> dict:
         plain["priority"] = i["priority"]
     if isinstance(i.get("notes"), str) and i["notes"].strip():
         plain["description"] = i["notes"].strip()
-    t = await tasks.create(_check(tasks.CreateBody, plain), user=ctx.user)
+    t = await tasks.create(_check(tasks.CreateBody, plain), space=personal_space(ctx.user))
     return _done({"kind": "create", "entityType": "task", "entityId": t["id"], "label": t["title"], "link": f"/tasks?id={t['id']}",
                   "undo": {"op": "delete", "type": "task", "id": t["id"]}},
                  {"id": t["id"], "title": t["title"], "due": _due_text(t, ctx.tz), "repeats": t.get("rrule")})
@@ -584,7 +585,7 @@ async def _create_task(i: dict, ctx: Ctx) -> dict:
 async def _update_task(i: dict, ctx: Ctx) -> dict:
     id = _req_str(i.get("id"), "id")
     try:
-        current = await tasks.get(id, user=ctx.user)
+        current = await tasks.get(id, space=personal_space(ctx.user))
     except HTTPException as exc:
         todo = await _app_todo(ctx, id) if exc.status_code == 404 else None
         if todo is None:
@@ -592,13 +593,13 @@ async def _update_task(i: dict, ctx: Ctx) -> dict:
         return await _update_app_todo(i, ctx, todo)
     link = f"/tasks?id={id}"
     if i.get("status") == "done":
-        t = await tasks.complete(id, user=ctx.user)
+        t = await tasks.complete(id, space=personal_space(ctx.user))
         nxt = t.get("nextOccurrence")
         undo = {"op": "reopen_task", "id": id, **({"nextId": nxt["id"]} if nxt else {})}  # undo also removes the next copy
         return _done({"kind": "complete", "entityType": "task", "entityId": id, "label": t["title"], "link": link, "undo": undo},
                      {"id": id, "title": t["title"], "status": "COMPLETED", "next": {"id": nxt["id"]} if nxt else None})
     if i.get("status") == "todo" and current["status"] == "COMPLETED":
-        await tasks.reopen(id, user=ctx.user)
+        await tasks.reopen(id, space=personal_space(ctx.user))
     patch = {}
     if isinstance(i.get("title"), str) and i["title"].strip():
         patch["title"] = i["title"].strip()
@@ -624,7 +625,7 @@ async def _update_task(i: dict, ctx: Ctx) -> dict:
         keep = local_time(current["dueAt"], ctx.tz) if current.get("dueAt") and current.get("hasDueTime") else None
         patch.update(_due(base, at or keep, ctx))
     before = await fields_now("task", id, patch, ctx) if patch else None
-    t = await tasks.update(id, _check(tasks.UpdateBody, patch), user=ctx.user) if patch else await tasks.get(id, user=ctx.user)
+    t = await tasks.update(id, _check(tasks.UpdateBody, patch), space=personal_space(ctx.user)) if patch else await tasks.get(id, space=personal_space(ctx.user))
     undo = await _fields_undo("task", id, before, ctx) if before else None
     return _done({"kind": "update", "entityType": "task", "entityId": id, "label": t["title"], "link": link, "undo": undo},
                  {"id": id, "title": t["title"], "status": t["status"], "due": _due_text(t, ctx.tz), "repeats": t.get("rrule")})
@@ -654,7 +655,7 @@ async def _create_event(i: dict, ctx: Ctx) -> dict:
                  "allDay": False, **({"timeAnchor": anchor} if anchor else {}), **series, **_extra(i)}
     else:
         plain = {"title": title, "date": date, "allDay": True, **series, **_extra(i)}
-    e = await events.create(_check(events.CreateBody, plain), user=ctx.user)
+    e = await events.create(_check(events.CreateBody, plain), space=personal_space(ctx.user))
     return _done({"kind": "create", "entityType": "event", "entityId": e["id"], "label": e["title"], "link": f"/calendar?id={e['id']}&date={date}",
                   "undo": {"op": "delete", "type": "event", "id": e["id"]}},
                  {"id": e["id"], "title": e["title"], "start": _event_start(e, ctx.tz),
@@ -665,7 +666,7 @@ async def _update_event(i: dict, ctx: Ctx) -> dict:
     from app.os.insight_text import js_round
 
     id = _req_str(i.get("id"), "id")
-    cur = await events.get(id, user=ctx.user)
+    cur = await events.get(id, space=personal_space(ctx.user))
     patch = {}
     if isinstance(i.get("title"), str) and i["title"].strip():
         patch["title"] = i["title"].strip()
@@ -693,7 +694,7 @@ async def _update_event(i: dict, ctx: Ctx) -> dict:
         else:
             patch.update({"date": date, "allDay": True})
     before = await fields_now("event", id, patch, ctx) if patch else None
-    e = await events.update(id, _check(events.UpdateBody, patch), user=ctx.user) if patch else cur
+    e = await events.update(id, _check(events.UpdateBody, patch), space=personal_space(ctx.user)) if patch else cur
     undo = await _fields_undo("event", id, before, ctx) if before else None
     return _done({"kind": "update", "entityType": "event", "entityId": id, "label": e["title"], "link": _event_link(id, e["startAt"], ctx.tz), "undo": undo},
                  {"id": id, "title": e["title"], "start": _event_start(e, ctx.tz), "repeats": e.get("rrule")})
@@ -822,7 +823,7 @@ async def _add_debt_payment(i: dict, ctx: Ctx) -> dict:
 async def _add_note(i: dict, ctx: Ctx) -> dict:
     title = _req_str(i.get("title"), "title")
     plain = {"title": js_slice(title, 200), **({"content": i["content"].strip()} if isinstance(i.get("content"), str) and i["content"].strip() else {})}
-    n = await notes.create(_check(notes.CreateBody, plain), user=ctx.user)
+    n = await notes.create(_check(notes.CreateBody, plain), space=personal_space(ctx.user))
     return _done({"kind": "create", "entityType": "note", "entityId": n["id"], "label": n["title"], "link": f"/notes?id={n['id']}",
                   "undo": {"op": "delete", "type": "note", "id": n["id"]}}, {"id": n["id"], "title": n["title"]})
 
@@ -1160,13 +1161,13 @@ async def _save_focus_mode(i: dict, ctx: Ctx) -> dict:
     project_ids: list[str] = []
     names = _str_list(i.get("project_names"), "project_names")
     if names:
-        mine = {p.name.strip().lower(): p.id for p in await db.project.find_many(where={"userId": ctx.user_id})}
+        mine = {p.name.strip().lower(): p.id for p in await db.project.find_many(where={"userId": ctx.user_id, "workspaceId": None})}
         missing = [n for n in names if n.strip().lower() not in mine]
         if missing:
             raise ToolError(f"No project named {', '.join(missing)}")
         project_ids = [mine[n.strip().lower()] for n in names]
     task_ids = _str_list(i.get("task_ids"), "task_ids")
-    if task_ids and await db.task.count(where={"id": {"in": task_ids}, "userId": ctx.user_id}) != len(task_ids):
+    if task_ids and await db.task.count(where={"id": {"in": task_ids}, "userId": ctx.user_id, "workspaceId": None}) != len(task_ids):
         raise ToolError("Task not found")
     before = await _focus_now(ctx)
     modes = before["focusModes"]
@@ -1284,7 +1285,7 @@ async def _create_project(i: dict, ctx: Ctx) -> dict:
         plain["budget"] = i["budget"]
     if _text(i, "currency"):
         plain["currency"] = _text(i, "currency").upper()
-    p = await projects.create(_check(projects.CreateBody, plain), user=ctx.user)
+    p = await projects.create(_check(projects.CreateBody, plain), space=personal_space(ctx.user))
     return _done({"kind": "create", "entityType": "project", "entityId": p["id"], "label": p["name"], "link": f"/projects?id={p['id']}",
                   "undo": {"op": "delete", "type": "project", "id": p["id"]}}, {"id": p["id"], "name": p["name"]})
 
@@ -1303,7 +1304,7 @@ async def _update_project(i: dict, ctx: Ctx) -> dict:
     if not plain:
         raise ToolError("Nothing to change")
     before = await fields_now("project", id, plain, ctx)
-    p = await projects.update(id, _check(projects.UpdateBody, plain), user=ctx.user)
+    p = await projects.update(id, _check(projects.UpdateBody, plain), space=personal_space(ctx.user))
     return _done({"kind": "complete" if plain.get("status") == "COMPLETED" else "update", "entityType": "project", "entityId": id,
                   "label": p["name"], "link": f"/projects?id={id}", "undo": await _fields_undo("project", id, before, ctx)},
                  {"id": id, "name": p["name"], "status": p["status"]})
@@ -1423,7 +1424,7 @@ async def fields_now(kind: str, id: str, keys, ctx: Ctx) -> dict:
     keys = set(keys)
     out: dict = {}
     if kind == "task":
-        t = await tasks.get(id, user=ctx.user)
+        t = await tasks.get(id, space=personal_space(ctx.user))
         if keys & set(_TASK_DUE):
             keys -= set(_TASK_DUE)
             if not t.get("dueAt"):
@@ -1435,7 +1436,7 @@ async def fields_now(kind: str, id: str, keys, ctx: Ctx) -> dict:
         for k in keys:
             out[k] = to_json(t.get(k))[:10] if k == "recurrenceEndAt" and t.get(k) else t.get(k)
     elif kind == "event":
-        e = await events.get(id, user=ctx.user)
+        e = await events.get(id, space=personal_space(ctx.user))
         if keys & set(_EVENT_TIME):
             keys -= set(_EVENT_TIME)
             if e["allDay"]:
@@ -1465,7 +1466,15 @@ async def _person_row(user_id: str, id: str):
 
 
 # kinds read straight from their row: (model, owned-row finder raising the route's 404)
-_ROW_KINDS = {"habit": ("Habit", habits._owned), "project": ("Project", projects._owned), "person": ("Person", _person_row),
+async def _project_row(user_id: str, id: str):
+    """A Personal project (the assistant works on Personal items only)."""
+    row = await db.project.find_first(where={"id": id, "userId": user_id, "workspaceId": None})
+    if row is None:
+        raise HTTPException(404, {"message": "Project not found"})
+    return row
+
+
+_ROW_KINDS = {"habit": ("Habit", habits._owned), "project": ("Project", _project_row), "person": ("Person", _person_row),
               "goal": ("Goal", goals._owned)}
 
 
@@ -1485,9 +1494,9 @@ async def _restore_fields(undo: dict, ctx: Ctx) -> None:
         raise ToolError("It was changed since — not undone")
     before = undo["before"]
     if kind == "task":
-        await tasks.update(id, _check(tasks.UpdateBody, before), user=ctx.user)
+        await tasks.update(id, _check(tasks.UpdateBody, before), space=personal_space(ctx.user))
     elif kind == "event":
-        await events.update(id, _check(events.UpdateBody, before), user=ctx.user)
+        await events.update(id, _check(events.UpdateBody, before), space=personal_space(ctx.user))
     elif kind == "transaction":
         await transactions.update(id, _check(transactions.UpdateBody, before), user=ctx.user)
     elif kind == "health_profile":
@@ -1495,7 +1504,7 @@ async def _restore_fields(undo: dict, ctx: Ctx) -> None:
     elif kind == "habit":
         await habits._update(ctx.user, id, _check(habits.UpdateBody, before))
     elif kind == "project":
-        await projects.update(id, _check(projects.UpdateBody, before), user=ctx.user)
+        await projects.update(id, _check(projects.UpdateBody, before), space=personal_space(ctx.user))
     elif kind == "person":
         await people.update(id, _check(people.PersonUpdateBody, before), user=ctx.user)
     elif kind == "goal":
@@ -1521,7 +1530,16 @@ async def remove(user, kind: str, id: str) -> dict | None:
     from app.os import assistant_snapshot
 
     async def remove_project(id: str, user):
-        return await projects.remove(id, _req({}), user=user)
+        return await projects.remove(id, _req({}), space=personal_space(user))
+
+    async def remove_task(id: str, user):
+        return await tasks.remove(id, space=personal_space(user))
+
+    async def remove_event(id: str, user):
+        return await events.remove(id, space=personal_space(user))
+
+    async def remove_note(id: str, user):
+        return await notes.remove(id, space=personal_space(user))
 
     async def remove_gift(id: str, user):
         gift = await db.giftidea.find_first(where={"id": id, "person": {"is": {"userId": user.id}}})
@@ -1529,8 +1547,8 @@ async def remove(user, kind: str, id: str) -> dict | None:
             raise ToolError("Gift not found")
         return await people.remove_gift(gift.personId, id, user=user)
 
-    handlers = {"task": tasks.remove, "event": events.remove, "reminder": reminders.remove, "transaction": transactions.remove, "debt": debts.remove,
-                "note": notes.remove, "shopping_item": shopping.remove_item, "food_log": wellness.remove_food, "weight": wellness.remove_weight,
+    handlers = {"task": remove_task, "event": remove_event, "reminder": reminders.remove, "transaction": transactions.remove, "debt": debts.remove,
+                "note": remove_note, "shopping_item": shopping.remove_item, "food_log": wellness.remove_food, "weight": wellness.remove_weight,
                 "habit": habits.remove, "project": remove_project, "gift": remove_gift, "goal": goals.remove,
                 "important_date": important_dates.remove, "account": accounts.remove}
     if kind not in handlers:
@@ -1553,9 +1571,9 @@ async def reverse(user, undo: dict, ctx: Ctx | None = None) -> None:
     elif undo["op"] == "delete":
         await remove(user, undo["type"], undo["id"])
     elif undo["op"] == "reopen_task":
-        await tasks.reopen(undo["id"], user=user)
+        await tasks.reopen(undo["id"], space=personal_space(user))
         if undo.get("nextId"):
-            await tasks.remove(undo["nextId"], user=user)
+            await tasks.remove(undo["nextId"], space=personal_space(user))
     elif undo["op"] == "restore_habit_log":
         await habits.check(undo["id"], _check(habits.CheckBody, {"date": undo["date"], "count": undo["count"]}), user=user)
     elif undo["op"] == "restore_weight":
@@ -1575,14 +1593,14 @@ async def describe(ctx: Ctx, kind, id: str) -> dict:
     tz, user = ctx.tz, ctx.user
     if kind == "task":
         try:
-            t = await tasks.get(id, user=user)
+            t = await tasks.get(id, space=personal_space(user))
         except HTTPException as exc:
             if exc.status_code == 404 and await _app_todo(ctx, id):
                 raise ToolError("This to-do comes from the vournal app: it can't be deleted here.") from exc
             raise
         return {"label": t["title"], "link": f"/tasks?id={id}"}
     if kind == "event":
-        e = await events.get(id, user=user)
+        e = await events.get(id, space=personal_space(user))
         return {"label": f"{e['title']} · {local_day(e['startAt'], tz)}", "link": _event_link(id, e["startAt"], tz)}
     if kind == "reminder":
         r = await reminders.get(id, user=user)
@@ -1595,7 +1613,7 @@ async def describe(ctx: Ctx, kind, id: str) -> dict:
         d = await debts.get(id, user=user)
         return {"label": f"{d['title']} · {d['who']}" if d.get("who") and d["who"] != d["title"] else d["title"], "link": f"/finance/debts?id={id}"}
     if kind == "note":
-        n = await notes.get(id, user=user)
+        n = await notes.get(id, space=personal_space(user))
         return {"label": n["title"], "link": f"/notes?id={id}"}
     if kind == "shopping_item":
         s = await shopping.get_item(id, user=user)
@@ -1612,7 +1630,7 @@ async def describe(ctx: Ctx, kind, id: str) -> dict:
         h = await habits._owned(ctx.user_id, id)
         return {"label": h.name, "link": f"/habits?id={id}"}
     if kind == "project":
-        p = await projects._owned(ctx.user_id, id)
+        p = await _project_row(ctx.user_id, id)
         return {"label": p.name, "link": f"/projects?id={id}"}
     if kind == "goal":
         g = await goals._owned(ctx.user_id, id)

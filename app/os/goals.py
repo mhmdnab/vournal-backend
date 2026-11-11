@@ -384,7 +384,7 @@ async def _project_progress(user_id: str, project_ids: list[str]) -> dict[str, i
     if not project_ids:
         return {}
     totals: dict[str, list[int]] = {}
-    for g in await db.task.group_by(by=["projectId", "status"], where={"userId": user_id, "projectId": {"in": project_ids}, "parentId": None}, count={"_all": True}):
+    for g in await db.task.group_by(by=["projectId", "status"], where={"userId": user_id, "workspaceId": None, "projectId": {"in": project_ids}, "parentId": None}, count={"_all": True}):
         if not g.get("projectId"):
             continue
         t = totals.setdefault(g["projectId"], [0, 0])
@@ -399,16 +399,16 @@ async def _detail(user, id: str) -> dict:
     (goal,) = await views(user.id, [row], ctx)
     milestones = await db.goalmilestone.find_many(where={"goalId": id, "goal": {"is": {"userId": user.id}}}, order=[{"sortOrder": "asc"}, {"createdAt": "asc"}])
     tasks = await db.task.find_many(
-        where={"userId": user.id, "goalId": id, "parentId": None},
+        where={"userId": user.id, "workspaceId": None, "goalId": id, "parentId": None},
         order=[{"status": "asc"}, {"dueAt": {"sort": "asc", "nulls": "last"}}, {"createdAt": "desc"}], take=200,
     )
-    projects = await db.project.find_many(where={"userId": user.id, "goalId": id}, order={"createdAt": "desc"})
+    projects = await db.project.find_many(where={"userId": user.id, "workspaceId": None, "goalId": id}, order={"createdAt": "desc"})
     habits = await db.habit.find_many(where={"userId": user.id, "goalId": id}, include={"logs": True}, order=[{"isArchived": "asc"}, {"sortOrder": "asc"}])
     events = await db.event.find_many(
-        where={"userId": user.id, "goalId": id, "startAt": {"gte": dates.start_of_day(dates._now(), ctx.tz)}}, order={"startAt": "asc"}, take=10
+        where={"userId": user.id, "workspaceId": None, "goalId": id, "startAt": {"gte": dates.start_of_day(dates._now(), ctx.tz)}}, order={"startAt": "asc"}, take=10
     )
     contributions = await db.transaction.find_many(where={"userId": user.id, "goalId": id}, include={"account": True}, order={"date": "desc"}, take=20)
-    completed_tasks = await db.task.count(where={"userId": user.id, "goalId": id, "parentId": None, "status": "COMPLETED"})
+    completed_tasks = await db.task.count(where={"userId": user.id, "workspaceId": None, "goalId": id, "parentId": None, "status": "COMPLETED"})
     project_tasks = {g["projectId"]: g["_count"]["_all"] for g in await db.task.group_by(by=["projectId"], where={"projectId": {"in": [p.id for p in projects]}}, count={"_all": True})} if projects else {}
     progress = await _project_progress(user.id, [p.id for p in projects])
     now = dates._now()
