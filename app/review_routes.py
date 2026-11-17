@@ -78,6 +78,7 @@ async def review_block(entry) -> Optional[dict]:
             # Ask vournal (design 2026-11-17): where the app sends it, and whether it came back from a chat
             "intent": result.get("intent") or "journal",
             "unasked": proposal.get("unasked") is True,
+            "conversationId": proposal.get("conversationId"),  # the chat this entry was asked in
         },
         "actions": [review_action(a) for a in rows],
         "question": proposal.get("question") if waiting else None,

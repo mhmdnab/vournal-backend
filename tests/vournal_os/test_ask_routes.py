@@ -154,3 +154,69 @@ class HiddenEntries(AskBase):
         await self.record("how much did I spend on food?")
         self.assertEqual(await self.remaining(), before)
         self.assertEqual(fm.requests("python"), [])
+
+
+class ReviewFixes(AskBase):
+    """Final review (2026-11-17): a claim that works across instances, no second AI step on unask,
+    and the card knows when an entry already has a chat."""
+
+    async def test_two_taps_at_once_send_once(self):
+        import asyncio
+
+        async def slow(*args, **kwargs):
+            await asyncio.sleep(0.3)
+            return reply()
+
+        self.send.side_effect = slow
+        entry = await self.record()
+        first, second = await asyncio.gather(self.app.post(f"/entries/{entry.id}/ask", json={}),
+                                             self.app.post(f"/entries/{entry.id}/ask", json={}))
+        self.assertEqual(sorted([first.status_code, second.status_code]), [200, 409])
+        self.assertEqual(self.send.await_count, 1)
+
+    async def test_an_ask_in_progress_is_refused_and_a_stale_one_runs_again(self):
+        from prisma import Json
+
+        entry = await self.record()
+        started = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
+        await self.db.entry.update(where={"id": entry.id}, data={"reviewState": "asking", "proposal": Json({**entry.proposal, "askStartedAt": started})})
+        await self.ask(entry.id, status=409)
+        stale = (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat()
+        await self.db.entry.update(where={"id": entry.id}, data={"proposal": Json({**entry.proposal, "askStartedAt": stale})})
+        pending = [e["id"] for e in (await self.app.get("/entries", params={"review": "pending"})).json()]
+        self.assertIn(entry.id, pending)  # cut off by a restart: back under Needs review
+        out = await self.ask(entry.id)
+        self.assertEqual(out["entryState"], "asked")
+
+    async def test_a_failed_answer_releases_the_claim(self):
+        self.send.return_value = reply("unavailable")
+        entry = await self.record()
+        await self.ask(entry.id)
+        stored = await self.db.entry.find_unique(where={"id": entry.id})
+        self.assertEqual(stored.reviewState, "needs_review")
+        self.assertNotIn("askStartedAt", stored.proposal)
+
+    async def test_unask_after_ask_instead_does_not_run_the_ai_step_again(self):
+        self.result = {**QUESTION, "intent": "journal"}
+        entry = await self.record("paid 20 for lunch")
+        await self.ask(entry.id, force=True)
+        with patch("app.entry_actions.after_extraction", AsyncMock()) as step:
+            r = await self.app.post(f"/entries/{entry.id}/unask")
+            self.assertEqual(r.status_code, 200, r.text)
+            step.assert_not_awaited()
+
+    async def test_unask_of_a_question_runs_the_skipped_ai_step(self):
+        entry = await self.record()
+        await self.ask(entry.id)
+        with patch("app.entry_actions.after_extraction", AsyncMock()) as step:
+            await self.app.post(f"/entries/{entry.id}/unask")
+            step.assert_awaited_once()
+
+    async def test_the_card_knows_an_entry_already_has_a_chat(self):
+        self.result = {**QUESTION, "intent": "both"}
+        entry = await self.record()
+        before = (await self.app.get(f"/entries/{entry.id}")).json()["review"]["proposal"]
+        self.assertIsNone(before["conversationId"])
+        await self.ask(entry.id)
+        after = (await self.app.get(f"/entries/{entry.id}")).json()["review"]["proposal"]
+        self.assertEqual(after["conversationId"], "conv-1")

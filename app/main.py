@@ -678,6 +678,10 @@ async def list_entries(
     current=Depends(get_current_user),
 ):
     """The journal, newest first. `?review=pending`: the entries waiting on the review card."""
+    if review == "pending":
+        from app.ask_routes import release_stale_asks
+
+        await release_stale_asks(current.id)  # a question cut off by a restart waits here again
     entries = await db.entry.find_many(
         where={
             "userId": current.id,

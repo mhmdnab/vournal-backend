@@ -8,12 +8,12 @@ entry instead" (/unask) can bring back the real recording; it gives its monthly 
 for review. Nothing changes until an answer arrives: no permission, no allowance or an error leave
 the entry waiting, so the app turns it into a journal entry instead.
 
-One request per entry at a time (a lock in this process; the API runs as one instance): a second
-tap waits, then finds the entry already handled."""
+One request per entry at a time, across instances: the entry is claimed ("asking", with the
+time) the way Save claims it, so a second tap gets 409. A claim older than ASK_TIMEOUT was cut off
+by a restart and is released, so the entry shows under "Needs review" again."""
 
-import asyncio
 import logging
-from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from prisma import Json
@@ -32,7 +32,21 @@ log = logging.getLogger("vournal")
 router = APIRouter()
 
 HANDLED = "This entry was already handled."
-_locks: defaultdict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+ASK_TIMEOUT = timedelta(minutes=5)
+
+
+def _without_claim(proposal: dict) -> dict:
+    return {k: v for k, v in proposal.items() if k != "askStartedAt"}
+
+
+async def release_stale_asks(user_id: str) -> None:
+    """Questions whose answer was cut off (a restart mid-request) wait on the review card again."""
+    now = datetime.now(timezone.utc)
+    for e in await db.entry.find_many(where={"userId": user_id, "reviewState": "asking"}):
+        started = (e.proposal or {}).get("askStartedAt")
+        if not started or now - datetime.fromisoformat(started) >= ASK_TIMEOUT:
+            await db.entry.update_many(where={"id": e.id, "reviewState": "asking"},
+                                       data={"reviewState": "needs_review", "proposal": Json(_without_claim(e.proposal or {}))})
 
 
 class AskBody(BaseModel):
@@ -43,16 +57,7 @@ class AskBody(BaseModel):
 @router.post("/entries/{entry_id}/ask")
 async def ask(entry_id: str, body: AskBody | None = None, current=Depends(get_current_user)):
     force = bool(body and body.force)
-    lock = _locks[entry_id]
-    try:
-        async with lock:
-            return await _ask(entry_id, force, current)
-    finally:
-        if not lock.locked() and not getattr(lock, "_waiters", None):
-            _locks.pop(entry_id, None)  # nobody else waiting: don't keep a lock per entry forever
-
-
-async def _ask(entry_id: str, force: bool, current) -> dict:
+    await release_stale_asks(current.id)
     entry = await _owned(entry_id, current.id)
     if entry.status != "DONE":
         raise HTTPException(status_code=409, detail=STILL_WORKING)
@@ -67,8 +72,24 @@ async def _ask(entry_id: str, force: bool, current) -> dict:
     if not journal_allowed(await ensure_os_profile(current)):
         return {"status": "consent_needed"}
 
-    result = await assistant.send(current, entry.rawTranscript, always_ask=True)
+    claimed = await db.entry.update_many(
+        where={"id": entry.id, "reviewState": "needs_review"},
+        data={"reviewState": "asking", "proposal": Json({**proposal, "askStartedAt": datetime.now(timezone.utc).isoformat()})},
+    )
+    if not claimed:
+        raise HTTPException(status_code=409, detail=HANDLED)  # a second tap, here or on another instance
+
+    async def release() -> None:
+        await db.entry.update_many(where={"id": entry.id, "reviewState": "asking"},
+                                   data={"reviewState": "needs_review", "proposal": Json(proposal)})
+
+    try:
+        result = await assistant.send(current, entry.rawTranscript, always_ask=True)
+    except BaseException:
+        await release()
+        raise
     if result.get("status") != "ok":
+        await release()
         return result  # the entry keeps waiting: the app shows it as a journal entry with a reason
     hide = force or intent == "ask"
     proposal["conversationId"] = result["conversation"]["id"]
@@ -94,8 +115,11 @@ async def unask(entry_id: str, current=Depends(get_current_user)):
     if not changed:
         await quota.release_entry_quota(db, current.id)
         raise HTTPException(status_code=409, detail=HANDLED)
-    try:
-        await entry_actions.after_extraction(entry.id)
-    except Exception:  # noqa: BLE001 — the entry still reaches the card
-        log.exception("AI actions step failed for unasked entry %s", entry.id)
+    # Only a question skipped the AI actions step; an entry asked with "Ask vournal instead" already
+    # had it, and running it again would spend twice and repeat the cards.
+    if ((entry.proposal or {}).get("result") or {}).get("intent") == "ask":
+        try:
+            await entry_actions.after_extraction(entry.id)
+        except Exception:  # noqa: BLE001 — the entry still reaches the card
+            log.exception("AI actions step failed for unasked entry %s", entry.id)
     return await entry_out(entry.id, current.id)
