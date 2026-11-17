@@ -99,3 +99,33 @@ class Scoring(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ----- the entry-actions eval's intent score (Ask vournal, design 2026-11-17) ---------------------
+
+_EA_PATH = pathlib.Path(__file__).resolve().parents[1] / "scripts" / "eval_entry_actions.py"
+_ea_spec = importlib.util.spec_from_file_location("eval_entry_actions", _EA_PATH)
+ea = importlib.util.module_from_spec(_ea_spec)
+_ea_spec.loader.exec_module(ea)
+
+from datetime import date as _date  # noqa: E402
+
+_ASK = {"id": "ask-en-x", "lang": "en", "expect": {"wantsActions": False, "actions": [], "question": "no", "expectIntent": "ask"}}
+_PLAIN = {"id": "day-en-x", "lang": "en", "expect": {"wantsActions": False, "actions": [], "question": "no"}}
+
+
+class EntryActionsIntent(unittest.TestCase):
+    def grade(self, case, intent):
+        return ea.grade(case, [], False, False, {}, _date(2026, 11, 17), intent=intent)[0]
+
+    def test_wrong_intent_is_a_miss(self):
+        self.assertEqual(self.grade(_ASK, "journal")["intent"], 0.0)
+        self.assertEqual(self.grade(_ASK, "ask")["intent"], 1.0)
+
+    def test_missing_expectation_means_journal(self):
+        self.assertEqual(self.grade(_PLAIN, "journal")["intent"], 1.0)
+        self.assertEqual(self.grade(_PLAIN, "both")["intent"], 0.0)
+
+    def test_intent_by_language(self):
+        rows = [{"lang": "en", "grade": {"intent": 1.0}}, {"lang": "en", "grade": {"intent": 0.0}}, {"lang": "lb", "grade": {"intent": 1.0}}]
+        self.assertEqual(ea.intent_by_lang(rows), {"en": (1, 2), "lb": (1, 1)})

@@ -180,7 +180,7 @@ def _matches(exp: dict, prop: dict, refs: dict, today: date) -> bool:
     return True
 
 
-def grade(case: dict, proposed: list[dict], asked: bool, wants: bool, refs: dict, today: date) -> tuple[dict, dict]:
+def grade(case: dict, proposed: list[dict], asked: bool, wants: bool, refs: dict, today: date, intent: str = "journal") -> tuple[dict, dict]:
     expect = case["expect"]
     left = list(proposed)
     matched, missing = [], []
@@ -200,9 +200,20 @@ def grade(case: dict, proposed: list[dict], asked: bool, wants: bool, refs: dict
     precision = len(matched) / counted if counted else 1.0
     ok = not missing and not extra and asked_ok
     scores = {"pass": 1.0 if ok else 0.0, "recall": recall, "precision": precision,
-              "gate": 1.0 if wants == expect["wantsActions"] else 0.0, "asked": 1.0 if asked_ok else 0.0}
+              "gate": 1.0 if wants == expect["wantsActions"] else 0.0, "asked": 1.0 if asked_ok else 0.0,
+              # Ask vournal (design 2026-11-17): journal / ask / both; a case without expectIntent is a journal entry
+              "intent": 1.0 if intent == expect.get("expectIntent", "journal") else 0.0}
     detail = {"missing": missing, "extra": [{"tool": p["tool"], "input": p["input"]} for p in extra]}
     return scores, detail
+
+
+def intent_by_lang(rows: list[dict]) -> dict[str, tuple[int, int]]:
+    """{lang: (intent right, runs)} for the report."""
+    out: dict[str, tuple[int, int]] = {}
+    for r in rows:
+        hit, n = out.get(r["lang"], (0, 0))
+        out[r["lang"]] = (hit + int(r["grade"]["intent"]), n + 1)
+    return out
 
 
 # ----- the scripted model (--fake) ------------------------------------------------------
@@ -254,7 +265,8 @@ def _fake_extract(mode: str):
         result = {"summary": transcript[:200], "mood": {"score": 3, "label": "neutral", "emotions": []}, "todos": [],
                   "topics": [], "people": _fake_people(case), "places": [],
                   "wantsActions": case["expect"]["wantsActions"] if mode == "oracle" else bool(case["expect"]["actions"]),
-                  "journalSuggested": True}
+                  "journalSuggested": True,
+                  "intent": case["expect"].get("expectIntent", "journal") if mode == "oracle" else "journal"}
         return result, {"inTokens": 0, "outTokens": 0}
     return extract
 
@@ -424,7 +436,7 @@ async def _run_one(db, case: dict, rep: int, user, refs: dict, today: date, out:
     proposed = _proposed(waiting, people)
     asked = bool(proposal.get("question"))
     wants = bool(result.get("wantsActions"))
-    scores, detail = grade(case, proposed, asked, wants, refs, today)
+    scores, detail = grade(case, proposed, asked, wants, refs, today, intent=result.get("intent") or "journal")
     conversation = await db.assistantconversation.find_first(where={"entryId": entry.id})
     history = await db.assistantmessage.find_many(where={"conversationId": conversation.id}, order=[{"createdAt": "asc"}, {"id": "asc"}]) if conversation else []
     truncated = any(c.get("stop_reason") == "max_tokens" for c in calls)
@@ -433,7 +445,7 @@ async def _run_one(db, case: dict, rep: int, user, refs: dict, today: date, out:
     tool_calls = sum(1 for h in history if h.role == "assistant" for b in (h.content or []) if isinstance(b, dict) and b.get("type") == "tool_use")
     models = [c.get("model") for c in calls if c.get("step") == "actions"]
     row = {
-        "prompt_id": case["id"], "rep": rep, "prompt": case["text"], "tags": case["tags"],
+        "prompt_id": case["id"], "rep": rep, "prompt": case["text"], "tags": case["tags"], "lang": case["lang"],
         "status": "truncated" if truncated else "ok", "stop_reason": (calls[-1].get("stop_reason") if calls else None),
         "grade": scores, "latency_s": latency, "tool_calls": tool_calls, "questions": 1 if asked else 0,
         "model": models[0] if models else (calls[0].get("model") if calls else None), "usage": usage,
@@ -556,6 +568,8 @@ async def main() -> None:
     n_err = len(errors.read_text().splitlines()) if errors.exists() else 0
     print(f"\n{variant}: pass {k:.0f}/{len(ok)} = {k / len(ok) if ok else 0:.1%} (95% CI {lo:.1%}-{hi:.1%}) · found {mean('recall'):.1%} · "
           f"no extras {mean('precision'):.1%} · needs-actions {mean('gate'):.1%} · asked right {mean('asked'):.1%}")
+    by_lang = intent_by_lang([{**r, "lang": r.get("lang", "?"), "grade": {"intent": 1.0, **r["grade"]}} for r in ok])
+    print("intent (journal/ask/both) " + " · ".join(f"{lang} {hit}/{n}" for lang, (hit, n) in sorted(by_lang.items())))
     print(f"{len(rows) - len(ok)} truncated · {n_err} errors · cost ${cost:.4f} · {time.monotonic() - started:.0f}s wall-clock")
 
 
