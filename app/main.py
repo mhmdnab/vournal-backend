@@ -52,6 +52,7 @@ from app.quota import (
 )
 from app.os import include_os_routers
 from app.review_routes import entry_out, router as review_router
+from app.ask_routes import router as ask_router
 from app.review import IN_JOURNAL
 from app.os.common.http import EmptyJsonBody, TrailingSlash, install_nest_errors
 from app.rate_limit import limiter
@@ -218,6 +219,7 @@ app.include_router(auth_router)
 app.include_router(oauth_router)
 app.include_router(threads_router)
 app.include_router(review_router)  # before /entries/{entry_id}: it owns /entries/actions/recent
+app.include_router(ask_router)  # Ask vournal (design 2026-11-17)
 app.include_router(billing_apple_router)
 app.include_router(billing_paddle_router)
 

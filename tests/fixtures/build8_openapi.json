@@ -5151,6 +5151,132 @@
    "summary": "Undo"
   }
  },
+ "/entries/{entry_id}/ask": {
+  "post": {
+   "operationId": "ask_entries__entry_id__ask_post",
+   "parameters": [
+    {
+     "in": "path",
+     "name": "entry_id",
+     "required": true,
+     "schema": {
+      "title": "Entry Id",
+      "type": "string"
+     }
+    },
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "anyOf": [
+        {
+         "additionalProperties": false,
+         "properties": {
+          "force": {
+           "default": false,
+           "title": "Force",
+           "type": "boolean"
+          }
+         },
+         "title": "AskBody",
+         "type": "object"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Body"
+      }
+     }
+    }
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {}
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Ask"
+  }
+ },
  "/entries/{entry_id}/audio": {
   "delete": {
    "description": "Remove just the recording, keeping the written entry.\n\nA real privacy affordance for a voice product: you can strip the audio and\nkeep the journal text. Returns the updated entry (audioUrl now null).",
@@ -6282,6 +6408,107 @@
     }
    },
    "summary": "Save"
+  }
+ },
+ "/entries/{entry_id}/unask": {
+  "post": {
+   "description": "\"Save as a journal entry instead\": the hidden question becomes an entry waiting for review\nagain, counted again, and gets the AI actions step a journal entry gets.",
+   "operationId": "unask_entries__entry_id__unask_post",
+   "parameters": [
+    {
+     "in": "path",
+     "name": "entry_id",
+     "required": true,
+     "schema": {
+      "title": "Entry Id",
+      "type": "string"
+     }
+    },
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {}
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Unask"
   }
  },
  "/health": {

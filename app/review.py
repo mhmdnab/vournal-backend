@@ -20,7 +20,8 @@ async def discard_stale(older_than: timedelta = timedelta(days=7)) -> int:
     """Entries left on the review card for 7 days are thrown away, with their recordings (the
     design's "Needs review" expiry). Saved and older apps' entries are never touched."""
     cutoff = datetime.now(timezone.utc) - older_than
-    stale = await db.entry.find_many(where={"reviewState": "needs_review", "createdAt": {"lt": cutoff}})
+    # questions turned into a chat ("asked", design 2026-11-17) go the same way
+    stale = await db.entry.find_many(where={"reviewState": {"in": ["needs_review", "asked"]}, "createdAt": {"lt": cutoff}})
     for entry in stale:
         if entry.audioUrl:
             await delete_audio(entry.audioUrl)
