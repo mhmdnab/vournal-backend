@@ -86,6 +86,7 @@ def parse_reply(text: str) -> dict:
 MAX_EMOTIONS = 4
 MAX_TOPICS = 6
 MAX_PLACES = 6
+INTENTS = ("journal", "ask", "both")  # Ask vournal (design 2026-11-17)
 
 # The core of the product — do not rewrite. Passed verbatim as the system prompt.
 SYSTEM_PROMPT = """You are the extraction engine for a voice-journaling app. The user speaks freely into their phone about their day, thoughts, and plans. You receive the raw transcript and turn it into clean structured data.
@@ -112,7 +113,8 @@ Return ONLY a single JSON object, no markdown, no code fences, no commentary bef
   "people": string[],         // names/handles of people mentioned, [] if none
   "places": string[],         // specific named locations mentioned, [] if none
   "wantsActions": boolean,    // see rules
-  "journalSuggested": boolean // see rules
+  "journalSuggested": boolean, // see rules
+  "intent": string            // "journal" | "ask" | "both", see rules
 }
 
 Rules:
@@ -128,6 +130,11 @@ Rules:
 - places: SPECIFIC named locations the speaker was at, went to, or is going to — a city, neighborhood, venue, or a named personal place ("Beirut", "Hamra", "the gym", "the office", "Mom's"). Use the name as spoken (keep the original language). Do NOT include vague or generic locations ("home", "outside", "there", "somewhere"), and do NOT invent a place that was not mentioned. [] if none.
 - wantsActions: true when the speaker mentions spending or receiving money, a habit done or skipped (any activity people track as a habit: exercise, reading, meditating, walking, praying and the like), a project, food eaten or drunk, exercise or weight, a gift, a goal, a birthday, anniversary or other date tied to a person, something to remember about a person, a change to something that already exists, or asks for something to be done in vournal. To-dos and plans alone do NOT count. Otherwise false.
 - journalSuggested: false only when the whole entry is a command with nothing about the speaker's day, thoughts or feelings (e.g. "create a project called Vournal 2"). Otherwise true.
+- intent: whether the speaker is talking TO vournal, the app, and wants an answer back.
+  - "ask": they ask vournal a question, ask for advice or information, or want to talk something through, and say nothing about their own day, thoughts or feelings. Examples: "what should I focus on this week?", "how much did I spend on food this month?", "help me plan my trip to Paris", "shu lazem a3mel la nam a7san?", "kam sarafet hal shahr?".
+  - "both": they talk about their day, thoughts or feelings AND ask vournal a question. Examples: "rough day at work and I keep sleeping badly, what can I change?", "nhar t3ib bel shighl, shu ba3mel la ertaa7?".
+  - "journal": everything else. That includes a question they asked another person or wonder about to themselves ("I asked Sara if she's coming", "I wonder if I should move"), and requests to do or log something in vournal ("add milk to shopping", "I paid 20 dollars for lunch", "zid 7alib 3al shopping"). Examples: "had a calm day, finished the report", "kan nhar 7elo ma3 l3ayle".
+  - When unsure, use "journal".
 - If the transcript is empty or has no real content, return the object with an empty summary, mood.score 3, and empty arrays.
 
 Output the JSON object and nothing else."""
@@ -370,6 +377,8 @@ def _normalize(raw: dict[str, Any]) -> dict[str, Any]:
         # the review card (design 2026-11-06): only a real bool counts
         "wantsActions": raw.get("wantsActions") is True,
         "journalSuggested": raw.get("journalSuggested") is not False,
+        # Ask vournal (design 2026-11-17): only the three known values; anything else is a journal entry
+        "intent": raw.get("intent") if raw.get("intent") in INTENTS else "journal",
     }
 
 
