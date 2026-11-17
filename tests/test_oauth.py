@@ -150,6 +150,24 @@ class OAuth(unittest.IsolatedAsyncioTestCase):
         response = await self.client.post("/auth/oauth/google", json={"idToken": id_token, "nonce": NONCE})
         self.assertEqual(response.status_code, 200, response.text)
 
+    async def test_app_google_token_with_the_sdks_own_nonce_signs_in(self):
+        # Google's iOS SDK (through AppAuth) puts a random nonce of its own in every
+        # request, and the app has no way to learn it: the token can't match ours.
+        response = await self._google(nonce="appauth-random-nonce")
+        self.assertEqual(response.status_code, 200, response.text)
+
+    async def test_the_web_still_checks_googles_nonce(self):
+        from fastapi import HTTPException
+
+        from app import oauth
+
+        bad = token(iss=GOOGLE, aud="web-client", sub=self.subject, nonce="other")
+        with self.assertRaises(HTTPException) as caught:
+            await oauth.verify_identity("google", bad, NONCE)
+        self.assertEqual(caught.exception.status_code, 401)
+        good = token(iss=GOOGLE, aud="web-client", sub=self.subject)
+        self.assertEqual((await oauth.verify_identity("google", good, NONCE)).subject, self.subject)
+
     async def test_links_to_a_confirmed_account(self):
         user = await self.db.user.create(
             data={"email": self.address, "passwordHash": "x", "emailVerifiedAt": datetime.now(timezone.utc)}

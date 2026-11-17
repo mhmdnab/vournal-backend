@@ -81,8 +81,14 @@ async def _signing_key(provider: Provider, id_token: str):
     return signing.key
 
 
-async def verify_identity(provider: Provider, id_token: str, nonce: str) -> VerifiedIdentity:
-    """The verified identity in a provider's token, or 401. 503 if keys can't load."""
+async def verify_identity(
+    provider: Provider, id_token: str, nonce: str, *, google_nonce: bool = True
+) -> VerifiedIdentity:
+    """The verified identity in a provider's token, or 401. 503 if keys can't load.
+
+    `google_nonce=False` is for the app: Google's iOS SDK (through AppAuth) puts a
+    random nonce of its own in every request and the app can't learn or set it, so a
+    Google token from the app can never match the app's nonce. The web passes ours."""
     try:
         key = await _signing_key(provider, id_token)
     except (jwt.PyJWKClientConnectionError, jwt.PyJWKSetError) as exc:
@@ -102,11 +108,15 @@ async def verify_identity(provider: Provider, id_token: str, nonce: str) -> Veri
             issuer=APPLE_ISSUER if provider == "apple" else GOOGLE_ISSUERS,
             options={"require": ["exp", "iat", "sub", "aud", "iss"]},
         )
-    except jwt.PyJWTError:
+    except jwt.PyJWTError as exc:
+        # Which check failed (audience, expiry, ...): one answer to the client, a reason in the log.
+        log.warning("%s token rejected: %s", provider, type(exc).__name__)
         raise HTTPException(401, "Sign-in could not be verified.")
     # Apple always echoes the nonce. Google's does when the client passed one.
     expected = hashlib.sha256(nonce.encode()).hexdigest()
-    if (provider == "apple" or "nonce" in claims) and claims.get("nonce") != expected:
+    checks_nonce = provider == "apple" or (google_nonce and "nonce" in claims)
+    if checks_nonce and claims.get("nonce") != expected:
+        log.warning("%s token rejected: nonce mismatch", provider)
         raise HTTPException(401, "Sign-in could not be verified.")
     email = claims.get("email")
     email = email.strip().lower() if isinstance(email, str) and email.strip() else None
@@ -243,7 +253,7 @@ async def identity_user(provider: Provider, id_token: str, nonce: str):
 async def sign_in(provider: Provider, request: Request, body: ProviderSignIn):
     if not _audiences(provider):
         raise HTTPException(503, "This sign-in option isn't available yet.")
-    identity = await verify_identity(provider, body.idToken, body.nonce)
+    identity = await verify_identity(provider, body.idToken, body.nonce, google_nonce=False)
     sealed = (
         await exchange_apple_code(body.authorizationCode)
         if provider == "apple" and body.authorizationCode
