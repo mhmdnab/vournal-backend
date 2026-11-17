@@ -19,7 +19,7 @@ from app.db import db
 from app import todo_rules
 from app.os.common.space import personal as personal_space
 from app.os import accounts, app_todos, calendar, debts, events, notes, reminders, search, shopping, spending_plan, tasks, transactions, wellness
-from app.os import goals, habits, important_dates, people, projects
+from app.os import assistant_journal, goals, habits, important_dates, people, projects
 from app.os.ai import _round
 from app.os.calendar_utils import local_date_time
 from app.os.common import prayer
@@ -325,6 +325,23 @@ async def _search(i: dict, ctx: Ctx) -> dict:
     found = await search.search(ctx.user, _req_str(i.get("query"), "query"), types or None, 15)
     return _json([{k: v for k, v in (("type", r["type"]), ("id", r["id"]), ("title", r["title"]), ("subtitle", r.get("subtitle")),
                                      ("date", r.get("date"))) if not (k == "date" and v is None)} for r in found["results"]])
+
+
+async def _search_journal(i: dict, ctx: Ctx) -> dict:
+    """Ask vournal (design 2026-11-17): journal entries by words, people, topics or places."""
+    start, end = opt_date(i.get("from")), opt_date(i.get("to"))
+    where = {**assistant_journal.matching(_req_str(i.get("query"), "query")), **assistant_journal.created_between(start, end, ctx.tz)}
+    found = await assistant_journal.find(ctx.user_id, where, assistant_journal.limit_of(i.get("limit")))
+    return _json([assistant_journal.view(e, lambda d: local_day(d, ctx.tz)) for e in found])
+
+
+async def _get_journal_entries(i: dict, ctx: Ctx) -> dict:
+    """Ask vournal (design 2026-11-17): journal entries written between two days."""
+    start, end = _req_date(i.get("from"), "from"), _req_date(i.get("to"), "to")
+    if end < start:
+        raise ToolError('"to" is before "from"')
+    found = await assistant_journal.find(ctx.user_id, assistant_journal.created_between(start, end, ctx.tz), assistant_journal.limit_of(i.get("limit")))
+    return _json([assistant_journal.view(e, lambda d: local_day(d, ctx.tz)) for e in found])
 
 
 async def _get_agenda(i: dict, ctx: Ctx) -> dict:
@@ -1391,6 +1408,7 @@ async def _update_goal(i: dict, ctx: Ctx) -> dict:
 _TOOLS = {
     "get_dashboard": _get_dashboard, "set_dashboard_layout": _set_dashboard_layout, "create_habit": _create_habit,
     "create_challenge": _create_challenge, "create_workout_plan": _create_workout_plan, "save_focus_mode": _save_focus_mode, "set_focus": _set_focus,
+    "search_journal": _search_journal, "get_journal_entries": _get_journal_entries,
     "get_options": _get_options, "search": _search, "get_agenda": _get_agenda, "list_tasks": _list_tasks, "get_money": _get_money,
     "list_transactions": _list_transactions, "list_debts": _list_debts, "get_health": _get_health, "update_health_profile": _update_health_profile,
     "get_prayer_times": _get_prayer_times, "create_task": _create_task, "update_task": _update_task, "create_event": _create_event,
@@ -1512,10 +1530,10 @@ async def _restore_fields(undo: dict, ctx: Ctx) -> None:
 
 
 READ_TOOLS = frozenset({"get_options", "search", "get_agenda", "list_tasks", "get_money", "list_transactions", "list_debts", "get_health",
-                        "get_prayer_times", "get_dashboard"})
+                        "get_prayer_times", "get_dashboard"}) | assistant_journal.JOURNAL_TOOLS
 WRITE_TOOLS = frozenset(_TOOLS) - READ_TOOLS
 # What an import (a file from another AI) may run: reads, and tools that only add something new.
-IMPORT_TOOLS = READ_TOOLS | frozenset({
+IMPORT_TOOLS = (READ_TOOLS - assistant_journal.JOURNAL_TOOLS) | frozenset({
     "create_task", "create_event", "create_reminder", "add_transaction", "create_debt", "add_note", "add_shopping_item",
     "create_habit", "create_project", "add_gift", "add_important_date", "create_goal", "create_account",
 })

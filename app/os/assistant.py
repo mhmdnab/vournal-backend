@@ -28,6 +28,8 @@ from prisma import Json
 
 from app.db import db
 from app.os import ai, assistant_pending, assistant_tools
+from app.os.assistant_consent import journal_allowed
+from app.os.assistant_journal import JOURNAL_TOOLS
 from app.os.assistant_effort import escalate, pick_effort
 from app.os.common import dates, validators
 from app.os.common.body import RuleBody
@@ -42,6 +44,11 @@ router = nest_router("/assistant")
 
 _DATA = json.loads((Path(__file__).parent / "data" / "assistant.json").read_text())
 SYSTEM, TOOLS = _DATA["system"], _DATA["tools"]
+
+
+def tools_for(journal: bool) -> list:
+    """The tools the model gets: the journal ones only once the user allowed it (design 2026-11-17)."""
+    return TOOLS if journal else [t for t in TOOLS if t["name"] not in JOURNAL_TOOLS]
 MAX_ROUNDS = 8  # tool rounds per message; the last one has to answer in words
 MAX_TURNS = 160  # stored turns per chat; past it the user starts a new one (history is replayed whole)
 PENDING_TTL = timedelta(hours=24)
@@ -217,11 +224,13 @@ async def _call(client, round_: int, messages: list, effort: str, system: str = 
     return raw.http_response.json()
 
 
-async def send(user, text: str, conversation_id: str | None = None, display: str | None = None, importing: bool = False) -> dict:
+async def send(user, text: str, conversation_id: str | None = None, display: str | None = None, importing: bool = False,
+               always_ask: bool = False) -> dict:
     """One message → the reply. `display` is what the chat shows for the user's turn when it
     differs from what the model gets (an import part). `importing`: only creating tools run, and
     the model gets this turn alone, not the chat's history (each import part stands alone, so
-    a long file neither replays everything before it nor runs into the chat's turn cap)."""
+    a long file neither replays everything before it nor runs into the chat's turn cap).
+    `always_ask` (the app, design 2026-11-17): every change waits as a card, whatever the user's mode."""
     s = await ensure_os_profile(user)
     lang = to_lang(s.language)
     left = await ai.remaining(user.id, s.timezone)
@@ -259,7 +268,7 @@ async def send(user, text: str, conversation_id: str | None = None, display: str
     tz = dates.valid_zone(s.timezone)
     now = datetime.now(timezone.utc)
     today = assistant_tools.local_day(now, tz)
-    mode = s.assistantMode if s.assistantMode in MODE_LINE else "manual"
+    mode = "manual" if always_ask else s.assistantMode if s.assistantMode in MODE_LINE else "manual"
     ctx = assistant_tools.Ctx(user, tz, today, mode)
     ctx.importing = importing
     weekday = ai.WEEKDAYS[(datetime.fromisoformat(f"{today}T12:00:00+00:00").weekday() + 1) % 7]
@@ -274,7 +283,7 @@ async def send(user, text: str, conversation_id: str | None = None, display: str
     effort = pick_effort(text, _last_reply_failed(history))
     try:
         for round_ in range(1, MAX_ROUNDS + 1):
-            res = await _call(client, round_, messages, effort)
+            res = await _call(client, round_, messages, effort, tools=tools_for(journal_allowed(s)))
             if res.get("stop_reason") == "refusal":
                 reply = {"content": [{"type": "text", "text": REPLY["refused"][lang]}], "text": REPLY["refused"][lang]}
                 break
@@ -462,9 +471,11 @@ class ChatBody(RuleBody):
             if isinstance(v, str) else
             [f"{f} must be shorter than or equal to {MAX_MESSAGE} characters", f"{f} must be longer than or equal to 1 characters", f"{f} must be a string"])),
         ("conversationId", True, False, validators.string_rules),
+        ("alwaysAsk", True, False, validators.bool_rules),
     )
     message: object = None
     conversationId: object = None
+    alwaysAsk: object = None
 
 
 @router.post("/chat")
@@ -476,4 +487,4 @@ async def chat(body: ChatBody, user=Depends(plus_user)):
         # its rows would interleave with the import's: wait, or chat in a new conversation
         raise nest_error(409, "This chat is importing a file. Wait for it to finish, or start a new chat.")
     ai.throttle("assistant-chat", user.id)
-    return await send(user, body.message, body.conversationId)
+    return await send(user, body.message, body.conversationId, always_ask=body.alwaysAsk is True)

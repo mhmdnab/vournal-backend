@@ -34,7 +34,7 @@ _DATA = json.loads((Path(__file__).parent / "os" / "data" / "entry_actions.json"
 SYSTEM = _DATA["system"]
 ASK_USER = _DATA["ask_user"]
 WITHDRAW = _DATA["withdraw_proposal"]
-EXCLUDED = frozenset({"create_task", "create_event", "create_reminder"})
+EXCLUDED = frozenset({"create_task", "create_event", "create_reminder", "search_journal", "get_journal_entries"})
 TOOLS_FOR_ENTRY = [t for t in assistant.TOOLS if t["name"] not in EXCLUDED] + [ASK_USER, WITHDRAW]
 MAX_ANSWERS = 3
 ASK_AGAIN_AFTER = timedelta(days=7)  # "Not now" on the consent sheet: offered again a week later
