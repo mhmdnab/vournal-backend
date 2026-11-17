@@ -727,6 +727,9 @@ model UserSettings {
   activeFocusModeId   String?
   // when the app last asked for AI actions consent (aiEnabled holds the answer)
   aiActionsAskedAt    DateTime?
+  // Ask vournal (design 2026-11-17): when the user let the assistant read the journal, and when they were asked
+  assistantJournalConsentAt DateTime?
+  assistantJournalAskedAt   DateTime?
   // spending plan: { "savingsMode": "none" | "percent" | "amount", "savingsValue": 10, "periodMode": "auto" | "month" }
   spendingPlan        Json?
   // prayer times: { "cityId": "beirut", "lat": 33.89, "lng": 35.50, "method": "MuslimWorldLeague", "madhab": "shafi" }
