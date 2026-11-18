@@ -7169,6 +7169,266 @@
    "summary": "Set Ai Actions"
   }
  },
+ "/nudges/prefs": {
+  "get": {
+   "operationId": "get_prefs_nudges_prefs_get",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {}
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Get Prefs"
+  },
+  "patch": {
+   "operationId": "patch_prefs_nudges_prefs_patch",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "additionalProperties": false,
+       "properties": {
+        "aiWriting": {
+         "anyOf": [
+          {
+           "type": "boolean"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Aiwriting"
+        },
+        "checkIns": {
+         "anyOf": [
+          {
+           "type": "boolean"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Checkins"
+        },
+        "morningTime": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Morningtime"
+        },
+        "nudges": {
+         "anyOf": [
+          {
+           "type": "boolean"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Nudges"
+        },
+        "plan": {
+         "anyOf": [
+          {
+           "type": "boolean"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Plan"
+        },
+        "suggestions": {
+         "anyOf": [
+          {
+           "type": "boolean"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Suggestions"
+        }
+       },
+       "title": "PrefsPatch",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {}
+      }
+     },
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Patch Prefs"
+  }
+ },
  "/threads": {
   "get": {
    "description": "The index for one kind, most-relevant first (moments desc, recency tiebreak).\nOne grouped query; the mood series is built per thread from its ordered rows.",
