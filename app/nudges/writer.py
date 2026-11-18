@@ -65,7 +65,16 @@ FORMAT = {"type": "json_schema", "schema": {
 
 _SYMBOLS = r"[$€£¥₺﷼]"
 _CODES = "|".join(sorted({c for c in SUPPORTED_CURRENCIES} | {"USD", "EUR", "LBP", "GBP"}))
-_MONEY = re.compile(rf"\d\s?{_SYMBOLS}|{_SYMBOLS}\s?\d|\d\s?(?:{_CODES})\b|\b(?:{_CODES})\s?\d|\d{{1,3}}(?:,\d{{3}})+")
+_DIGIT = r"[0-9\u0660-\u0669\u06F0-\u06F9]"  # Western, Arabic-Indic and Persian digits
+_WORDS = (r"k\b|dollars?\b|bucks\b|euros?\b|pounds?\b|lira\b|lire\b|liras\b|ll\b|"
+          r"دولار|ليرة|ل\.ل|يورو|جنيه|درهم|ريال|دينار")
+# An amount of money in any form the model might write: a symbol or code beside a number, a
+# currency word after one (English or Arabic), "1.5k", a thousands separator, or any number of 3+
+# digits (nudges count tasks and streak days; a big number is almost always money).
+_MONEY = re.compile(
+    rf"{_DIGIT}\s?{_SYMBOLS}|{_SYMBOLS}\s?{_DIGIT}|{_DIGIT}\s?(?:{_CODES})\b|\b(?:{_CODES})\s?{_DIGIT}"
+    rf"|{_DIGIT}(?:[.,]{_DIGIT}+)?\s?(?:{_WORDS})|{_DIGIT}{{1,3}}(?:,{_DIGIT}{{3}})+|{_DIGIT}{{3,}}",
+    re.IGNORECASE)
 _WORD = re.compile(r"\w+", re.UNICODE)
 
 

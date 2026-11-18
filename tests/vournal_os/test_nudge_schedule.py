@@ -4,7 +4,7 @@
 import unittest
 from datetime import datetime
 
-from app.nudges.schedule import allowed, due_moment, in_quiet_hours, moments_for
+from app.nudges.schedule import allowed, could_be_due, due_moment, in_quiet_hours, moments_for
 
 
 def at(hhmm: str) -> datetime:
@@ -46,3 +46,11 @@ class Schedule(unittest.TestCase):
     def test_free_has_no_midday(self):
         self.assertEqual(moments_for(True), ("morning", "midday", "evening"))
         self.assertEqual(moments_for(False), ("morning", "evening"))
+
+
+class Prefilter(unittest.TestCase):
+    def test_could_be_due_covers_every_possible_window(self):
+        for t in ("05:00", "08:10", "11:59", "13:00", "13:29", "20:00", "20:29"):
+            self.assertTrue(could_be_due(at(t)), t)
+        for t in ("04:59", "12:00", "12:59", "13:30", "19:59", "20:30", "23:00", "02:00"):
+            self.assertFalse(could_be_due(at(t)), t)

@@ -41,3 +41,10 @@ def allowed(moment: Moment, local_now: datetime) -> bool:
 
 def moments_for(plus: bool) -> tuple[Moment, ...]:
     return ("morning", "midday", "evening") if plus else ("morning", "evening")
+
+
+def could_be_due(local_now: datetime) -> bool:
+    """Whether any moment could be due now, whatever the person's morning time (05:00–11:30 plus its
+    window, midday, evening): people outside all of them are skipped before any database read."""
+    hhmm = local_now.strftime("%H:%M")
+    return "05:00" <= hhmm < "12:00" or MIDDAY <= hhmm < "13:30" or EVENING <= hhmm < "20:30"

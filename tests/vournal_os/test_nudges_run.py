@@ -242,3 +242,45 @@ class NudgesRun(OsTestCase):
         await run.cleanup(datetime.now(timezone.utc))
         self.assertEqual(await self.logs(user), [])
         self.assertEqual([d.token for d in await self.db.pushdevice.find_many(where={"userId": user.id})], ["ExponentPushToken[a]"])
+
+
+class ReviewFixes(NudgesRun):
+    async def sent_and_aged(self):
+        user = await self.person()
+        await run.tick(tokyo(8, 5))
+        await self.db.nudgelog.update_many(where={"userId": user.id}, data={"createdAt": tokyo(8, 5) - timedelta(minutes=1)})
+        return user
+
+    async def test_receipts_request_failure_leaves_rows_unchecked(self):
+        user = await self.sent_and_aged()
+        self.receipts.return_value = None
+        await run.check_receipts(tokyo(8, 30))
+        self.assertIsNone((await self.logs(user))[0].receiptsCheckedAt)
+
+    async def test_other_receipt_errors_are_logged(self):
+        await self.sent_and_aged()
+        self.receipts.return_value = {"t0": {"status": "error", "error": "InvalidCredentials"}}
+        with self.assertLogs("vournal", level="WARNING") as logs:
+            await run.check_receipts(tokyo(8, 30))
+        self.assertTrue(any("InvalidCredentials" in line for line in logs.output))
+
+    async def test_ticket_errors_are_logged(self):
+        self.send.side_effect = lambda msgs: [{"status": "error", "error": "MessageRateExceeded"}]
+        await self.person()
+        with self.assertLogs("vournal", level="WARNING") as logs:
+            await run.tick(tokyo(8, 5))
+        self.assertTrue(any("MessageRateExceeded" in line for line in logs.output))
+
+    async def test_people_outside_every_window_cost_no_settings_read(self):
+        user = await self.person()
+        actions = type(run.db.usersettings)
+        original = actions.find_unique
+        reads = []
+
+        async def find_unique(this, *args, **kwargs):
+            reads.append(kwargs.get("where", {}).get("userId"))
+            return await original(this, *args, **kwargs)
+
+        with patch.object(actions, "find_unique", find_unique):
+            await run.tick(tokyo(16, 0))  # 16:00 in Tokyo: no moment could be due
+        self.assertNotIn(user.id, reads)

@@ -111,3 +111,15 @@ class Writer(OsTestCase):
                                          "inJournal": True, "createdAt": datetime.now(timezone.utc) - timedelta(days=5)})
         out = await journal_summaries(user, settings, TZ, datetime.now(TZ).date())
         self.assertEqual(out, [])
+
+
+class MoneyCheck(Writer):
+    async def test_amounts_in_words_and_arabic_are_caught(self):
+        for body in ("You spent 300 dollars on dinner", "Rent of 600 is due", "٣٠٠ دولار للإيجار", "500 ليرة",
+                     "1.5k on food", "50 usd left", "1500000 LL", "20 euros left", "Paid 40 pounds"):
+            self.assertFalse(passes_checks(Nudge("t", body, "life"), []), body)
+
+    async def test_counts_and_streaks_still_pass(self):
+        for body in ("3 tasks today, day 5 of your gym streak", "Keep your 12-day streak going.", "2 events and 1 reminder today",
+                     "Read for 20 minutes?", "Sara's birthday is tomorrow"):
+            self.assertTrue(passes_checks(Nudge("t", body, "life"), []), body)

@@ -111,7 +111,8 @@ class Rules(OsTestCase):
             birthdays={"items": [{"title": "Sara's birthday", "daysUntil": 1}]},
             budgets={"items": [{"name": "Food", "percentUsed": 95, "isOver": False}]},
         ), insights=[{"id": "tasks-overdue", "title": "2 overdue tasks"}, {"id": "goal-behind:g1", "title": "Save for car is behind"}])
-        self.assertEqual(len(busy["triggers"]), 5)
+        # 4, not 5: "tasks-overdue" fires for any old overdue task; follow-ups are only tasks overdue since yesterday
+        self.assertEqual(len(busy["triggers"]), 4)
         self.assertNotIn("30", json.dumps(busy))
 
     async def test_sections_off_give_empty_values(self):
@@ -130,3 +131,23 @@ class Rules(OsTestCase):
         self.assertLessEqual(len(n.body), 140)
         self.assertIsNone(plus_fallback_text("midday", app, full))
         self.assertEqual(plus_fallback_text("evening", app, full), free_text("evening", app))
+
+
+class ReviewFixes(Rules):
+    async def test_plus_morning_counts_app_todos(self):
+        empty = {"tasksToday": [], "overdue": 0, "events": 0, "reminders": 0, "billsSoon": [], "habits": [], "goals": [],
+                 "birthdays": [], "triggers": []}
+        n = plus_fallback_text("morning", {"todosDue": 3, "recordedToday": False, "streak": 0}, empty)
+        self.assertIsNotNone(n)
+        self.assertIn("3 to-dos today", n.body)
+
+    async def test_only_recently_overdue_tasks_are_a_trigger(self):
+        today = date(2026, 11, 18)
+        old = {"title": "Old thing", "dueAt": "2026-10-01T09:00:00.000Z", "isOverdue": True}
+        app_todo = {"title": "Buy milk", "dueAt": "2026-11-17T09:00:00.000Z", "isOverdue": True, "source": "app"}
+        base = dashboard(today=today.isoformat(), timezone="UTC", overdueTasks={"count": 2, "items": [old, app_todo]})
+        quiet = await self.life(base, insights=[{"id": "tasks-overdue", "title": "2 overdue tasks"}])
+        self.assertEqual(quiet["triggers"], [])
+        fresh = {"title": "Finish report", "dueAt": "2026-11-17T15:00:00.000Z", "isOverdue": True}
+        busy = await self.life(dashboard(today=today.isoformat(), timezone="UTC", overdueTasks={"count": 3, "items": [old, fresh]}))
+        self.assertEqual(busy["triggers"], ["Finish report is overdue"])

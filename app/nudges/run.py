@@ -19,7 +19,7 @@ from app import push_expo
 from app.db import db
 from app.entitlements import FREE, effective_plan
 from app.nudges.rules import Nudge, app_facts, free_text, life_facts, plus_fallback_text
-from app.nudges.schedule import CAP_FREE, CAP_PLUS, allowed, due_moment, moments_for
+from app.nudges.schedule import CAP_FREE, CAP_PLUS, allowed, could_be_due, due_moment, moments_for
 from app.nudges.writer import WriterFailed, journal_summaries, write
 from app.os.common.dates import valid_zone
 from app.os.settings import normalize_prefs
@@ -59,15 +59,17 @@ async def _text(user, settings, prefs, moment, zone, today) -> tuple[Nudge | Non
 
 
 async def _for_user(user, devices: list, now: datetime) -> bool:
+    newest = max(devices, key=lambda d: d.lastSeenAt)
+    zone = ZoneInfo(valid_zone(newest.timezone))
+    local = now.astimezone(zone)
+    if not could_be_due(local):
+        return False  # most minutes, for most people: no database read at all
     settings = await db.usersettings.find_unique(where={"userId": user.id})
     if settings is None:
         return False
     prefs = normalize_prefs(settings.notificationPrefs)
     if not prefs["nudges"]:
         return False
-    newest = max(devices, key=lambda d: d.lastSeenAt)
-    zone = ZoneInfo(valid_zone(newest.timezone))
-    local = now.astimezone(zone)
     today = local.date()
     moment = due_moment(local, prefs["nudgeMorningTime"])
     plus = effective_plan(user) != FREE
@@ -90,6 +92,9 @@ async def _for_user(user, devices: list, now: datetime) -> bool:
     tickets = await push_expo.send(messages)
     ok = [f"{t['id']}|{d.token}" for d, t in zip(devices, tickets) if t["status"] == "ok"]
     dead = [d.token for d, t in zip(devices, tickets) if t.get("error") == "DeviceNotRegistered"]
+    for t in tickets:
+        if t["status"] != "ok" and t.get("error") != "DeviceNotRegistered":
+            log.warning("nudge push failed for user %s: %s", user.id, t.get("error") or "request failed")
     if dead:
         await db.pushdevice.delete_many(where={"token": {"in": dead}})
     if ok:
@@ -130,7 +135,12 @@ async def check_receipts(now: datetime) -> None:
             ticket, _, token = pair.partition("|")
             token_of[ticket] = token
     found = await push_expo.receipts(list(token_of))
+    if found is None:
+        return  # Expo didn't answer: try again on a later tick, within the 24 hours receipts are kept
     dead = [token_of[t] for t, rec in found.items() if t in token_of and rec.get("error") == "DeviceNotRegistered"]
+    for rec in found.values():
+        if rec.get("status") != "ok" and rec.get("error") != "DeviceNotRegistered":
+            log.warning("nudge push receipt error: %s", rec.get("error") or "unknown")
     if dead:
         await db.pushdevice.delete_many(where={"token": {"in": dead}})
     await db.nudgelog.update_many(where={"id": {"in": [r.id for r in rows]}}, data={"receiptsCheckedAt": now})

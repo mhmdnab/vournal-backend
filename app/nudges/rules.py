@@ -51,6 +51,22 @@ def _items(section) -> list:
     return (section or {}).get("items") or []
 
 
+def _recently_overdue(d: dict) -> list[dict]:
+    try:
+        today = date.fromisoformat(d["today"])
+        zone = ZoneInfo(d.get("timezone") or "UTC")
+    except (KeyError, TypeError, ValueError):
+        return []
+    out = []
+    for t in _items(d.get("overdueTasks")):
+        if t.get("source") == "app" or not t.get("dueAt"):
+            continue
+        due = datetime.fromisoformat(t["dueAt"].replace("Z", "+00:00")).astimezone(zone).date()
+        if due >= today - timedelta(days=1):
+            out.append(t)
+    return out
+
+
 async def life_facts(user) -> dict:
     """vournal life as names and counts (no amounts), plus the midday triggers."""
     d = await get_dashboard(user)
@@ -65,8 +81,10 @@ async def life_facts(user) -> dict:
         insights = []
     for ins in insights:
         iid = ins.get("id", "")
-        if iid == "tasks-overdue" or iid.startswith("habit-risk:") or iid.startswith("goal-behind:"):
+        if iid.startswith("habit-risk:") or iid.startswith("goal-behind:"):
             triggers.append(ins.get("title") or iid)
+    # a follow-up: a vournal life task that became overdue yesterday or today, not one overdue for weeks
+    triggers += [f"{t['title']} is overdue" for t in _recently_overdue(d)]
     for b in _items(d.get("budgets")):
         if b.get("isOver"):
             triggers.append(f"The {b['name']} budget is over its limit")
@@ -113,7 +131,9 @@ def plus_fallback_text(moment: str, app: dict, life: dict) -> Nudge | None:
     parts: list[str] = []
     if life["tasksToday"]:
         parts.append(f"{_plural(len(life['tasksToday']), 'task', 'tasks')} today")
-    elif life["events"]:
+    if app.get("todosDue"):
+        parts.append(f"{_plural(app['todosDue'], 'to-do', 'to-dos')} today")
+    if not parts and life["events"]:
         parts.append(f"{_plural(life['events'], 'event', 'events')} today")
     for b in life["billsSoon"][:1]:
         parts.append(f"{b['name']} due {_when(b['inDays'])}")

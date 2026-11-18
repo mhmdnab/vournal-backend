@@ -75,8 +75,12 @@ class PushExpo(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(out["r-7"], {"status": "error", "error": "DeviceNotRegistered"})
         self.assertEqual(out["r-1"], {"status": "ok", "error": None})
 
-    async def test_receipts_failure_is_empty(self):
+    async def test_receipts_failure_is_none(self):
         self.use(lambda r: httpx.Response(503))
+        self.assertIsNone(await push_expo.receipts(["a"]))
+
+    async def test_receipts_none_ready_is_empty(self):
+        self.use(lambda r: httpx.Response(200, json={"data": {}}))
         self.assertEqual(await push_expo.receipts(["a"]), {})
 
     async def test_access_token_header_only_when_set(self):

@@ -70,18 +70,21 @@ async def send(messages: list[dict]) -> list[dict]:
     return tickets
 
 
-async def receipts(ids: list[str]) -> dict[str, dict]:
-    """id -> {"status", "error"}; ids without a receipt yet are left out; {} when the request fails."""
+async def receipts(ids: list[str]) -> dict[str, dict] | None:
+    """id -> {"status", "error"}; ids without a receipt yet are left out; None when no request got
+    an answer (so the caller can try again later rather than give up)."""
     out: dict[str, dict] = {}
     if not ids:
         return out
+    answered = False
     async with httpx.AsyncClient(timeout=15.0, transport=_transport) as client:
         for start in range(0, len(ids), RECEIPT_BATCH):
             body = await _post(client, RECEIPTS_URL, {"ids": ids[start:start + RECEIPT_BATCH]})
             data = body.get("data") if isinstance(body, dict) else None
             if not isinstance(data, dict):
                 continue
+            answered = True
             for rid, item in data.items():
                 if isinstance(item, dict):
                     out[rid] = {"status": item.get("status"), "error": _error_of(item)}
-    return out
+    return out if answered else None
