@@ -84,3 +84,36 @@ class PushDevices(OsTestCase):
         await self.register()
         await self.db.user.delete(where={"id": self.app.user.id})
         self.assertEqual(await self.rows(), [])
+
+
+class RepeatGuard(PushDevices):
+    """2026-11-18 incident: build 15 re-registered its token in a tight loop. The same person, token,
+    time zone and version are written at most once every 10 minutes; repeats answer at once."""
+
+    async def test_an_exact_repeat_writes_nothing(self):
+        await self.register(appVersion="1.2.0")
+        old = datetime.now(timezone.utc) - timedelta(days=3)
+        await self.db.pushdevice.update_many(where={"token": TOKEN}, data={"lastSeenAt": old})
+        for _ in range(20):
+            await self.register(appVersion="1.2.0")
+        [row] = await self.rows()
+        self.assertLess(row.lastSeenAt, datetime.now(timezone.utc) - timedelta(days=2))  # still the old date: no write
+
+    async def test_a_new_time_zone_or_another_account_still_writes_at_once(self):
+        await self.register()
+        await self.register(tz="Europe/Paris")
+        self.assertEqual((await self.rows())[0].timezone, "Europe/Paris")
+        other = await self.mobile()
+        await self.register(client=other, tz="Europe/Paris")
+        self.assertEqual((await self.rows())[0].userId, other.user.id)
+
+    async def test_after_ten_minutes_it_writes_again(self):
+        from app import push_devices
+
+        await self.register()
+        old = datetime.now(timezone.utc) - timedelta(days=3)
+        await self.db.pushdevice.update_many(where={"token": TOKEN}, data={"lastSeenAt": old})
+        for key in list(push_devices._recent):
+            push_devices._recent[key] -= push_devices.REPEAT_WINDOW + 1
+        await self.register()
+        self.assertGreater((await self.rows())[0].lastSeenAt, old)
