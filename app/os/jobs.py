@@ -8,6 +8,9 @@
 - finance-recurring-transactions and finance-recurring-autolog, hourly;
 - market-rates, at minute 17 every 6 hours;
 - plus-trial-reminders, at 09:00: the email a week before the free months of Plus end.
+- nudges-tick, every minute, in its own lane: the app's daily nudges (design 2026-11-18), free
+  and Plus alike;
+- nudges-cleanup, at 03:10: nudge records older than 30 days, phones not seen for 60.
 
 Started from the app's startup; VOURNAL_OS_JOBS=0 switches them off. Each run holds a
 Postgres advisory lock for as long as it runs (in a transaction, so a crash or a dropped
@@ -15,8 +18,8 @@ connection releases it), so two processes never run a job at the same time. One 
 a run the other just finished (there's no run record), which is harmless: every job is safe
 to repeat (dedupe keys, conditional updates). Accounts without Plus are skipped, and one failing account never stops a run.
 
-Two lanes, each running one job at a time: the tick alone, so the long jobs never make a
-reminder late, and everything else. Each lane holds one connection for its lock."""
+Three lanes, each running one job at a time: the tick alone, so the long jobs never make a
+reminder late, the nudges alone, and everything else. Each lane holds one connection for its lock."""
 
 import asyncio
 import logging
@@ -117,6 +120,18 @@ async def refresh_market_rates() -> None:
     await market_rates.refresh()
 
 
+async def nudges_tick() -> None:
+    from app.nudges import run
+
+    await run.tick(datetime.now(timezone.utc))
+
+
+async def nudges_cleanup() -> None:
+    from app.nudges import run
+
+    await run.cleanup(datetime.now(timezone.utc))
+
+
 @dataclass(frozen=True)
 class Job:
     name: str
@@ -136,6 +151,8 @@ JOBS = (
     Job("finance-recurring-transactions", lambda t: t.minute == 0, finance_repeat),
     Job("finance-recurring-autolog", lambda t: t.minute == 0, finance_autolog),
     Job("plus-trial-reminders", lambda t: (t.hour, t.minute) == (9, 0), plus_trial_reminders),
+    Job("nudges-tick", lambda t: True, nudges_tick, lane="nudges", timeout=timedelta(minutes=5)),
+    Job("nudges-cleanup", lambda t: (t.hour, t.minute) == (3, 10), nudges_cleanup),
 )
 _BY_NAME = {j.name: j for j in JOBS}
 

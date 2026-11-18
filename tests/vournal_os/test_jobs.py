@@ -21,13 +21,15 @@ class Schedule(unittest.TestCase):
 
         tick, sweep, cleanup = "notifications-tick", "notifications-sweep", "notifications-cleanup"
         rates, repeat, autolog = "market-rates", "finance-recurring-transactions", "finance-recurring-autolog"
-        self.assertEqual(jobs.due_jobs(utc(3, 0)), [tick, sweep, cleanup, repeat, autolog])
-        self.assertEqual(jobs.due_jobs(utc(4, 0)), [tick, sweep, repeat, autolog])
-        self.assertEqual(jobs.due_jobs(utc(10, 45)), [tick, sweep])
-        self.assertEqual(jobs.due_jobs(utc(10, 7)), [tick])
-        self.assertEqual(jobs.due_jobs(utc(6, 17)), [tick, rates])
-        self.assertEqual(jobs.due_jobs(utc(0, 17)), [tick, rates])
-        self.assertEqual(jobs.due_jobs(utc(5, 17)), [tick])
+        nudges, nudge_cleanup = "nudges-tick", "nudges-cleanup"
+        self.assertEqual(jobs.due_jobs(utc(3, 0)), [tick, sweep, cleanup, repeat, autolog, nudges])
+        self.assertEqual(jobs.due_jobs(utc(4, 0)), [tick, sweep, repeat, autolog, nudges])
+        self.assertEqual(jobs.due_jobs(utc(10, 45)), [tick, sweep, nudges])
+        self.assertEqual(jobs.due_jobs(utc(10, 7)), [tick, nudges])
+        self.assertEqual(jobs.due_jobs(utc(6, 17)), [tick, rates, nudges])
+        self.assertEqual(jobs.due_jobs(utc(0, 17)), [tick, rates, nudges])
+        self.assertEqual(jobs.due_jobs(utc(5, 17)), [tick, nudges])
+        self.assertEqual(jobs.due_jobs(utc(3, 10)), [tick, nudges, nudge_cleanup])
         self.assertEqual(jobs.due_jobs(utc(3, 0) + timedelta(seconds=42)), jobs.due_jobs(utc(3, 0)))
 
     def test_switched_off_by_the_environment(self):
