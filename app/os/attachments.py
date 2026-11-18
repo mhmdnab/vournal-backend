@@ -5,8 +5,10 @@ Files attached to a task, document, trip… live in the app's private R2 bucket 
 through the owner's download route; lists never carry the bytes.
 """
 
+import logging
 import re
 import uuid
+from datetime import datetime, timedelta
 from urllib.parse import quote
 
 from fastapi import Depends, Request
@@ -35,7 +37,8 @@ ALLOWED_MIME = {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.ms-powerpoint",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/zip",
 }
-_FIELDS = ("entityType", "entityId")
+_FIELDS = ("entityType", "entityId", "inline")
+INLINE_KEEP = timedelta(days=7)  # an image removed from its note is kept this long (undo)
 _UNSAFE = re.compile(r'[\\/\x00-\x1f"<>|:*?]')
 
 
@@ -145,6 +148,12 @@ async def _create(form, space: Space) -> dict:
     if mime not in ALLOWED_MIME:
         raise nest_error(400, "This file type is not allowed")
     entity_type, entity_id = values["entityType"], values["entityId"]
+    # an image pasted into a rich note (design 2026-11-18): cleaned up with its note
+    inline = values.get("inline", "false")
+    if inline not in ("true", "false"):
+        raise nest_error(400, ["inline must be true or false"])
+    if inline == "true" and (entity_type != "NOTE" or not mime.startswith("image/")):
+        raise nest_error(400, ["inline is only for note images"])
     await _assert_parent(space, entity_type, entity_id)
 
     data = await upload.read()
@@ -156,6 +165,7 @@ async def _create(form, space: Space) -> dict:
             data={
                 **space.create_fields(), "entityType": entity_type, "entityId": entity_id,
                 "fileName": _file_name(upload.filename), "mimeType": mime, "size": len(data), "storageKey": key,
+                "inline": inline == "true",
             }
         )
     except BaseException:
@@ -226,3 +236,24 @@ async def delete_rows(client, user_id: str | None, entity_type: str, entity_ids:
 
 async def delete_objects(keys: list[str]) -> None:
     await storage.delete_objects(keys)  # best-effort, never raises
+
+
+log = logging.getLogger("vournal.os")
+
+
+async def cleanup_note_images(now: datetime) -> int:
+    """Inline note images older than a week that their note no longer shows (or whose note is gone):
+    rows and files deleted. Other files attached to a note are never touched."""
+    rows = await db.attachment.find_many(where={"entityType": "NOTE", "inline": True, "createdAt": {"lt": now - INLINE_KEEP}})
+    if not rows:
+        return 0
+    notes = {n.id: n.content for n in await db.note.find_many(where={"id": {"in": list({r.entityId for r in rows})}})}
+    gone = [r for r in rows if f"/api/attachments/{r.id}/download" not in notes.get(r.entityId, "")]
+    if gone:
+        await db.attachment.delete_many(where={"id": {"in": [r.id for r in gone]}})
+        for r in gone:
+            try:
+                await storage.delete_object(r.storageKey)
+            except Exception:  # noqa: BLE001 — the row is gone; a file left behind is only logged
+                log.exception("note image %s: deleting its file failed", r.id)
+    return len(gone)

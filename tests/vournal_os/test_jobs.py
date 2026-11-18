@@ -30,6 +30,7 @@ class Schedule(unittest.TestCase):
         self.assertEqual(jobs.due_jobs(utc(0, 17)), [tick, rates, nudges])
         self.assertEqual(jobs.due_jobs(utc(5, 17)), [tick, nudges])
         self.assertEqual(jobs.due_jobs(utc(3, 10)), [tick, nudges, nudge_cleanup])
+        self.assertEqual(jobs.due_jobs(utc(3, 20)), [tick, nudges, "note-image-cleanup"])
         self.assertEqual(jobs.due_jobs(utc(3, 0) + timedelta(seconds=42)), jobs.due_jobs(utc(3, 0)))
 
     def test_switched_off_by_the_environment(self):

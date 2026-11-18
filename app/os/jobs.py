@@ -10,7 +10,8 @@
 - plus-trial-reminders, at 09:00: the email a week before the free months of Plus end.
 - nudges-tick, every minute, in its own lane: the app's daily nudges (design 2026-11-18), free
   and Plus alike;
-- nudges-cleanup, at 03:10: nudge records older than 30 days, phones not seen for 60.
+- nudges-cleanup, at 03:10: nudge records older than 30 days, phones not seen for 60;
+- note-image-cleanup, at 03:20: images pasted into rich notes that left their note over a week ago.
 
 Started from the app's startup; VOURNAL_OS_JOBS=0 switches them off. Each run holds a
 Postgres advisory lock for as long as it runs (in a transaction, so a crash or a dropped
@@ -126,6 +127,12 @@ async def nudges_tick() -> None:
     await run.tick(datetime.now(timezone.utc))
 
 
+async def note_image_cleanup() -> None:
+    from app.os.attachments import cleanup_note_images
+
+    await cleanup_note_images(datetime.now(timezone.utc))
+
+
 async def nudges_cleanup() -> None:
     from app.nudges import run
 
@@ -153,6 +160,7 @@ JOBS = (
     Job("plus-trial-reminders", lambda t: (t.hour, t.minute) == (9, 0), plus_trial_reminders),
     Job("nudges-tick", lambda t: True, nudges_tick, lane="nudges", timeout=timedelta(minutes=5)),
     Job("nudges-cleanup", lambda t: (t.hour, t.minute) == (3, 10), nudges_cleanup),
+    Job("note-image-cleanup", lambda t: (t.hour, t.minute) == (3, 20), note_image_cleanup),
 )
 _BY_NAME = {j.name: j for j in JOBS}
 
