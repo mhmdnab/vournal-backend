@@ -22,7 +22,7 @@ FONT_FAMILIES: dict[str, str] = {
 }
 FONT_SIZES = (12, 14, 15, 16, 18, 20, 24, 28, 32)
 
-TAGS = {"p", "br", "h1", "h2", "h3", "strong", "em", "u", "s", "mark", "span", "a", "ul", "ol", "li", "blockquote",
+TAGS = {"p", "br", "h1", "h2", "h3", "h4", "h5", "h6", "strong", "em", "u", "s", "mark", "span", "a", "ul", "ol", "li", "blockquote",
         "pre", "code", "table", "thead", "tbody", "tr", "th", "td", "colgroup", "col", "img", "hr"}
 ATTRIBUTES = {
     "*": {"dir", "style"},
@@ -34,10 +34,11 @@ ATTRIBUTES = {
     "li": {"data-type", "data-checked"},
 }
 
-_IMG_SRC = re.compile(r"^/api/attachments/[A-Za-z0-9_-]+/download(\?space=[A-Za-z0-9_-]+)?$")
-_COLOR = re.compile(r"^(#[0-9a-fA-F]{3,8}|rgba?\(\s*\d{1,3},\s*\d{1,3},\s*\d{1,3}(,\s*(0|1|0?\.\d+))?\s*\))$")
-_SIZE = re.compile(r"^(\d+(?:\.\d+)?)(px|pt)$")
-_SPAN_NUM = re.compile(r"^[1-9]\d?$")
+# \Z, not $: a value with a trailing newline is not the same value
+_IMG_SRC = re.compile(r"^/api/attachments/[A-Za-z0-9_-]+/download(\?space=[A-Za-z0-9_-]+)?\Z")
+_COLOR = re.compile(r"^(#[0-9a-fA-F]{3,8}|rgba?\(\s*\d{1,3},\s*\d{1,3},\s*\d{1,3}(,\s*(0|1|0?\.\d+))?\s*\))\Z")
+_SIZE = re.compile(r"^(\d+(?:\.\d+)?)(px|pt)\Z")
+_SPAN_NUM = re.compile(r"^[1-9]\d?\Z")
 # documents (Google Docs, Word) stamp black-on-white on everything: unreadable in dark mode, so dropped
 _DEFAULT_COLOR = re.compile(r"^(#000|#000000|rgba?\(\s*0,\s*0,\s*0(,\s*1(\.0+)?)?\s*\)|black)$", re.I)
 _DEFAULT_BACKGROUND = re.compile(r"^(#fff|#ffffff|rgba?\(\s*255,\s*255,\s*255(,\s*1(\.0+)?)?\s*\)|white|transparent)$", re.I)
@@ -95,7 +96,10 @@ def _filter(element: str, attribute: str, value: str) -> str | None:
     if attribute == "style":
         return _style(value)
     if attribute == "href":
-        return value if value.lower().startswith(("http://", "https://", "mailto:")) else None
+        v = value.lower()
+        if v.startswith(("http://", "https://", "mailto:", "tel:")):
+            return value
+        return value if v.startswith("/") and not v.startswith(("//", "/\\")) else None  # a page of this site
     if attribute == "target":
         return value if value == "_blank" else None
     if attribute == "src":
@@ -142,12 +146,12 @@ def _image_or_link(match: re.Match) -> str:
 def sanitize(html: str) -> str:
     html = _IMG_TAG.sub(_image_or_link, html)
     out = nh3.clean(html, tags=TAGS, clean_content_tags={"script", "style", "template", "iframe", "object"},
-                    attributes=ATTRIBUTES, attribute_filter=_filter, url_schemes={"http", "https", "mailto"},
+                    attributes=ATTRIBUTES, attribute_filter=_filter, url_schemes={"http", "https", "mailto", "tel"},
                     link_rel="noopener noreferrer", strip_comments=True)
     return _SRC_LESS_IMG.sub("", out)
 
 
-_BLOCKS = {"p", "h1", "h2", "h3", "li", "blockquote", "pre", "tr", "table", "ul", "ol", "hr", "div"}
+_BLOCKS = {"p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "blockquote", "pre", "tr", "table", "ul", "ol", "hr", "div"}
 
 
 class _Text(HTMLParser):
@@ -158,14 +162,19 @@ class _Text(HTMLParser):
         self.parts: list[str] = []
         self.cells = 0
         self.blocks: list[bool] = []  # per open block: has it any text yet
+        self.in_cell = 0  # the editor writes <td><p>…</p></td>: a cell's paragraph stays on the row
 
     def _newline(self):
         if self.parts and not self.parts[-1].endswith("\n"):
             self.parts.append("\n")
 
     def handle_starttag(self, tag, attrs):
+        if tag in ("td", "th"):
+            self.in_cell += 1
         if tag == "br":
             self.parts.append("\n")
+        elif tag == "p" and self.in_cell:
+            pass
         elif tag in _BLOCKS:
             self._newline()
             self.blocks.append(False)
@@ -177,6 +186,10 @@ class _Text(HTMLParser):
             self.cells += 1
 
     def handle_endtag(self, tag):
+        if tag in ("td", "th"):
+            self.in_cell = max(0, self.in_cell - 1)
+        if tag == "p" and self.in_cell:
+            return
         if tag in _BLOCKS and self.blocks:
             had_text = self.blocks.pop()
             if had_text:

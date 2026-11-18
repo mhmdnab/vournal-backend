@@ -44,11 +44,20 @@ def make_excerpt(md: str) -> str:
     text = md
     for pattern, replacement in _EXCERPT_STEPS:
         text = pattern.sub(replacement, text)
-    text = text.strip(_JS_SPACE)
+    return _cut(text.strip(_JS_SPACE))
+
+
+def _cut(text: str) -> str:
+    """At most about 200 (UTF-16) characters, with "…" when cut."""
     if _utf16_len(text) <= EXCERPT_LEN:
         return text
     head = text.encode("utf-16-le")[: EXCERPT_LEN * 2].decode("utf-16-le", errors="ignore")
     return head.rstrip(_JS_SPACE) + "…"
+
+
+def text_excerpt(text: str) -> str:
+    """A rich note's excerpt: its words on one line, cut like make_excerpt (nothing stripped)."""
+    return _cut(re.sub(_S + "+", " ", text).strip(_JS_SPACE))
 
 
 def word_count(md: str) -> int:
@@ -87,8 +96,8 @@ def view(row) -> dict:
 def list_item(row) -> dict:
     out = view(row)
     content = out.pop("content")
-    if row.contentFormat == "html":  # the words, never the tags
-        return {**out, "excerpt": make_excerpt(row.contentText), "wordCount": word_count(row.contentText)}
+    if row.contentFormat == "html":  # the words, never the tags; plain text, so no markdown stripping
+        return {**out, "excerpt": text_excerpt(row.contentText), "wordCount": word_count(row.contentText)}
     return {**out, "excerpt": make_excerpt(content), "wordCount": word_count(content)}
 
 
@@ -191,12 +200,6 @@ def text_match(term: str) -> list[dict]:
     """A note whose title or words contain the term: markdown by its content, HTML by its text."""
     like = {"contains": term, "mode": "insensitive"}
     return [{"title": like}, {"contentFormat": "markdown", "content": like}, {"contentFormat": "html", "contentText": like}]
-
-
-@router.get("/editor")
-async def editor_mode(space: Space = Depends(current_space)):
-    """Which editor a new note opens in (the off switch)."""
-    return {"editor": "rich" if rich_editor_on() else "classic"}
 
 
 @router.get("")

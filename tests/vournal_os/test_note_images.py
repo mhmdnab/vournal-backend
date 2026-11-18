@@ -101,3 +101,23 @@ class SharedImages(NoteImages):
         await self.age(made["id"], 30)
         self.assertEqual(await cleanup_note_images(datetime.now(timezone.utc)), 0)
         self.assertIsNotNone(await self.row(made["id"]))
+
+
+class CleanupBound(NoteImages):
+    async def test_cleanup_goes_through_images_in_batches(self):
+        """Bounded memory per batch, and every old image is still reached (a cap per run would stick on images in use)."""
+        from app.os import attachments
+
+        made = [await self.upload() for _ in range(3)]
+        for a in made:
+            await self.age(a["id"], 9)
+        await self.use(made[0]["id"])  # the oldest stays in use
+        with patch_batch(attachments, 1):
+            self.assertEqual(await attachments.cleanup_note_images(datetime.now(timezone.utc)), 2)
+        self.assertIsNotNone(await self.row(made[0]["id"]))
+
+
+def patch_batch(module, n):
+    from unittest.mock import patch
+
+    return patch.object(module, "CLEANUP_BATCH", n)

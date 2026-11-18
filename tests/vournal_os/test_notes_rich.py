@@ -63,10 +63,8 @@ class NotesRich(OsTestCase):
             await self.patch(status=409, content="<p>x</p>", contentFormat="html")
             out = await self.patch(content="still markdown")
             self.assertEqual(out["editor"], "classic")
-            self.assertEqual((await self.web.get("/api/notes/editor")).json(), {"editor": "classic"})
             r = await self.web.post("/api/notes", json={"title": "x", "content": "<p>x</p>", "contentFormat": "html"})
             self.assertEqual(r.status_code, 409)
-        self.assertEqual((await self.web.get("/api/notes/editor")).json(), {"editor": "rich"})
 
     async def test_markdown_save_after_html_switches_format(self):
         await self.patch(content="<p>x</p>", contentFormat="html")
@@ -136,3 +134,13 @@ class NoteReaders(NotesRich):
         tools = _json.load(open("app/os/data/assistant.json"))["tools"]
         add = next(t for t in tools if t["name"] == "add_note")
         self.assertIn("no HTML", add["input_schema"]["properties"]["content"]["description"])
+
+
+class DeferredNotes(NotesRich):
+    async def test_html_excerpt_keeps_every_character(self):
+        await self.patch(content="<p>open my_file_name and *star* - dash 1. one</p>", contentFormat="html")
+        item = next(i for i in (await self.web.get("/api/notes")).json()["items"] if i["id"] == self.note["id"])
+        self.assertEqual(item["excerpt"], "open my_file_name and *star* - dash 1. one")
+
+    async def test_unused_editor_route_is_gone(self):
+        self.assertEqual((await self.web.get("/api/notes/editor")).status_code, 404)

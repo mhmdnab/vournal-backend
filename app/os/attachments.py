@@ -39,6 +39,7 @@ ALLOWED_MIME = {
 }
 _FIELDS = ("entityType", "entityId", "inline")
 INLINE_KEEP = timedelta(days=7)  # an image removed from its note is kept this long (undo)
+CLEANUP_BATCH = 500  # images read per query in the daily clean-up
 _UNSAFE = re.compile(r'[\\/\x00-\x1f"<>|:*?]')
 
 
@@ -244,17 +245,22 @@ log = logging.getLogger("vournal.os")
 async def cleanup_note_images(now: datetime) -> int:
     """Inline note images older than a week that their note no longer shows (or whose note is gone):
     rows and files deleted. Other files attached to a note are never touched."""
-    rows = await db.attachment.find_many(where={"entityType": "NOTE", "inline": True, "createdAt": {"lt": now - INLINE_KEEP}})
-    if not rows:
-        return 0
     from app.os.notes import image_in_use
 
-    gone = [r for r in rows if not await image_in_use(r.id)]  # in its own note or one it was copied into
-    if gone:
-        await db.attachment.delete_many(where={"id": {"in": [r.id for r in gone]}})
-        for r in gone:
-            try:
-                await storage.delete_object(r.storageKey)
-            except Exception:  # noqa: BLE001 — the row is gone; a file left behind is only logged
-                log.exception("note image %s: deleting its file failed", r.id)
-    return len(gone)
+    where = {"entityType": "NOTE", "inline": True, "createdAt": {"lt": now - INLINE_KEEP}}
+    deleted, after = 0, None
+    while True:  # in batches: bounded memory, and images still in use never stop the rest being reached
+        # by id, not a cursor: the last row read may just have been deleted
+        rows = await db.attachment.find_many(where={**where, **({"id": {"gt": after}} if after else {})}, order={"id": "asc"}, take=CLEANUP_BATCH)
+        if not rows:
+            return deleted
+        after = rows[-1].id
+        gone = [r for r in rows if not await image_in_use(r.id)]  # in its own note or one it was copied into
+        if gone:
+            await db.attachment.delete_many(where={"id": {"in": [r.id for r in gone]}})
+            for r in gone:
+                try:
+                    await storage.delete_object(r.storageKey)
+                except Exception:  # noqa: BLE001 — the row is gone; a file left behind is only logged
+                    log.exception("note image %s: deleting its file failed", r.id)
+            deleted += len(gone)

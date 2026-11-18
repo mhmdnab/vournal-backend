@@ -82,3 +82,21 @@ class Text(unittest.TestCase):
 
     def test_markdown_text_keeps_lines(self):
         self.assertEqual(markdown_text("# Title\n\n- **one**\n- [x] two\n\nSee [docs](https://x.y)"), "Title\n\none\ntwo\n\nSee docs")
+
+
+class Deferred(unittest.TestCase):
+    """The small items left after the final review (2026-11-18)."""
+
+    def test_editor_table_cells_stay_on_one_line(self):
+        html = "<table><tbody><tr><th><p>Who</p></th><th><p>What</p></th></tr><tr><td><p>Ali</p></td><td><p>Slides</p></td></tr></tbody></table>"
+        self.assertEqual(html_text(html), "Who\tWhat\nAli\tSlides")
+
+    def test_deeper_headings_and_more_links_survive(self):
+        for tag in ("h4", "h5", "h6"):
+            self.assertEqual(sanitize(f"<{tag}>T</{tag}>"), f"<{tag}>T</{tag}>")
+        self.assertIn('href="tel:+96170123456"', sanitize('<a href="tel:+96170123456">call</a>'))
+        self.assertIn('href="/tasks?id=1"', sanitize('<a href="/tasks?id=1">task</a>'))
+        self.assertNotIn("href", sanitize('<a href="//evil.example/x">x</a>'))
+
+    def test_addresses_match_whole_values(self):
+        self.assertNotIn("src=", sanitize('<img src="/api/attachments/a/download\n">'))
