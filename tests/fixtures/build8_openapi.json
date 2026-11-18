@@ -2685,6 +2685,245 @@
    ]
   }
  },
+ "/devices/push-token": {
+  "delete": {
+   "operationId": "forget_devices_push_token_delete",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "additionalProperties": false,
+       "properties": {
+        "token": {
+         "maxLength": 200,
+         "title": "Token",
+         "type": "string"
+        }
+       },
+       "required": [
+        "token"
+       ],
+       "title": "ForgetBody",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "204": {
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Forget"
+  },
+  "post": {
+   "operationId": "register_devices_push_token_post",
+   "parameters": [
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Authorization"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "additionalProperties": false,
+       "properties": {
+        "appVersion": {
+         "anyOf": [
+          {
+           "maxLength": 32,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Appversion"
+        },
+        "timezone": {
+         "anyOf": [
+          {
+           "maxLength": 64,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Timezone"
+        },
+        "token": {
+         "maxLength": 200,
+         "pattern": "^ExponentPushToken\\[[^\\]]{1,180}\\]$",
+         "title": "Token",
+         "type": "string"
+        }
+       },
+       "required": [
+        "token"
+       ],
+       "title": "TokenBody",
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "204": {
+     "description": "Successful Response"
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "ctx": {
+             "title": "Context",
+             "type": "object"
+            },
+            "input": {
+             "title": "Input"
+            },
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "title": "Location",
+             "type": "array"
+            },
+            "msg": {
+             "title": "Message",
+             "type": "string"
+            },
+            "type": {
+             "title": "Error Type",
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "title": "ValidationError",
+           "type": "object"
+          },
+          "title": "Detail",
+          "type": "array"
+         }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+       }
+      }
+     },
+     "description": "Validation Error"
+    }
+   },
+   "summary": "Register"
+  }
+ },
  "/entries": {
   "get": {
    "description": "The journal, newest first. `?review=pending`: the entries waiting on the review card.",
