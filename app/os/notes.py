@@ -13,6 +13,7 @@ from app.os.common.activity import log_activity
 from app.os.common.space import Space, assert_in_space, assert_personal_links_allowed, current_space
 from app.os.common.http import invalid_data, nest_error, nest_router
 from app.os.common.jsparse import _JS_SPACE
+from app.os.note_html import MARKDOWN_STEPS
 from app.os.common.ownership import assert_many_owned, assert_owned
 from app.os.common.query import _query_bool, _query_int, unknown_params
 
@@ -26,19 +27,9 @@ _FIELDS = (
 )
 _INCLUDE = {"category": True, "tags": {"order_by": {"name": "asc"}}, "project": True, "trip": True, "course": True, "person": True}
 
-# JavaScript's regex classes: \s (WhiteSpace + LineTerminator), and ^ under the m flag
+# the excerpt: the markdown steps shared with note_html, then everything on one line
 _S = "[" + re.escape(_JS_SPACE) + "]"
-_LINE_START = r"(?:^|(?<=[\r  ]))"
-_EXCERPT_STEPS = (
-    (re.compile(r"```[\s\S]*?```"), " "),
-    (re.compile(r"`([^`]*)`"), r"\1"),
-    (re.compile(r"!\[([^\]]*)\]\([^)]*\)"), r"\1"),
-    (re.compile(r"\[([^\]]*)\]\([^)]*\)"), r"\1"),
-    (re.compile(_LINE_START + _S + r"{0,3}(#{1,6}|>|[-*+]|[0-9]+\.)" + _S + "+", re.M), ""),
-    (re.compile(r"\[( |x|X)\]" + _S + "*"), ""),
-    (re.compile(r"(\*\*|__|~~|\*|_)"), ""),
-    (re.compile(_S + "+"), " "),
-)
+_EXCERPT_STEPS = MARKDOWN_STEPS + ((re.compile(_S + "+"), " "),)
 
 
 def _utf16_len(text: str) -> int:

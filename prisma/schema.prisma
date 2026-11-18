@@ -970,6 +970,8 @@ model Attachment {
   size       Int
   // R2 object key; files no longer live in Postgres (design: Files)
   storageKey String
+  // an image pasted into a rich note (design 2026-11-18): cleaned up with its note
+  inline     Boolean    @default(false)
   createdAt  DateTime   @default(now())
 
   // Workspaces (9n): the shared space this item is in (null = its creator's Personal space),
@@ -1353,7 +1355,11 @@ model Note {
   userId     String
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   title      String
-  content    String    @default("") // markdown
+  content    String    @default("") // markdown, or sanitized HTML when contentFormat is "html"
+  // rich notes (design 2026-11-18): "markdown" (old notes, the AI, onboarding) | "html" (the editor)
+  contentFormat String  @default("markdown")
+  // the note's words (from the HTML or the markdown) for lists, search and the AI
+  contentText   String  @default("")
   color      String?
   isPinned   Boolean   @default(false)
   isFavorite Boolean   @default(false)
