@@ -59,6 +59,16 @@ class SharedProjects(WorkspaceCase):
         gated = await guest.get("/api/tasks")
         self.assertEqual((gated.status_code, gated.json().get("code")), (403, "plus_required"))
 
+    async def test_rich_note_reaches_guests_as_text(self):
+        """Rich notes (design 2026-11-18): the shared view stays plain text."""
+        owner, guest = await self.member(), await self.guest()
+        project = (await owner.post("/api/projects", json={"name": "Launch"})).json()
+        await owner.post("/api/notes", json={"title": "Plan", "projectId": project["id"], "contentFormat": "html",
+                                             "content": '<h1>Goals</h1><p><span style="color:#ff0000">ship it</span></p>'})
+        await self.share(owner, project["id"], guest)
+        [note] = (await guest.get(f"/api/shared/projects/{project['id']}")).json()["notes"]
+        self.assertEqual(note["content"], "Goals\nship it")
+
     async def test_share_needs_matching_email(self):
         owner, guest, stranger = await self.member(), await self.guest(), await self.guest()
         project = await self.project_with_children(owner)

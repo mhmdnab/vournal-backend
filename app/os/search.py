@@ -7,6 +7,7 @@ import re
 from fastapi import Depends, Request
 
 from app.db import db
+from app.os import notes
 from app.os.common.currency import to_number
 from app.os.common.space import Space, current_space
 from app.os.common.http import nest_error, nest_router
@@ -175,9 +176,9 @@ async def search(user, q_raw: str | None, types: list[str] | None, limit: int | 
             add("habit", h.id, h.name, fmt(M["habitArchived" if h.isArchived else "habit"], frequency=enum_label(lang, "habitFrequency", h.frequency)),
                 f"/habits?id={h.id}", None, "habits")
     if want("note"):
-        for n in await db.note.find_many(where={**space.where, "OR": [{"title": like}, {"content": like}]},
+        for n in await db.note.find_many(where={**space.where, "OR": notes.text_match(q)},
                                          order=[{"isArchived": "asc"}, {"updatedAt": "desc"}], take=per_type):
-            add("note", n.id, n.title, snippet(n.content, q) or (M["noteArchived"] if n.isArchived else M["note"]), f"/notes?id={n.id}",
+            add("note", n.id, n.title, snippet(n.contentText if n.contentFormat == "html" else n.content, q) or (M["noteArchived"] if n.isArchived else M["note"]), f"/notes?id={n.id}",
                 iso_ms(n.updatedAt), "notes")
     if want("shopping"):
         for s in await db.shoppingitem.find_many(where={"userId": uid, "OR": [{"name": like}, {"store": like}, {"notes": like}]},

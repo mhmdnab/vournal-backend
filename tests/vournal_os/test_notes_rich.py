@@ -92,3 +92,47 @@ class NotesRich(OsTestCase):
         self.assertIsNone(await self.db.attachment.find_unique(where={"id": rows[0].id}))
         self.assertNotIn(rows[0].storageKey, self.objects)
         self.assertIsNotNone(await self.db.attachment.find_unique(where={"id": rows[1].id}))
+
+
+class NoteReaders(NotesRich):
+    """Search, trips, export and the AI read a rich note's words, never its tags."""
+
+    HTML = '<p><span style="color:#ff0000">zebra crossing</span> notes</p>'
+
+    async def test_global_search_snippet_is_text(self):
+        await self.patch(content=self.HTML, contentFormat="html")
+        results = (await self.web.get("/api/search", params={"q": "zebra"})).json()["results"]
+        hit = next(r for r in results if r.get("id") == self.note["id"])
+        self.assertNotIn("<", str(hit))
+        self.assertIn("zebra crossing", str(hit))
+        self.assertFalse([r for r in (await self.web.get("/api/search", params={"q": "span"})).json()["results"] if r.get("id") == self.note["id"]])
+
+    async def test_trip_notes_list_shows_text(self):
+        trip = (await self.web.post("/api/trips", json={"name": "Rome", "destination": "Rome"})).json()
+        await self.patch(content=self.HTML, contentFormat="html", tripId=trip["id"])
+        body = (await self.web.get(f"/api/trips/{trip['id']}")).json()
+        [n] = [n for n in body["notesList"] if n["id"] == self.note["id"]]
+        self.assertEqual(n["content"], "zebra crossing notes")
+
+    async def test_export_includes_format(self):
+        await self.patch(content=self.HTML, contentFormat="html")
+        r = await self.web.get("/api/users/me/export")
+        notes = r.json()["data"]["notes"]
+        [n] = [n for n in notes if n["id"] == self.note["id"]]
+        self.assertEqual(n["contentFormat"], "html")
+
+    async def test_ai_add_note_is_markdown(self):
+        import json as _json
+        from datetime import datetime, timezone
+
+        from app.os import assistant_tools
+
+        ctx = assistant_tools.Ctx(self.web.user, "Asia/Beirut", assistant_tools.local_day(datetime.now(timezone.utc), "Asia/Beirut"), "auto")
+        out = await assistant_tools.run("add_note", {"title": "From AI", "content": "# Plan\n\n- one"}, ctx)
+        self.assertFalse(out.get("isError"), out)
+        note_id = _json.loads(out["content"])["id"]
+        row = await self.db.note.find_unique(where={"id": note_id})
+        self.assertEqual((row.contentFormat, row.contentText), ("markdown", "Plan\n\none"))
+        tools = _json.load(open("app/os/data/assistant.json"))["tools"]
+        add = next(t for t in tools if t["name"] == "add_note")
+        self.assertIn("no HTML", add["input_schema"]["properties"]["content"]["description"])

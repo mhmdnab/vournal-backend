@@ -175,7 +175,8 @@ async def shared_project(id: str, user=Depends(web_user)):
     return {
         "project": _pick(project, _PROJECT),
         "tasks": [_pick(t, _TASK) for t in tasks],
-        "notes": [_pick(n, _NOTE) for n in notes],
+        # the shared view is plain text: a rich note's words, never its HTML (design 2026-11-18)
+        "notes": [{**_pick(n, _NOTE), "content": n.contentText if n.contentFormat == "html" else n.content} for n in notes],
         "events": [_pick(e, _EVENT) for e in events],
         "attachments": [_pick(f, _FILE) for f in files],
         "readOnly": True,

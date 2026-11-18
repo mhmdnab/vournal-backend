@@ -31,3 +31,13 @@ class ShareLinks(OsTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TripDetail(OsTestCase):
+    async def test_trip_detail_opens(self):
+        """Regression (found 2026-11-18): trip expenses were filtered by a workspace that transactions don't have."""
+        web = await self.signed_in()
+        trip = (await web.post("/api/trips", json={"name": "Rome", "destination": "Rome"})).json()
+        r = await web.get(f"/api/trips/{trip['id']}")
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()["expensesCount"], 0)
