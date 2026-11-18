@@ -293,11 +293,12 @@ class Unavailable(Exception):
     """The provider failed, or the reply didn't fit the output format."""
 
 
-async def _structured(system: str, content: str, output_format: dict, enums: dict | None = None):
-    """One structured-output request: (refused, parsed reply or None)."""
+async def _structured(system: str, content: str, output_format: dict, enums: dict | None = None, model: str | None = None):
+    """One structured-output request: (refused, parsed reply or None). A `model` other than the
+    default (the nudges' small model) also logs the tokens used, for the owner's cost check."""
     try:
         response = await _client.beta.messages.create(
-            model=MODEL,
+            model=model or MODEL,
             max_tokens=2048,
             betas=[FALLBACK_BETA, STRUCTURED_BETA],
             fallbacks="default",
@@ -317,6 +318,9 @@ async def _structured(system: str, content: str, output_format: dict, enums: dic
     except Exception as exc:  # noqa: BLE001 — a network error, a timeout
         log.warning("AI request failed: %s", exc)
         raise Unavailable from exc
+    if model:
+        usage = getattr(response, "usage", None)
+        log.info("nudge ai usage model=%s input=%s output=%s", model, getattr(usage, "input_tokens", None), getattr(usage, "output_tokens", None))
     # as the SDK's parse() did: every text block is parsed (one that doesn't fit fails the
     # request), the first one is the answer, and only then is a refusal looked at
     parsed = None
