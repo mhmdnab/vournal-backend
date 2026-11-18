@@ -381,9 +381,11 @@ async def get_trip(id: str, user=Depends(plus_user)):
     items = await db.tripitem.find_many(where={"tripId": id}, order=_ITEM_ORDER)
     packing = await db.packingitem.find_many(where={"tripId": id}, order=_PACKING_ORDER)
     trip_where = {"userId": user.id, "workspaceId": None, "tripId": id}
-    expenses = await db.transaction.find_many(where={**trip_where, "type": "EXPENSE"}, include={"category": True, "account": True},
+    # money is always personal: transactions have no workspace column (found 2026-11-18)
+    money_where = {"userId": user.id, "tripId": id, "type": "EXPENSE"}
+    expenses = await db.transaction.find_many(where=money_where, include={"category": True, "account": True},
                                               order={"date": "desc"}, take=100)
-    sums = await db.transaction.group_by(by=["currency"], where={**trip_where, "type": "EXPENSE"}, sum={"amount": True}, count={"_all": True})
+    sums = await db.transaction.group_by(by=["currency"], where=money_where, sum={"amount": True}, count={"_all": True})
     events = await db.event.find_many(where=trip_where, order={"startAt": "asc"}, take=100)
     tasks = await db.task.find_many(where=trip_where, order=[{"status": "asc"}, {"dueAt": "asc"}], take=100)
     notes = await db.note.find_many(where={**trip_where, "isArchived": False}, order=[{"isPinned": "desc"}, {"updatedAt": "desc"}], take=50)
