@@ -3,8 +3,8 @@
 For each person with a phone and nudges on: find the moment due in their phone's time zone, check
 the switches, quiet hours and the daily cap, write the text (AI for Plus users who agreed, rules
 otherwise), record it in NudgeLog *before* sending (the unique row stops a second worker), and
-send it to each of their phones through Expo. A nudge no phone took is sent again, same text,
-every 5 minutes while its window lasts. Dead tokens are deleted from the tickets, and from
+send it to each of their phones through Expo. A nudge Expo surely didn't take is sent again
+once, same text, 5 minutes on, within its window. Dead tokens are deleted from the tickets, and from
 the receipts checked once, 20 minutes to 24 hours later. NUDGES_ENABLED=0 stops everything;
 NUDGES_AI=0 makes every nudge rule-based."""
 
@@ -32,6 +32,8 @@ SWITCH = {"morning": "nudgePlan", "midday": "nudgeSuggestions", "evening": "nudg
 RECENT_DAYS = 3
 RECEIPTS_AFTER, RECEIPTS_UNTIL = timedelta(minutes=20), timedelta(hours=24)
 RETRY_AFTER = timedelta(minutes=5)
+FIRST_TRY = ("ai", "rules")  # NudgeLog.source before any retry; a suffix marks what happened next
+RETRIED, NO_RETRY = "+retry", "+noretry"
 LOG_DAYS, DEVICE_DAYS = 30, 60
 
 
@@ -81,18 +83,27 @@ async def _send(user, devices: list, row, nudge: Nudge, client) -> None:
         await db.pushdevice.delete_many(where={"token": {"in": dead}})
     if ok:
         await db.nudgelog.update(where={"id": row.id}, data={"ticketIds": ok})
+    elif row.source in FIRST_TRY and any(t["status"] != "ok" and t.get("error") is not None for t in tickets):
+        # Expo may have taken it (no clear answer) or refused the message itself (a rate limit, a
+        # credential problem): sending again would repeat it or make it worse
+        await db.nudgelog.update(where={"id": row.id}, data={"source": f"{row.source}{NO_RETRY}"})
 
 
-async def _retry(user, devices: list, row, now: datetime, client) -> bool:
-    """A nudge no phone took (Expo down, a failed request) is sent again with the same text, every
-    RETRY_AFTER while its window lasts: no second AI call. The claim moves createdAt on, so two
-    workers never both resend it."""
-    if row.ticketIds:
-        return False  # delivered
-    claimed = await db.nudgelog.update_many(where={"id": row.id, "createdAt": {"lte": now - RETRY_AFTER}}, data={"createdAt": now})
+async def _retry(user, devices: list, row, now: datetime, zone, today, client) -> bool:
+    """A nudge Expo surely didn't take (no connection, an error status) is sent again once, same
+    text (no second AI call), 5 minutes on, while its window lasts. Once only: a push can reach
+    the phone even when the request looked failed. The claim marks the row, so two workers never
+    both resend it."""
+    if row.ticketIds or row.source not in FIRST_TRY:
+        return False  # delivered, already retried, or not worth retrying
+    if row.moment == "evening" and (await app_facts(user, zone, today))["recordedToday"]:
+        return False  # "No entry yet today" isn't true any more
+    claimed = await db.nudgelog.update_many(where={"id": row.id, "source": row.source, "createdAt": {"lte": now - RETRY_AFTER}},
+                                            data={"createdAt": now, "source": f"{row.source}{RETRIED}"})
     if not claimed:
         return False
-    await _send(user, devices, row, Nudge(row.title, row.body, row.opens, row.prompt), client)  # type: ignore[arg-type]
+    await _send(user, devices, row.model_copy(update={"source": f"{row.source}{RETRIED}"}),
+                Nudge(row.title, row.body, row.opens, row.prompt), client)  # type: ignore[arg-type]
     return True
 
 
@@ -110,7 +121,7 @@ async def _for_user(user, devices: list, settings, now: datetime, client=None) -
         return False
     sent = await db.nudgelog.find_first(where={"userId": user.id, "date": _day_value(today), "moment": moment})
     if sent:
-        return await _retry(user, devices, sent, now, client)
+        return await _retry(user, devices, sent, now, local.tzinfo, today, client)
     if await db.nudgelog.count(where={"userId": user.id, "date": _day_value(today)}) >= (CAP_PLUS if plus else CAP_FREE):
         return False
     nudge, source = await _text(user, settings, moment, local.tzinfo, today)

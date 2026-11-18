@@ -92,7 +92,7 @@ async def merge_prefs(user_id: str, changes: dict) -> None:
     (the app's nudge settings and the website's) each keep the other's change. Reads normalize."""
     await db.execute_raw(
         'UPDATE "UserSettings" SET "notificationPrefs" = (CASE WHEN jsonb_typeof("notificationPrefs") = \'object\' '
-        'THEN "notificationPrefs" ELSE \'{}\'::jsonb END) || $1::jsonb, "updatedAt" = now() WHERE "userId" = $2',
+        'THEN "notificationPrefs" ELSE \'{}\'::jsonb END) || $1::jsonb, "updatedAt" = (now() AT TIME ZONE \'UTC\') WHERE "userId" = $2',
         json.dumps(changes), user_id)
 
 

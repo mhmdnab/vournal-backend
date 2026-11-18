@@ -182,6 +182,61 @@ class NudgeJob(nudge_tests.NudgesRun):
         self.assertEqual(log.ticketIds, ["t9|ExponentPushToken[a]"])
         self.assertEqual(self.send.await_args_list[0].args[0][0]["body"], self.send.await_args_list[-1].args[0][0]["body"])
 
+    async def fail_with(self, error):
+        self.send.side_effect = lambda msgs, **kw: [{"status": "error", "error": error} for _ in msgs]
+
+    async def test_a_failed_send_is_retried_once_only(self):
+        """Final review: a retry can duplicate a push Expo took after all, so there's one."""
+        await self.person()
+        await self.fail_with(None)
+        with self.assertLogs("vournal", level="WARNING"):
+            await run.tick(tokyo(8, 5))
+            await run.tick(tokyo(8, 11))
+            self.assertEqual(await run.tick(tokyo(8, 17)), 0)
+        self.assertEqual(self.send.await_count, 2)
+
+    async def test_an_unclear_answer_or_a_message_error_is_not_resent(self):
+        for error in ("NoAnswer", "MessageRateExceeded"):
+            await self.fail_with(error)
+            await self.person(tokens=(f"ExponentPushToken[{error}]",))
+            with self.assertLogs("vournal", level="WARNING"):
+                await run.tick(tokyo(8, 5))
+        before = self.send.await_count
+        self.assertEqual(await run.tick(tokyo(8, 11)), 0)
+        self.assertEqual(self.send.await_count, before)
+
+    async def test_an_evening_retry_is_dropped_once_they_recorded(self):
+        user = await self.person()
+        await self.fail_with(None)
+        with self.assertLogs("vournal", level="WARNING"):
+            await run.tick(tokyo(20, 5))
+        await self.db.entry.create(data={"userId": user.id, "rawTranscript": "x", "status": "DONE", "inJournal": True,
+                                         "createdAt": tokyo(20, 7)})
+        self.send.side_effect = lambda msgs, **kw: [{"status": "ok", "id": "t9"} for _ in msgs]
+        self.assertEqual(await run.tick(tokyo(20, 11)), 0)
+        self.assertEqual(self.send.await_count, 1)
+
+    async def test_a_time_zone_postgres_lacks_still_counts_the_streak(self):
+        from zoneinfo import ZoneInfo
+
+        from app.nudges import rules
+
+        user = await self.make_user()
+        cls = type(rules.db)
+        real = cls.query_raw
+        calls = []
+
+        async def picky(this, sql, *args):
+            calls.append(args[-1])
+            if args[-1] != "UTC":
+                raise RuntimeError('time zone "Asia/Tokyo" not recognized')
+            return await real(this, sql, *args)
+
+        with patch.object(cls, "query_raw", picky):
+            facts = await rules.app_facts(user, ZoneInfo("Asia/Tokyo"), datetime(2026, 11, 18).date())
+        self.assertEqual(facts["streak"], 0)
+        self.assertEqual(calls, ["Asia/Tokyo", "UTC"])
+
     async def test_a_delivered_nudge_is_never_sent_again(self):
         await self.person()
         await run.tick(tokyo(8, 5))

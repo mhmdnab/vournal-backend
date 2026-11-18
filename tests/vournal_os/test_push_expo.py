@@ -55,6 +55,16 @@ class PushExpo(unittest.IsolatedAsyncioTestCase):
         self.use(boom)
         self.assertEqual(await push_expo.send([msg(1)]), [{"status": "error", "error": None}])
 
+    async def test_a_reply_that_never_comes_is_not_called_unsent(self):
+        """Expo may have taken it (final review 2026-11-18): the job mustn't send it again."""
+        def slow(request):
+            raise httpx.ReadTimeout("slow")
+
+        self.use(slow)
+        self.assertEqual(await push_expo.send([msg(1)]), [{"status": "error", "error": "NoAnswer"}])
+        self.use(lambda r: httpx.Response(200, text="not json"))
+        self.assertEqual(await push_expo.send([msg(1)]), [{"status": "error", "error": "NoAnswer"}])
+
     async def test_empty_sends_nothing(self):
         self.use(lambda r: httpx.Response(200, json={"data": []}))
         self.assertEqual(await push_expo.send([]), [])

@@ -33,12 +33,26 @@ def _error_of(item: dict) -> str | None:
     return details.get("error") if isinstance(details, dict) else None
 
 
+# A request that may have reached Expo but got no usable answer (a timeout after sending, a reply
+# that isn't Expo's): the push may be on the phone already, so the nudge job doesn't send it again.
+# A request Expo surely didn't take (no connection, an error status) gives error None.
+NO_ANSWER = "NoAnswer"
+
+
+class _Unclear(Exception):
+    pass
+
+
 async def _post(client: httpx.AsyncClient, url: str, payload) -> dict | None:
+    """The reply, None when Expo surely didn't take it; raises _Unclear when it may have."""
     try:
         response = await client.post(url, json=payload, headers=_headers())
-    except httpx.HTTPError as exc:
+    except (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout) as exc:
         log.warning("Expo push request failed: %s", type(exc).__name__)
         return None
+    except httpx.HTTPError as exc:
+        log.warning("Expo push request failed: %s", type(exc).__name__)
+        raise _Unclear from exc
     if response.status_code != 200:
         log.warning("Expo push request failed (%s)", response.status_code)
         return None
@@ -46,7 +60,7 @@ async def _post(client: httpx.AsyncClient, url: str, payload) -> dict | None:
         return response.json()
     except ValueError:
         log.warning("Expo push reply wasn't JSON")
-        return None
+        raise _Unclear from None
 
 
 def new_client() -> httpx.AsyncClient:
@@ -65,10 +79,17 @@ async def send(messages: list[dict], client: httpx.AsyncClient | None = None) ->
             return await send(messages, own)
     for start in range(0, len(messages), SEND_BATCH):
         batch = messages[start:start + SEND_BATCH]
-        body = await _post(client, SEND_URL, batch)
+        try:
+            body = await _post(client, SEND_URL, batch)
+        except _Unclear:
+            tickets += [{"status": "error", "error": NO_ANSWER} for _ in batch]
+            continue
+        if body is None:
+            tickets += [{"status": "error", "error": None} for _ in batch]
+            continue
         data = body.get("data") if isinstance(body, dict) else None
         if not isinstance(data, list) or len(data) != len(batch):
-            tickets += [{"status": "error", "error": None} for _ in batch]
+            tickets += [{"status": "error", "error": NO_ANSWER} for _ in batch]  # an answer, but not Expo's
             continue
         for item in data:
             if isinstance(item, dict) and item.get("status") == "ok" and item.get("id"):
@@ -87,7 +108,10 @@ async def receipts(ids: list[str]) -> dict[str, dict] | None:
     answered = False
     async with httpx.AsyncClient(timeout=15.0, transport=_transport) as client:
         for start in range(0, len(ids), RECEIPT_BATCH):
-            body = await _post(client, RECEIPTS_URL, {"ids": ids[start:start + RECEIPT_BATCH]})
+            try:
+                body = await _post(client, RECEIPTS_URL, {"ids": ids[start:start + RECEIPT_BATCH]})
+            except _Unclear:
+                continue  # receipts are only read: an unclear answer is no answer
             data = body.get("data") if isinstance(body, dict) else None
             if not isinstance(data, dict):
                 continue

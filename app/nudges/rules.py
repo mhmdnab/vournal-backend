@@ -38,10 +38,13 @@ async def app_facts(user, tz: ZoneInfo, today: date) -> dict:
                                            "dueDate": {"gte": _utc_midnight(today), "lt": _utc_midnight(today + timedelta(days=1))}})
     since = datetime.combine(today - timedelta(days=STREAK_LOOKBACK), time(0), tzinfo=tz)
     # the distinct local days only, worked out in the database (not every entry of four months)
-    rows = await db.query_raw(
-        f'SELECT DISTINCT ((e."createdAt" AT TIME ZONE \'UTC\') AT TIME ZONE $3)::date::text AS day FROM "Entry" e '
-        f'WHERE e."userId" = $1 AND e."createdAt" >= $2::timestamp AND {LISTED_SQL}',
-        user.id, since.astimezone(timezone.utc).replace(tzinfo=None).isoformat(), tz.key)
+    sql = (f'SELECT DISTINCT ((e."createdAt" AT TIME ZONE \'UTC\') AT TIME ZONE $3)::date::text AS day FROM "Entry" e '
+           f'WHERE e."userId" = $1 AND e."createdAt" >= $2::timestamp AND {LISTED_SQL}')
+    start = since.astimezone(timezone.utc).replace(tzinfo=None).isoformat()
+    try:
+        rows = await db.query_raw(sql, user.id, start, tz.key)
+    except Exception:  # noqa: BLE001 — a zone Python knows and the database doesn't: count in UTC rather than skip the nudge
+        rows = await db.query_raw(sql, user.id, start, "UTC")
     days = {date.fromisoformat(str(r["day"])[:10]) for r in rows}
     recorded_today = today in days
     day, streak = (today if recorded_today else today - timedelta(days=1)), 0
