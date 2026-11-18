@@ -1,6 +1,8 @@
 """/api/notes (port of vournalOS NotesService). Markdown notes with tags and links to a
 project, trip, course or person; lists carry a plain-text excerpt instead of the body."""
 
+import logging
+import os
 import re
 from typing import Literal
 
@@ -13,7 +15,8 @@ from app.os.common.activity import log_activity
 from app.os.common.space import Space, assert_in_space, assert_personal_links_allowed, current_space
 from app.os.common.http import invalid_data, nest_error, nest_router
 from app.os.common.jsparse import _JS_SPACE
-from app.os.note_html import MARKDOWN_STEPS
+from app import storage
+from app.os.note_html import MARKDOWN_STEPS, html_text, markdown_text, sanitize
 from app.os.common.ownership import assert_many_owned, assert_owned
 from app.os.common.query import _query_bool, _query_int, unknown_params
 
@@ -57,8 +60,19 @@ def _pick(row, *fields):
     return None if row is None else {f: getattr(row, f) for f in fields}
 
 
+TEXT_LIMIT, HTML_LIMIT = 100_000, 1_000_000
+log = logging.getLogger("vournal.os")
+
+
+def rich_editor_on() -> bool:
+    """The off switch (design 2026-11-18): NOTES_RICH_EDITOR=0 pauses the rich editor."""
+    return os.environ.get("NOTES_RICH_EDITOR", "1") != "0"
+
+
 def view(row) -> dict:
     out = {f: getattr(row, f) for f in _FIELDS}
+    out["contentFormat"] = row.contentFormat
+    out["editor"] = "rich" if rich_editor_on() else "classic"
     out.update(
         category=_pick(row.category, "id", "name", "color", "icon"),
         tags=[_pick(t, "id", "name", "color") for t in row.tags or []],
@@ -73,13 +87,17 @@ def view(row) -> dict:
 def list_item(row) -> dict:
     out = view(row)
     content = out.pop("content")
+    if row.contentFormat == "html":  # the words, never the tags
+        return {**out, "excerpt": make_excerpt(row.contentText), "wordCount": word_count(row.contentText)}
     return {**out, "excerpt": make_excerpt(content), "wordCount": word_count(content)}
 
 
 class _Fields(BaseModel):
     model_config = ConfigDict(extra="forbid")
     title: StrictStr | None = None
-    content: StrictStr | None = Field(default=None, max_length=100_000)
+    # markdown up to 100,000; HTML up to 1,000,000 with its words up to 100,000 (checked in _content)
+    content: StrictStr | None = Field(default=None, max_length=HTML_LIMIT)
+    contentFormat: Literal["markdown", "html"] | None = None
     color: StrictStr | None = None
     isPinned: StrictBool | None = None
     isFavorite: StrictBool | None = None
@@ -108,6 +126,26 @@ class CreateBody(_Fields):
 
 class UpdateBody(_Fields):
     pass
+
+
+_TOO_LONG = f"content must be shorter than or equal to {TEXT_LIMIT} characters"
+
+
+def _content(content: str | None, fmt: str | None) -> dict:
+    """The stored content fields: HTML sanitized here (never trusted from the browser), its words
+    in contentText; markdown as sent. The off switch refuses HTML."""
+    content = content or ""
+    if fmt == "html":
+        if not rich_editor_on():
+            raise nest_error(409, "Rich notes are paused")
+        clean = sanitize(content)
+        text = html_text(clean)
+        if len(text) > TEXT_LIMIT:
+            raise nest_error(400, [_TOO_LONG])
+        return {"content": clean, "contentFormat": "html", "contentText": text}
+    if len(content) > TEXT_LIMIT:
+        raise nest_error(400, [_TOO_LONG])
+    return {"content": content, "contentFormat": "markdown", "contentText": markdown_text(content)}
 
 
 def _unique(ids):
@@ -144,6 +182,18 @@ _LIST_QUERY = (  # the NestJS query DTO's fields (its own first, then the inheri
 SORTS = ("updatedAt", "createdAt", "title")
 
 
+def text_match(term: str) -> list[dict]:
+    """A note whose title or words contain the term: markdown by its content, HTML by its text."""
+    like = {"contains": term, "mode": "insensitive"}
+    return [{"title": like}, {"contentFormat": "markdown", "content": like}, {"contentFormat": "html", "contentText": like}]
+
+
+@router.get("/editor")
+async def editor_mode(space: Space = Depends(current_space)):
+    """Which editor a new note opens in (the off switch)."""
+    return {"editor": "rich" if rich_editor_on() else "classic"}
+
+
 @router.get("")
 async def list_notes(request: Request, space: Space = Depends(current_space)):
     user = space.user
@@ -174,7 +224,7 @@ async def list_notes(request: Request, space: Space = Depends(current_space)):
         where["tags"] = {"some": {"id": q.get("tagId")}}
     term = (text or "").strip(_JS_SPACE)
     if term:
-        where["OR"] = [{"title": {"contains": term, "mode": "insensitive"}}, {"content": {"contains": term, "mode": "insensitive"}}]
+        where["OR"] = text_match(term)
     sort = sort or "updatedAt"
     order = [{"isPinned": "desc"}, {"title": "asc"} if sort == "title" else {sort: "desc"}]
     page, size = page or 1, page_size or DEFAULT_PAGE_SIZE
@@ -187,11 +237,12 @@ async def list_notes(request: Request, space: Space = Depends(current_space)):
 async def create(body: CreateBody, space: Space = Depends(current_space)):
     user = space.user
     await _assert_links(space, body)
+    fields = _content(body.content, body.contentFormat)
     row = await db.note.create(
         data={
             **space.create_fields(),
             "title": body.title,
-            "content": body.content or "",
+            **fields,
             "color": body.color,
             "isPinned": bool(body.isPinned),
             "isFavorite": bool(body.isFavorite),
@@ -228,7 +279,7 @@ async def update(id: str, body: UpdateBody, space: Space = Depends(current_space
         if field in sent:
             data[field] = getattr(body, field)
     if "content" in sent:
-        data["content"] = body.content if body.content is not None else ""
+        data.update(_content(body.content, body.contentFormat))
     for flag in ("isPinned", "isFavorite", "isArchived"):
         if getattr(body, flag) is not None:  # null leaves it as it is
             data[flag] = getattr(body, flag)
@@ -252,6 +303,15 @@ async def remove(id: str, space: Space = Depends(current_space)):
     existing = await _owned(space, id)
     if not space.can_delete(existing):
         raise nest_error(404, "Note not found")
+    images = await db.attachment.find_many(where={"entityType": "NOTE", "entityId": existing.id, "inline": True})
     await db.note.delete(where={"id": existing.id})
+    # its pasted images go with it (other files attached to the note stay, as before)
+    if images:
+        await db.attachment.delete_many(where={"id": {"in": [a.id for a in images]}})
+        for a in images:
+            try:
+                await storage.delete_object(a.storageKey)
+            except Exception:  # noqa: BLE001 — the note is gone either way; the file is logged
+                log.exception("note %s: deleting image %s failed", existing.id, a.id)
     await log_activity(user.id, "note.deleted", entity_id=id, title=existing.title)
     return {"ok": True}
