@@ -7,7 +7,7 @@ keeps its colours; its fonts map to the editor's four, or go). html_text() and m
 a note's words for lists, search and the AI, which never see tags."""
 
 import re
-from html import unescape
+from html import escape, unescape
 from html.parser import HTMLParser
 
 import nh3
@@ -38,6 +38,9 @@ _IMG_SRC = re.compile(r"^/api/attachments/[A-Za-z0-9_-]+/download(\?space=[A-Za-
 _COLOR = re.compile(r"^(#[0-9a-fA-F]{3,8}|rgba?\(\s*\d{1,3},\s*\d{1,3},\s*\d{1,3}(,\s*(0|1|0?\.\d+))?\s*\))$")
 _SIZE = re.compile(r"^(\d+(?:\.\d+)?)(px|pt)$")
 _SPAN_NUM = re.compile(r"^[1-9]\d?$")
+# documents (Google Docs, Word) stamp black-on-white on everything: unreadable in dark mode, so dropped
+_DEFAULT_COLOR = re.compile(r"^(#000|#000000|rgba?\(\s*0,\s*0,\s*0(,\s*1(\.0+)?)?\s*\)|black)$", re.I)
+_DEFAULT_BACKGROUND = re.compile(r"^(#fff|#ffffff|rgba?\(\s*255,\s*255,\s*255(,\s*1(\.0+)?)?\s*\)|white|transparent)$", re.I)
 _ALIGN = {"left", "right", "center", "justify", "start", "end"}
 _FAMILY_MAP = {
     "arial": "sans", "helvetica": "sans", "calibri": "sans", "inter": "sans", "system-ui": "sans", "sans-serif": "sans",
@@ -71,7 +74,9 @@ def _style(value: str) -> str | None:
             continue
         prop, val = (part.strip() for part in decl.split(":", 1))
         prop = prop.lower()
-        if prop in ("color", "background-color") and _COLOR.match(val):
+        if prop == "color" and _COLOR.match(val) and not _DEFAULT_COLOR.match(val):
+            out = val
+        elif prop == "background-color" and _COLOR.match(val) and not _DEFAULT_BACKGROUND.match(val):
             out = val
         elif prop == "font-family":
             out = _font_family(val)
@@ -109,9 +114,33 @@ def _filter(element: str, attribute: str, value: str) -> str | None:
 
 
 _SRC_LESS_IMG = re.compile(r"<img(?![^>]*\ssrc=)[^>]*>")
+_IMG_TAG = re.compile(r"<img\b[^>]*>", re.I)
+
+
+class _Attrs(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.attrs: dict[str, str] = {}
+
+    def handle_starttag(self, tag, attrs):
+        self.attrs = {k: v or "" for k, v in attrs}
+
+    handle_startendtag = handle_starttag
+
+
+def _image_or_link(match: re.Match) -> str:
+    """Our own images stay; a web image (pasted from a page, or ![alt](url) in an old markdown note)
+    becomes a link to it, so its address and words aren't lost (the site shows only our images)."""
+    parser = _Attrs()
+    parser.feed(match[0])
+    src = parser.attrs.get("src", "").strip()
+    if _IMG_SRC.match(src) or not src.lower().startswith(("http://", "https://")):
+        return match[0]
+    return f'<a href="{escape(src)}" target="_blank">{escape(parser.attrs.get("alt", "").strip() or src)}</a>'
 
 
 def sanitize(html: str) -> str:
+    html = _IMG_TAG.sub(_image_or_link, html)
     out = nh3.clean(html, tags=TAGS, clean_content_tags={"script", "style", "template", "iframe", "object"},
                     attributes=ATTRIBUTES, attribute_filter=_filter, url_schemes={"http", "https", "mailto"},
                     link_rel="noopener noreferrer", strip_comments=True)

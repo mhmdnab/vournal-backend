@@ -75,3 +75,29 @@ class NoteImages(OsTestCase):
         await self.age(made["id"], 8)
         await self.db.note.delete(where={"id": self.note["id"]})
         self.assertEqual(await cleanup_note_images(datetime.now(timezone.utc)), 1)
+
+
+class SharedImages(NoteImages):
+    """An image copied into another note (final review): deleting or editing the first note keeps it."""
+
+    async def other_note_showing(self, attachment_id):
+        other = (await self.web.post("/api/notes", json={"title": "B", "contentFormat": "html",
+                                                          "content": f'<p>b</p><img src="/api/attachments/{attachment_id}/download">'})).json()
+        return other
+
+    async def test_delete_keeps_images_shown_in_another_note(self):
+        made = await self.upload()
+        await self.use(made["id"])
+        await self.other_note_showing(made["id"])
+        r = await self.web.delete(f"/api/notes/{self.note['id']}")
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertIsNotNone(await self.row(made["id"]))
+
+    async def test_cleanup_keeps_images_shown_in_another_note(self):
+        from app.os.attachments import cleanup_note_images
+
+        made = await self.upload()
+        await self.other_note_showing(made["id"])
+        await self.age(made["id"], 30)
+        self.assertEqual(await cleanup_note_images(datetime.now(timezone.utc)), 0)
+        self.assertIsNotNone(await self.row(made["id"]))

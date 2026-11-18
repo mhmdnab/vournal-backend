@@ -182,6 +182,11 @@ _LIST_QUERY = (  # the NestJS query DTO's fields (its own first, then the inheri
 SORTS = ("updatedAt", "createdAt", "title")
 
 
+async def image_in_use(attachment_id: str) -> bool:
+    """Whether any note still shows this image (one copied into another note keeps it alive)."""
+    return await db.note.count(where={"content": {"contains": f"/api/attachments/{attachment_id}/download"}}) > 0
+
+
 def text_match(term: str) -> list[dict]:
     """A note whose title or words contain the term: markdown by its content, HTML by its text."""
     like = {"contains": term, "mode": "insensitive"}
@@ -305,6 +310,8 @@ async def remove(id: str, space: Space = Depends(current_space)):
         raise nest_error(404, "Note not found")
     images = await db.attachment.find_many(where={"entityType": "NOTE", "entityId": existing.id, "inline": True})
     await db.note.delete(where={"id": existing.id})
+    # an image copied into another note stays as long as a note still shows it
+    images = [a for a in images if not await image_in_use(a.id)]
     # its pasted images go with it (other files attached to the note stay, as before)
     if images:
         await db.attachment.delete_many(where={"id": {"in": [a.id for a in images]}})

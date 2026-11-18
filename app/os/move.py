@@ -11,6 +11,7 @@
   into another space (a task's project or parent, an event's task or project, a note's project).
 """
 
+import re
 from datetime import timedelta
 from typing import Literal
 
@@ -33,6 +34,9 @@ _LINKS_CLEARED = {
 }
 _HAS_TAGS = ("task", "note")
 _ENTITY = {"task": "TASK", "event": "EVENT", "project": "PROJECT", "note": "NOTE"}
+
+
+_IMAGE_URL = re.compile(r"/api/attachments/([A-Za-z0-9_-]+)/download(?:\?space=[A-Za-z0-9_-]+)?")
 
 
 class MoveBody(BaseModel):
@@ -132,6 +136,13 @@ async def move(body: MoveBody, user=Depends(plus_user)):
                 attachment_ids += [f.id for f in files]
         if attachment_ids:
             await tx.attachment.update_many(where={"id": {"in": attachment_ids}}, data=dict(common))
+
+    # rich notes (design 2026-11-18): an image's address names its space (an <img> can't send the header)
+    if ids["note"]:
+        for n in await db.note.find_many(where={"id": {"in": ids["note"]}, "contentFormat": "html"}):
+            content = _IMAGE_URL.sub(lambda m: f"/api/attachments/{m[1]}/download" + (f"?space={dest.workspace_id}" if dest.workspace_id else ""), n.content)
+            if content != n.content:
+                await db.note.update(where={"id": n.id}, data={"content": content})
 
     # a project that changes space loses its outside shares: in a workspace only its admins
     # share it, and back in Personal its new owner decides

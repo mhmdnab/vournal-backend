@@ -79,3 +79,21 @@ class Move(WorkspaceCase):
         response = await self.move(self.member_, "project", project["id"], self.w)
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(await self.db.projectshare.count(where={"projectId": project["id"]}), 0)
+
+
+class MoveRichNote(Move):
+    """Rich notes (final review 2026-11-18): an image's address names its space, so a move rewrites it."""
+
+    async def test_moving_a_rich_note_rewrites_its_image_addresses(self):
+        me = self.member_.user.id
+        note = await self.db.note.create(data={"userId": me, "createdById": me, "title": "N", "contentFormat": "html",
+                                               "content": '<p>x</p><img src="/api/attachments/att1/download">'})
+        r = await self.move(self.member_, "note", note.id, self.w)
+        self.assertEqual(r.status_code, 200, r.text)
+        moved = await self.db.note.find_unique(where={"id": note.id})
+        self.assertIn(f'src="/api/attachments/att1/download?space={self.w}"', moved.content)
+        r = await self.member_.post("/api/move", json={"type": "note", "id": note.id, "to": None}, headers=self.ws)
+        self.assertEqual(r.status_code, 200, r.text)
+        back = await self.db.note.find_unique(where={"id": note.id})
+        self.assertIn('src="/api/attachments/att1/download"', back.content)
+        self.assertNotIn("?space=", back.content)

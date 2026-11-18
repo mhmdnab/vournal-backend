@@ -20,8 +20,10 @@ class Sanitize(unittest.TestCase):
     def test_img_src_rules(self):
         self.assertIn('src="/api/attachments/abc_1-2/download"', sanitize('<img src="/api/attachments/abc_1-2/download">'))
         self.assertIn('src="/api/attachments/abc/download?space=w1"', sanitize('<img src="/api/attachments/abc/download?space=w1">'))
-        for bad in ("https://evil/x.png", "data:image/png;base64,AAAA", "/api/attachments/abc/download?x=1", "//evil/x.png"):
+        for bad in ("data:image/png;base64,AAAA", "/api/attachments/abc/download?x=1", "//evil/x.png"):
             self.assertEqual(sanitize(f'<p>t</p><img src="{bad}">'), "<p>t</p>", bad)
+        # a web image is never shown; it becomes a link to itself (final review)
+        self.assertNotIn("<img", sanitize('<img src="https://evil/x.png">'))
         self.assertIn('width="50%"', sanitize('<img src="/api/attachments/a/download" width="50%">'))
         self.assertNotIn("width", sanitize('<img src="/api/attachments/a/download" width="999">'))
 
@@ -36,7 +38,7 @@ class Sanitize(unittest.TestCase):
         out = sanitize('<b style="font-weight:normal" id="docs-internal-guid-1"><span class="x" style="font-size:11pt;'
                        'font-family:Arial;color:#000000;font-weight:700">Hi</span></b><!-- c -->')
         self.assertIn("Hi", out)
-        self.assertIn("color:#000000", out)
+        self.assertNotIn("color:#000000", out)  # documents' default black would vanish in dark mode
         self.assertIn(f"font-family:{FONT_FAMILIES['sans']}", out)
         self.assertIn("font-size:15px", out)
         for gone in ("id=", "class=", "font-weight", "<b", "<!--"):
@@ -54,6 +56,20 @@ class Sanitize(unittest.TestCase):
         self.assertEqual(out, '<p dir="auto">مرحبا بالعالم</p>')
         self.assertEqual(html_text(out), "مرحبا بالعالم")
         self.assertNotIn("dir", sanitize('<p dir="sideways">x</p>'))
+
+
+class ReviewFixes(unittest.TestCase):
+    def test_default_colours_dropped(self):
+        out = sanitize('<p style="color:#000;background-color:#ffffff">a</p><span style="color:rgb(0, 0, 0)">b</span>'
+                       '<span style="color:#e5484d;background-color:transparent">c</span>')
+        self.assertEqual(out, '<p>a</p><span>b</span><span style="color:#e5484d">c</span>')
+
+    def test_foreign_images_become_links(self):
+        self.assertEqual(sanitize('<img src="https://example.com/chart.png" alt="Q3 chart">'),
+                         '<a href="https://example.com/chart.png" target="_blank" rel="noopener noreferrer">Q3 chart</a>')
+        self.assertIn(">https://example.com/a.png</a>", sanitize('<img src="https://example.com/a.png">'))
+        self.assertEqual(sanitize('<p>x</p><img src="javascript:alert(1)" alt="y">'), "<p>x</p>")
+        self.assertNotIn("<script", sanitize('<img src="https://e.com/a.png" alt="<script>x</script>">'))
 
 
 class Text(unittest.TestCase):

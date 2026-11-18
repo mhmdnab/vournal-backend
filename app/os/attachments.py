@@ -247,8 +247,9 @@ async def cleanup_note_images(now: datetime) -> int:
     rows = await db.attachment.find_many(where={"entityType": "NOTE", "inline": True, "createdAt": {"lt": now - INLINE_KEEP}})
     if not rows:
         return 0
-    notes = {n.id: n.content for n in await db.note.find_many(where={"id": {"in": list({r.entityId for r in rows})}})}
-    gone = [r for r in rows if f"/api/attachments/{r.id}/download" not in notes.get(r.entityId, "")]
+    from app.os.notes import image_in_use
+
+    gone = [r for r in rows if not await image_in_use(r.id)]  # in its own note or one it was copied into
     if gone:
         await db.attachment.delete_many(where={"id": {"in": [r.id for r in gone]}})
         for r in gone:
