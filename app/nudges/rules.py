@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 from app.db import db
 from app.os.dashboard import get_dashboard
 from app.os.insights import insights_for
-from app.review import IN_JOURNAL
+from app.review import LISTED_SQL
 
 STREAK_LOOKBACK = 120  # days; a longer streak still reads as "120-day"
 SOON_DAYS = 3
@@ -37,8 +37,12 @@ async def app_facts(user, tz: ZoneInfo, today: date) -> dict:
     todos_due = await db.todo.count(where={"userId": user.id, "done": False,
                                            "dueDate": {"gte": _utc_midnight(today), "lt": _utc_midnight(today + timedelta(days=1))}})
     since = datetime.combine(today - timedelta(days=STREAK_LOOKBACK), time(0), tzinfo=tz)
-    rows = await db.entry.find_many(where={"userId": user.id, "createdAt": {"gte": since}, "AND": [IN_JOURNAL]})
-    days = {r.createdAt.astimezone(tz).date() for r in rows}
+    # the distinct local days only, worked out in the database (not every entry of four months)
+    rows = await db.query_raw(
+        f'SELECT DISTINCT ((e."createdAt" AT TIME ZONE \'UTC\') AT TIME ZONE $3)::date::text AS day FROM "Entry" e '
+        f'WHERE e."userId" = $1 AND e."createdAt" >= $2::timestamp AND {LISTED_SQL}',
+        user.id, since.astimezone(timezone.utc).replace(tzinfo=None).isoformat(), tz.key)
+    days = {date.fromisoformat(str(r["day"])[:10]) for r in rows}
     recorded_today = today in days
     day, streak = (today if recorded_today else today - timedelta(days=1)), 0
     while day in days:
@@ -113,38 +117,70 @@ def _when(days: int) -> str:
     return "today" if days <= 0 else "tomorrow" if days == 1 else f"in {days} days"
 
 
-def free_text(moment: str, facts: dict) -> Nudge | None:
+# Arabic (an account whose vournal life language is Arabic): Modern Standard Arabic, counted the
+# Arabic way (one, two, 3–10, 11+). An app to-do and a vournal life task are both "مهمة", so the
+# morning adds them up into one count.
+def _ar_count(n: int, one: str, two: str, few: str, many: str) -> str:
+    return one if n == 1 else two if n == 2 else f"{n} {few}" if 3 <= n <= 10 else f"{n} {many}"
+
+
+def _ar_tasks(n: int) -> str:
+    return _ar_count(n, "مهمة واحدة", "مهمتان", "مهام", "مهمة")
+
+
+def _ar_when(days: int) -> str:
+    return "اليوم" if days <= 0 else "غدًا" if days == 1 else f"بعد {days} أيام" if days <= 10 else f"بعد {days} يومًا"
+
+
+def free_text(moment: str, facts: dict, lang: str = "en") -> Nudge | None:
+    ar = lang == "ar"
     if moment == "morning" and facts["todosDue"] >= 1:
+        if ar:
+            return Nudge("اليوم", f"{_ar_tasks(facts['todosDue'])} مستحقة اليوم.", "life")
         return Nudge("Today", f"{_plural(facts['todosDue'], 'to-do', 'to-dos')} due today.", "life")
     if moment == "evening" and not facts["recordedToday"]:
         if facts["streak"] >= 2:
+            if ar:
+                return Nudge("مراجعة المساء", f"لا يوجد تسجيل اليوم بعد. حافظ على سلسلتك المستمرة منذ {facts['streak']} أيام.", "record")
             return Nudge("Evening check-in", f"No entry yet today. Keep your {facts['streak']}-day streak going.", "record")
+        if ar:
+            return Nudge("مراجعة المساء", "لا يوجد تسجيل اليوم بعد. كيف كان يومك؟", "record")
         return Nudge("Evening check-in", "No entry yet today. How was your day?", "record")
     return None
 
 
-def plus_fallback_text(moment: str, app: dict, life: dict) -> Nudge | None:
+def plus_fallback_text(moment: str, app: dict, life: dict, lang: str = "en") -> Nudge | None:
     if moment == "evening":
-        return free_text("evening", app)
+        return free_text("evening", app, lang)
     if moment != "morning":
         return None
+    ar = lang == "ar"
     parts: list[str] = []
-    if life["tasksToday"]:
-        parts.append(f"{_plural(len(life['tasksToday']), 'task', 'tasks')} today")
-    if app.get("todosDue"):
-        parts.append(f"{_plural(app['todosDue'], 'to-do', 'to-dos')} today")
-    if not parts and life["events"]:
-        parts.append(f"{_plural(life['events'], 'event', 'events')} today")
+    if ar:
+        tasks = len(life["tasksToday"]) + (app.get("todosDue") or 0)
+        if tasks:
+            parts.append(f"{_ar_tasks(tasks)} اليوم")
+        elif life["events"]:
+            parts.append(f"{_ar_count(life['events'], 'حدث واحد', 'حدثان', 'أحداث', 'حدثًا')} اليوم")
+    else:
+        if life["tasksToday"]:
+            parts.append(f"{_plural(len(life['tasksToday']), 'task', 'tasks')} today")
+        if app.get("todosDue"):
+            parts.append(f"{_plural(app['todosDue'], 'to-do', 'to-dos')} today")
+        if not parts and life["events"]:
+            parts.append(f"{_plural(life['events'], 'event', 'events')} today")
     for b in life["billsSoon"][:1]:
-        parts.append(f"{b['name']} due {_when(b['inDays'])}")
+        parts.append(f"{b['name']} مستحق {_ar_when(b['inDays'])}" if ar else f"{b['name']} due {_when(b['inDays'])}")
     streaks = sorted((h for h in life["habits"] if h["streak"] >= 2 and not h["doneToday"]), key=lambda h: -h["streak"])
     for h in streaks[:1]:
-        parts.append(f"day {h['streak'] + 1} of your {h['name']} streak")
+        parts.append(f"اليوم {h['streak'] + 1} من سلسلة {h['name']}" if ar else f"day {h['streak'] + 1} of your {h['name']} streak")
     for b in life["birthdays"][:1]:
-        parts.append(f"{b['name']} {_when(b['inDays'])}")
+        parts.append(f"{b['name']} {_ar_when(b['inDays'])}" if ar else f"{b['name']} {_when(b['inDays'])}")
     if not parts:
         return None
     body = " · ".join(parts[:3])
     if len(body) > MAX_BODY:
         body = body[:MAX_BODY - 1].rstrip() + "…"
+    if ar:
+        return Nudge("يومك", body, "life")
     return Nudge("Your day", body[0].upper() + body[1:], "life")

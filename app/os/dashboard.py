@@ -107,7 +107,9 @@ async def _tasks(ctx) -> dict:
     return {
         "todayTasks": {"items": today_items, "total": len(today) + len(todo_today),
                        "completed": sum(1 for t in today if t.status == "COMPLETED") + sum(1 for t in todo_today if t.done)},
-        "overdue": {"count": overdue_count + len(todo_overdue), "items": priority_order(views(overdue, todo_overdue))[:6]},
+        # taskCount: vournal life's own tasks, without the app's to-dos (the app counts those itself)
+        "overdue": {"count": overdue_count + len(todo_overdue), "taskCount": overdue_count,
+                    "items": priority_order(views(overdue, todo_overdue))[:6]},
         "topPriorities": {"date": ctx.today, "items": [_task(t, ctx) for t in focus],
                           "suggestions": priority_order(views(candidates, todo_open))[:3] if len(focus) < 3 else []},
     }
@@ -264,7 +266,7 @@ def _scoped_tasks(tasks: dict, project_ids: set[str], task_ids: set[str]) -> dic
     top = tasks["topPriorities"]
     return {
         "todayTasks": {"items": today, "total": len(today), "completed": sum(1 for t in today if t["status"] == "COMPLETED")},
-        "overdue": {"count": len(overdue), "items": overdue},
+        "overdue": {"count": len(overdue), "taskCount": sum(1 for t in overdue if t.get("source") != "app"), "items": overdue},
         "topPriorities": {**top, "items": [t for t in top["items"] if keep(t)], "suggestions": [t for t in top["suggestions"] if keep(t)]},
     }
 

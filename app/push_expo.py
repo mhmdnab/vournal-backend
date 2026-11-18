@@ -49,24 +49,32 @@ async def _post(client: httpx.AsyncClient, url: str, payload) -> dict | None:
         return None
 
 
-async def send(messages: list[dict]) -> list[dict]:
-    """One ticket per message, in order: {"status": "ok", "id"} or {"status": "error", "error"}."""
+def new_client() -> httpx.AsyncClient:
+    """One connection pool, for a caller sending many people's nudges in one go."""
+    return httpx.AsyncClient(timeout=15.0, transport=_transport)
+
+
+async def send(messages: list[dict], client: httpx.AsyncClient | None = None) -> list[dict]:
+    """One ticket per message, in order: {"status": "ok", "id"} or {"status": "error", "error"}.
+    `client`: a pool to reuse (the nudge job's tick); otherwise one is opened for this call."""
     tickets: list[dict] = []
     if not messages:
         return tickets
-    async with httpx.AsyncClient(timeout=15.0, transport=_transport) as client:
-        for start in range(0, len(messages), SEND_BATCH):
-            batch = messages[start:start + SEND_BATCH]
-            body = await _post(client, SEND_URL, batch)
-            data = body.get("data") if isinstance(body, dict) else None
-            if not isinstance(data, list) or len(data) != len(batch):
-                tickets += [{"status": "error", "error": None} for _ in batch]
-                continue
-            for item in data:
-                if isinstance(item, dict) and item.get("status") == "ok" and item.get("id"):
-                    tickets.append({"status": "ok", "id": item["id"]})
-                else:
-                    tickets.append({"status": "error", "error": _error_of(item) if isinstance(item, dict) else None})
+    if client is None:
+        async with new_client() as own:
+            return await send(messages, own)
+    for start in range(0, len(messages), SEND_BATCH):
+        batch = messages[start:start + SEND_BATCH]
+        body = await _post(client, SEND_URL, batch)
+        data = body.get("data") if isinstance(body, dict) else None
+        if not isinstance(data, list) or len(data) != len(batch):
+            tickets += [{"status": "error", "error": None} for _ in batch]
+            continue
+        for item in data:
+            if isinstance(item, dict) and item.get("status") == "ok" and item.get("id"):
+                tickets.append({"status": "ok", "id": item["id"]})
+            else:
+                tickets.append({"status": "error", "error": _error_of(item) if isinstance(item, dict) else None})
     return tickets
 
 

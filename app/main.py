@@ -331,7 +331,7 @@ def _to_entry_out(entry: Any, ambiguous: dict[str, set[str]] | None = None) -> E
 
 
 async def process_transcript(
-    entry_id: str, transcript: str, use_merged: bool = False, review: bool = False
+    entry_id: str, transcript: str, use_merged: bool = False, review: bool = False, ask: bool = False
 ) -> None:
     """Run extraction on a transcript and persist the results onto an entry.
 
@@ -408,6 +408,8 @@ async def process_transcript(
             "useMerged": use_merged,
             "journalSuggested": result.get("journalSuggested", True) is not False,
         }
+        if ask:
+            proposal["askable"] = True  # the app can hand a question to the chat
         await db.entry.update(
             where={"id": entry_id},
             data={"proposal": Json(proposal), "reviewState": "needs_review"},
@@ -505,7 +507,7 @@ async def apply_extraction(
     return people
 
 
-async def process_audio_entry(entry_id: str, review: bool = False) -> None:
+async def process_audio_entry(entry_id: str, review: bool = False, ask: bool = False) -> None:
     """Background task: transcribe a saved audio file, then run the pipeline.
 
     PENDING -> PROCESSING -> transcribe -> save transcript -> process_transcript
@@ -581,7 +583,7 @@ async def process_audio_entry(entry_id: str, review: bool = False) -> None:
     # and extracts in one call — replacing the old two-call repair->extract. The
     # stored rawTranscript above is untouched: the record stays exactly as heard,
     # and only the derived structure benefits from the correction.
-    await process_transcript(entry_id, transcript, use_merged=True, review=review)
+    await process_transcript(entry_id, transcript, use_merged=True, review=review, ask=ask)
 
 
 # ---- Entries -----------------------------------------------------------------
@@ -608,7 +610,7 @@ async def create_entry(body: CreateEntryRequest, background: BackgroundTasks, cu
     # a review-mode entry: a Plus entry's AI actions step can take a while, so the app
     # polls for it as it does for a recording.
     if body.review:
-        background.add_task(process_transcript, entry.id, body.transcript, review=True)
+        background.add_task(process_transcript, entry.id, body.transcript, review=True, ask=body.ask)
     else:
         await process_transcript(entry.id, body.transcript)
 
@@ -621,6 +623,7 @@ async def create_audio_entry(
     file: UploadFile = File(...),
     durationSec: Optional[float] = Form(None),
     review: bool = Form(False),
+    ask: bool = Form(False),
     current=Depends(get_current_user),
 ):
     """Ingest an audio recording. Returns a PENDING entry immediately; the
@@ -670,7 +673,7 @@ async def create_audio_entry(
     await db.entry.update(where={"id": entry.id}, data={"audioUrl": audio_url})
 
     # Schedule transcription + extraction; return the PENDING entry immediately.
-    background.add_task(process_audio_entry, entry.id, review)
+    background.add_task(process_audio_entry, entry.id, review, ask)
 
     return _to_entry_out(await _load_entry(entry.id))
 

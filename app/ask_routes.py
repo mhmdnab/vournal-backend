@@ -26,6 +26,7 @@ from app.entitlements import effective_plan
 from app.os import assistant
 from app.os.assistant_consent import journal_allowed
 from app.os.profile import ensure_os_profile
+from app.rate_limit import rate_limited
 from app.review_routes import STILL_WORKING, _owned, entry_out
 
 log = logging.getLogger("vournal")
@@ -33,6 +34,7 @@ router = APIRouter()
 
 HANDLED = "This entry was already handled."
 ASK_TIMEOUT = timedelta(minutes=5)
+ASK_LIMIT, ASK_WINDOW = 10, 600  # questions per person per 10 minutes: each one is a paid answer
 
 
 def _without_claim(proposal: dict) -> dict:
@@ -71,6 +73,8 @@ async def ask(entry_id: str, body: AskBody | None = None, current=Depends(get_cu
         raise HTTPException(status_code=400, detail="This entry isn't a question.")
     if not journal_allowed(await ensure_os_profile(current)):
         return {"status": "consent_needed"}
+    if rate_limited("ask", current.id, ASK_LIMIT, ASK_WINDOW):
+        raise HTTPException(status_code=429, detail={"code": "too_many_asks", "message": "Too many questions in a row. Try again in a few minutes."})
 
     claimed = await db.entry.update_many(
         where={"id": entry.id, "reviewState": "needs_review"},
@@ -95,7 +99,7 @@ async def ask(entry_id: str, body: AskBody | None = None, current=Depends(get_cu
     proposal["conversationId"] = result["conversation"]["id"]
     await db.entry.update(where={"id": entry.id}, data={"reviewState": "asked" if hide else "needs_review", "proposal": Json(proposal)})
     if hide:
-        await quota.release_entry_quota(db, current.id)  # a question isn't a journal entry
+        await quota.release_entry_quota(db, current.id, entry.createdAt)  # a question isn't a journal entry
     return {**result, "entryState": "asked" if hide else "needs_review"}
 
 

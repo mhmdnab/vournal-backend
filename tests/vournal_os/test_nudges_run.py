@@ -27,7 +27,7 @@ def tokyo(hh: int, mm: int, day: int = 18) -> datetime:
 class NudgesRun(OsTestCase):
     async def asyncSetUp(self):
         await super().asyncSetUp()
-        self.send = AsyncMock(side_effect=lambda msgs: [{"status": "ok", "id": f"t{i}"} for i, _ in enumerate(msgs)])
+        self.send = AsyncMock(side_effect=lambda msgs, **kw: [{"status": "ok", "id": f"t{i}"} for i, _ in enumerate(msgs)])
         self.receipts = AsyncMock(return_value={})
         self.write = AsyncMock(return_value=AI_NUDGE)
         self.life = AsyncMock(return_value=dict(LIFE))
@@ -189,7 +189,7 @@ class NudgesRun(OsTestCase):
         self.assertEqual(await run.tick(datetime(2026, 11, 18, 8, 5, tzinfo=timezone.utc)), 2)
 
     async def test_device_not_registered_ticket_deletes_device(self):
-        self.send.side_effect = lambda msgs: [{"status": "error", "error": "DeviceNotRegistered"}, {"status": "ok", "id": "t1"}]
+        self.send.side_effect = lambda msgs, **kw: [{"status": "error", "error": "DeviceNotRegistered"}, {"status": "ok", "id": "t1"}]
         user = await self.person(tokens=("ExponentPushToken[a]", "ExponentPushToken[b]"))
         await run.tick(tokyo(8, 5))
         left = await self.db.pushdevice.find_many(where={"userId": user.id})
@@ -265,7 +265,7 @@ class ReviewFixes(NudgesRun):
         self.assertTrue(any("InvalidCredentials" in line for line in logs.output))
 
     async def test_ticket_errors_are_logged(self):
-        self.send.side_effect = lambda msgs: [{"status": "error", "error": "MessageRateExceeded"}]
+        self.send.side_effect = lambda msgs, **kw: [{"status": "error", "error": "MessageRateExceeded"}]
         await self.person()
         with self.assertLogs("vournal", level="WARNING") as logs:
             await run.tick(tokyo(8, 5))
@@ -281,6 +281,12 @@ class ReviewFixes(NudgesRun):
             reads.append(kwargs.get("where", {}).get("userId"))
             return await original(this, *args, **kwargs)
 
-        with patch.object(actions, "find_unique", find_unique):
+        original_many = actions.find_many
+
+        async def find_many(this, *args, **kwargs):  # the tick reads everyone due in one go
+            reads.extend(kwargs.get("where", {}).get("userId", {}).get("in", []))
+            return await original_many(this, *args, **kwargs)
+
+        with patch.object(actions, "find_unique", find_unique), patch.object(actions, "find_many", find_many):
             await run.tick(tokyo(16, 0))  # 16:00 in Tokyo: no moment could be due
         self.assertNotIn(user.id, reads)

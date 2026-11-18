@@ -53,6 +53,7 @@ class Ctx:
         self.round_deletes = 0  # delete_item calls in the round being run
         self.entry_people: dict[str, str] = {}  # an app recording's new people: "proposal-person:<i>" → name
         self.importing = False  # an import from other AI chats: it adds and updates, never deletes
+        self.journal = False  # the person allowed the assistant to read their journal (design 2026-11-17)
 
 
 # ----- results ---------------------------------------------------------------------------
@@ -292,6 +293,9 @@ async def run(name: str, raw_input, ctx: Ctx) -> dict:
         tool = _TOOLS.get(name)
         if tool is None:
             return {"content": f"Unknown tool {name}", "isError": True}
+        if name in assistant_journal.JOURNAL_TOOLS and not ctx.journal:
+            # the model only gets these once the person allowed it; a stray call still reads nothing
+            return {"content": "Error: reading the journal needs the person's permission, which they haven't given.", "isError": True}
         if ctx.importing and name not in IMPORT_TOOLS:
             # the file is someone else's text: an import only reads and adds
             return {"content": "Error: an import only adds new things; it can't change, archive or delete what's there.", "isError": True}

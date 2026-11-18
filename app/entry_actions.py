@@ -57,8 +57,8 @@ async def after_extraction(entry_id: str) -> None:
     user = await db.user.find_unique(where={"id": entry.userId})
     if effective_plan(user) != "plus" or not (entry.proposal or {}).get("result", {}).get("wantsActions"):
         return
-    if entry.proposal["result"].get("intent") == "ask" and not entry.proposal.get("unasked"):
-        return  # a question goes to the chat (design 2026-11-17): no AI actions, no AI use
+    if entry.proposal["result"].get("intent") == "ask" and entry.proposal.get("askable") and not entry.proposal.get("unasked"):
+        return  # a question goes to the chat (design 2026-11-17): no AI actions, no AI use. Older apps can't ask, so they get them
     if ai.client() is None:
         await _set_proposal(entry_id, skipped="unavailable")
         return

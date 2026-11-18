@@ -22,18 +22,21 @@ class NudgeRoutes(OsTestCase):
     async def settings(self):
         return await self.db.usersettings.find_unique(where={"userId": self.app.user.id})
 
-    async def test_free_user_gets_defaults_and_a_settings_row(self):
+    async def test_free_user_gets_defaults_without_a_settings_row(self):
         free = await self.mobile(await self.make_user(plan="free"))
         self.assertIsNone(await self.db.usersettings.find_unique(where={"userId": free.user.id}))
         r = await free.get("/nudges/prefs")
         self.assertEqual(r.json(), {"nudges": False, "morningTime": "08:00", "plan": True, "checkIns": True,
                                     "suggestions": True, "aiWriting": False, "plus": False})
+        # a read makes no row (2026-11-18 leftovers); the first change does
+        self.assertIsNone(await self.db.usersettings.find_unique(where={"userId": free.user.id}))
+        await free.patch("/nudges/prefs", json={"nudges": True})
         self.assertIsNotNone(await self.db.usersettings.find_unique(where={"userId": free.user.id}))
 
     async def test_patch_keeps_web_prefs(self):
         from prisma import Json
 
-        await self.get()
+        await self.patch()  # makes the settings row (a read no longer does)
         await self.db.usersettings.update(where={"userId": self.app.user.id},
                                           data={"notificationPrefs": Json({"bills": False, "dailyDigestTime": "07:00"})})
         out = await self.patch(nudges=True, morningTime="07:15", suggestions=False)

@@ -4,6 +4,7 @@ The stored row is normalised on the way out exactly like NestJS's toView: known
 sections and widgets only, in canonical order, with every default filled in.
 """
 
+import json
 import re
 import zoneinfo
 from functools import lru_cache
@@ -84,6 +85,15 @@ def normalize_prefs(value) -> dict:
             elif isinstance(v, bool):
                 out[key] = v
     return out
+
+
+async def merge_prefs(user_id: str, changes: dict) -> None:
+    """Writes only the changed notificationPrefs keys, merged in the database: two patches at once
+    (the app's nudge settings and the website's) each keep the other's change. Reads normalize."""
+    await db.execute_raw(
+        'UPDATE "UserSettings" SET "notificationPrefs" = (CASE WHEN jsonb_typeof("notificationPrefs") = \'object\' '
+        'THEN "notificationPrefs" ELSE \'{}\'::jsonb END) || $1::jsonb, "updatedAt" = now() WHERE "userId" = $2',
+        json.dumps(changes), user_id)
 
 
 def settings_view(row) -> dict:
@@ -319,9 +329,11 @@ async def update_settings(body: SettingsBody, user=Depends(plus_user)):
     elif body.focusModes is not None and current.activeFocusModeId and not any(m["id"] == current.activeFocusModeId for m in modes):
         data["activeFocusModeId"] = None  # the mode that was on was removed
     if body.notificationPrefs is not None:
-        merged = {**normalize_prefs(current.notificationPrefs), **body.notificationPrefs.model_dump(exclude_unset=True)}
-        data["notificationPrefs"] = Json(merged)
-    row = await db.usersettings.update(where={"userId": user.id}, data=data)
+        await merge_prefs(user.id, body.notificationPrefs.model_dump(exclude_unset=True))
+    if data:
+        row = await db.usersettings.update(where={"userId": user.id}, data=data)
+    else:
+        row = await db.usersettings.find_unique(where={"userId": user.id})
     if body.language is not None and body.language != current.language:
         await translate_default_data(user.id, to_lang(body.language))
     return settings_view(row)

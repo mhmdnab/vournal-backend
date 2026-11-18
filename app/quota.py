@@ -144,12 +144,14 @@ async def check_global_daily_cap(db) -> None:
         raise HTTPException(status_code=503, detail={"code": "SERVICE_BUSY"})
 
 
-async def release_entry_quota(db, user_id: str) -> None:
-    """Give back a reserved entry that turned out to hold nothing, such as silence."""
-    await db.user.update_many(
-        where={"id": user_id, "usagePeriodEntries": {"gt": 0}},
-        data={"usagePeriodEntries": {"decrement": 1}},
-    )
+async def release_entry_quota(db, user_id: str, created_at: datetime | None = None) -> None:
+    """Give back a reserved entry that turned out to hold nothing, such as silence. With
+    `created_at`, only when that entry counted in the current month: a question asked from last
+    month's recording leaves this month's count alone."""
+    where: dict = {"id": user_id, "usagePeriodEntries": {"gt": 0}}
+    if created_at is not None:
+        where["usagePeriodStart"] = {"lte": created_at}
+    await db.user.update_many(where=where, data={"usagePeriodEntries": {"decrement": 1}})
 
 
 async def reserve_entry_quota(db, user) -> None:

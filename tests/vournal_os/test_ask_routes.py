@@ -27,6 +27,12 @@ class AskBase(EntryActionsBase):
         self.addCleanup(p.stop)
         await self.consent(True)
 
+    async def record(self, text="paid 20 for lunch with Ali, gave him a book"):
+        # an app that knows about questions says so (older builds never send "ask")
+        r = await self.app.post("/entries", json={"transcript": text, "review": True, "ask": True})
+        self.assertEqual(r.status_code, 200, r.text)
+        return await self.db.entry.find_unique(where={"id": r.json()["id"]})
+
     async def consent(self, allowed: bool):
         await self.db.usersettings.update(where={"userId": self.user.id},
                                           data={"assistantJournalConsentAt": datetime.now(timezone.utc) if allowed else None})

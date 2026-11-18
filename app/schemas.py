@@ -191,6 +191,9 @@ class CreateEntryRequest(BaseModel):
     durationSec: Optional[int] = None
     # the review card (design 2026-11-06): new apps ask for it; older ones never send it
     review: bool = False
+    # Ask vournal (design 2026-11-17): an app that can hand a question to the chat says so. Older
+    # builds don't, so their question entries still get the AI actions step.
+    ask: bool = False
 
 
 class UpdateTodoRequest(BaseModel):

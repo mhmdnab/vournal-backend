@@ -46,9 +46,14 @@ _DATA = json.loads((Path(__file__).parent / "data" / "assistant.json").read_text
 SYSTEM, TOOLS = _DATA["system"], _DATA["tools"]
 
 
-def tools_for(journal: bool) -> list:
-    """The tools the model gets: the journal ones only once the user allowed it (design 2026-11-17)."""
+def tools_for(journal: bool, importing: bool = False) -> list:
+    """The tools the model gets: the journal ones only once the user allowed it (design 2026-11-17);
+    an import gets only the tools an import may run (it reads and adds, never the journal)."""
+    if importing:
+        return [t for t in TOOLS if t["name"] in assistant_tools.IMPORT_TOOLS]
     return TOOLS if journal else [t for t in TOOLS if t["name"] not in JOURNAL_TOOLS]
+
+
 MAX_ROUNDS = 8  # tool rounds per message; the last one has to answer in words
 MAX_TURNS = 160  # stored turns per chat; past it the user starts a new one (history is replayed whole)
 PENDING_TTL = timedelta(hours=24)
@@ -271,6 +276,7 @@ async def send(user, text: str, conversation_id: str | None = None, display: str
     mode = "manual" if always_ask else s.assistantMode if s.assistantMode in MODE_LINE else "manual"
     ctx = assistant_tools.Ctx(user, tz, today, mode)
     ctx.importing = importing
+    ctx.journal = journal_allowed(s) and not importing
     weekday = ai.WEEKDAYS[(datetime.fromisoformat(f"{today}T12:00:00+00:00").weekday() + 1) % 7]
     block = context_block(f"{today} {assistant_tools.local_time(now, tz)}", weekday, s.timezone, lang, s.defaultCurrency, s.name, mode)
     first = [{"type": "text", "text": f"{block}\n{text}"}]
@@ -283,7 +289,7 @@ async def send(user, text: str, conversation_id: str | None = None, display: str
     effort = pick_effort(text, _last_reply_failed(history))
     try:
         for round_ in range(1, MAX_ROUNDS + 1):
-            res = await _call(client, round_, messages, effort, tools=tools_for(journal_allowed(s)))
+            res = await _call(client, round_, messages, effort, tools=tools_for(ctx.journal, importing))
             if res.get("stop_reason") == "refusal":
                 reply = {"content": [{"type": "text", "text": REPLY["refused"][lang]}], "text": REPLY["refused"][lang]}
                 break

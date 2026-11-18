@@ -22,5 +22,16 @@ class IntentNormalizeTest(unittest.TestCase):
         self.assertEqual(_empty_result()["intent"], "journal")
 
 
+class IntentPromptTest(unittest.TestCase):
+    def test_examples_in_arabic_script_for_each_intent(self):
+        """2026-11-18 leftovers: Modern Standard Arabic examples, not only Arabizi."""
+        from app.extraction import SYSTEM_PROMPT
+
+        intent = SYSTEM_PROMPT[SYSTEM_PROMPT.index("- intent:"):SYSTEM_PROMPT.index("When unsure")]
+        for line_start in ('  - "ask"', '  - "both"', '  - "journal"'):
+            line = intent[intent.index(line_start):].split("\n", 1)[0]
+            self.assertRegex(line, "[\u0600-\u06FF]", line_start)
+
+
 if __name__ == "__main__":
     unittest.main()

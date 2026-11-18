@@ -26,6 +26,7 @@ class JournalBase(ChatBase):
 
         u = user or self.user
         ctx = assistant_tools.Ctx(u, "Asia/Beirut", assistant_tools.local_day(datetime.now(timezone.utc), "Asia/Beirut"), "manual")
+        ctx.journal = True  # the person allowed it (the runner refuses these tools otherwise)
         out = await assistant_tools.run(name, payload, ctx)
         self.assertFalse(out.get("isError"), out)
         return json.loads(out["content"])
