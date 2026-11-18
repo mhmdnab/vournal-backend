@@ -39,6 +39,11 @@ from app.os.profile import ensure_os_profile
 router = nest_router("/settings")
 
 _HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d\Z", re.ASCII)
+MORNING_EARLIEST, MORNING_LATEST = "05:00", "11:30"  # nudges' morning time (design 2026-11-18)
+
+
+def valid_morning_time(v) -> bool:
+    return isinstance(v, str) and bool(_HHMM.match(v)) and MORNING_EARLIEST <= v <= MORNING_LATEST
 
 
 def normalize_sections(values) -> list[str]:
@@ -72,6 +77,9 @@ def normalize_prefs(value) -> dict:
             v = value.get(key)
             if key == "dailyDigestTime":
                 if key in value and (v is None or (isinstance(v, str) and _HHMM.match(v))):
+                    out[key] = v
+            elif key == "nudgeMorningTime":
+                if valid_morning_time(v):
                     out[key] = v
             elif isinstance(v, bool):
                 out[key] = v

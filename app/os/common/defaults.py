@@ -87,6 +87,12 @@ DEFAULT_NOTIFICATION_PREFS: dict = {
     "budgets": True,
     "health": True,
     "dailyDigestTime": "08:00",  # "HH:mm" in the user's timezone, or None = off
+    # the app's daily nudges (design 2026-11-18): off until the person taps "Turn on"
+    "nudges": False,
+    "nudgePlan": True,
+    "nudgeCheckIns": True,
+    "nudgeSuggestions": True,
+    "nudgeMorningTime": "08:00",  # "HH:mm" in the phone's timezone, 05:00–11:30
 }
 
 CURRENCIES = [

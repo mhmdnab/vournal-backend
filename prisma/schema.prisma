@@ -138,6 +138,8 @@ model User {
   reminders         Reminder[]
   notifications     Notification[]
   pushSubscriptions PushSubscription[]
+  pushDevices       PushDevice[]
+  nudgeLogs         NudgeLog[]
   activityLogs      ActivityLog[]
   dayLogs           DayLog[]
   weekReviews       WeekReview[]
@@ -716,6 +718,8 @@ model UserSettings {
   dashboardWidgets    Json?
   // { "email": false, "push": true, "inApp": true, "taskReminders": true, "bills": true, "birthdays": true, "documents": true, "habits": true, "dailyDigestTime": "08:00" }
   notificationPrefs   Json?
+  // the person agreed to AI-written nudges in the app (design 2026-11-18); null = rule-based text
+  nudgeAiConsentAt    DateTime?
   onboardingCompleted Boolean         @default(false)
   // AI features are opt-in: the user's text is sent to the AI provider only when this is on
   aiEnabled           Boolean         @default(false)
@@ -1587,6 +1591,42 @@ model PushSubscription {
   auth      String
   userAgent String?
   createdAt DateTime @default(now())
+}
+
+// The app's Expo push tokens, one row per phone (design 2026-11-18). A token moves to whoever
+// signs in on that phone; the timezone is where the phone was when last seen.
+model PushDevice {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token      String   @unique
+  platform   String   @default("ios")
+  timezone   String   @default("UTC")
+  appVersion String?
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// One row per daily nudge sent (design 2026-11-18): written before sending, so the unique key is
+// both "already sent" and the daily cap. ticketIds are "<ticketId>|<token>".
+model NudgeLog {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date              DateTime  @db.Date
+  moment            String // "morning" | "midday" | "evening"
+  title             String
+  body              String
+  opens             String // "life" | "record"
+  prompt            String?
+  source            String // "ai" | "rules"
+  ticketIds         String[]  @default([])
+  receiptsCheckedAt DateTime?
+  createdAt         DateTime  @default(now())
+
+  @@unique([userId, date, moment])
 }
 
 // Append-only activity stream. Feeds insights now and future AI analysis later.
