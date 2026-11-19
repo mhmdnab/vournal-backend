@@ -36,6 +36,7 @@ ENTITY = {
     "create_budget": "budget", "update_budget": "budget", "create_recurring_payment": "recurring_payment", "update_recurring_payment": "recurring_payment",
     "add_document": "document", "update_document": "document", "add_maintenance_item": "maintenance_item", "update_maintenance_item": "maintenance_item",
     "create_trip": "trip", "update_trip": "trip", "add_trip_item": "trip_item", "update_trip_item": "trip_item",
+    "add_study_item": "course", "update_study_item": "course",
 }
 # the item an edit or payment points at: (input field, kind for describe)
 _TARGET = {"update_task": ("id", "task"), "update_event": ("id", "event"), "update_transaction": ("id", "transaction"),
@@ -45,6 +46,18 @@ _TARGET = {"update_task": ("id", "task"), "update_event": ("id", "event"), "upda
            "update_budget": ("id", "budget"), "update_recurring_payment": ("id", "recurring_payment"),
            "update_document": ("id", "document"), "update_maintenance_item": ("id", "maintenance_item"),
            "update_trip": ("id", "trip")}
+
+
+_STUDY_KIND = {"course": "course", "assessment": "assessment", "session": "study_session"}
+
+
+def entity_of(name: str, i: dict) -> str:
+    """The card's item type: the tool's, or for the tools that handle several, the one asked for."""
+    if name in ("add_trip_item", "update_trip_item") and i.get("list") == "packing":
+        return "packing_item"
+    if name in ("add_study_item", "update_study_item") and i.get("kind") in _STUDY_KIND:
+        return _STUDY_KIND[i["kind"]]
+    return ENTITY[name]
 
 
 def check_input(schema: dict, value: dict) -> str | None:
@@ -172,7 +185,7 @@ async def defer(name: str, i: dict, ctx: Ctx) -> dict:
     aid = uuid.uuid4().hex
     target = _TARGET.get(name, ("id", None))[0]
     entity_id = i.get(target) if name in _TARGET and isinstance(i.get(target), str) else ""
-    draft = {"id": aid, "kind": pending_kind(name, i), "entityType": ENTITY[name], "entityId": entity_id, "label": found["label"],
+    draft = {"id": aid, "kind": pending_kind(name, i), "entityType": entity_of(name, i), "entityId": entity_id, "label": found["label"],
              "link": found["link"], "undo": None, "status": "pending", "call": {"name": name, "input": i}}
     before = await _before(name, i, ctx)
     if before:

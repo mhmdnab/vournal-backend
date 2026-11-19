@@ -306,7 +306,7 @@ async def run(name: str, raw_input, ctx: Ctx) -> dict:
         if ctx.importing and name not in IMPORT_TOOLS:
             # the file is someone else's text: an import only reads and adds
             return {"content": "Error: an import only adds new things; it can't change, archive or delete what's there.", "isError": True}
-        if ctx.mode == "manual" and name in WRITE_TOOLS and name != "delete_item":
+        if ctx.mode == "manual" and name not in READ_TOOLS and name != "delete_item":  # every write, the registered ones included
             from app.os.assistant_pending import defer
 
             return await defer(name, i, ctx)
@@ -1587,7 +1587,6 @@ async def _restore_fields(undo: dict, ctx: Ctx) -> None:
 
 READ_TOOLS = frozenset({"get_options", "search", "get_agenda", "list_tasks", "get_money", "list_transactions", "list_debts", "get_health",
                         "get_prayer_times", "get_dashboard", "get_section"}) | assistant_journal.JOURNAL_TOOLS
-WRITE_TOOLS = frozenset(_TOOLS) - READ_TOOLS
 # What an import (a file from another AI) may run: reads, and tools that only add something new.
 IMPORT_TOOLS = (READ_TOOLS - assistant_journal.JOURNAL_TOOLS) | frozenset({
     "create_task", "create_event", "create_reminder", "add_transaction", "create_debt", "add_note", "add_shopping_item",
@@ -1730,4 +1729,4 @@ async def describe(ctx: Ctx, kind, id: str) -> dict:
 
 
 # the section modules register their tools and item types (they import this module's helpers)
-from app.os import assistant_sections, assistant_meals, assistant_money, assistant_home, assistant_trips  # noqa: E402,F401
+from app.os import assistant_sections, assistant_meals, assistant_money, assistant_home, assistant_trips, assistant_study  # noqa: E402,F401
