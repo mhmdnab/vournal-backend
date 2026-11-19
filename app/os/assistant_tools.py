@@ -7,6 +7,7 @@ worded as the route would answer ("Error: Task not found")."""
 
 import json
 import re
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from urllib.parse import urlencode
@@ -54,6 +55,7 @@ class Ctx:
         self.entry_people: dict[str, str] = {}  # an app recording's new people: "proposal-person:<i>" → name
         self.importing = False  # an import from other AI chats: it adds and updates, never deletes
         self.journal = False  # the person allowed the assistant to read their journal (design 2026-11-17)
+        self.recording = False  # an app recording's AI actions step (entry_actions), not the chat
 
 
 # ----- results ---------------------------------------------------------------------------
@@ -296,6 +298,11 @@ async def run(name: str, raw_input, ctx: Ctx) -> dict:
         if name in assistant_journal.JOURNAL_TOOLS and not ctx.journal:
             # the model only gets these once the person allowed it; a stray call still reads nothing
             return {"content": "Error: reading the journal needs the person's permission, which they haven't given.", "isError": True}
+        if name in assistant_sections.SECTION_OF:
+            # a section the user turned off in Settings: say so rather than add what they can't see
+            refusal = await assistant_sections.section_refusal(ctx, assistant_sections.SECTION_OF[name])
+            if refusal:
+                return {"content": refusal, "isError": True}
         if ctx.importing and name not in IMPORT_TOOLS:
             # the file is someone else's text: an import only reads and adds
             return {"content": "Error: an import only adds new things; it can't change, archive or delete what's there.", "isError": True}
@@ -921,7 +928,7 @@ async def _delete_item(i: dict, ctx: Ctx) -> dict:
         # Auto deletes one plain item at once (with Undo); anything bigger still asks
         from app.os import assistant_snapshot
 
-        copy = await assistant_snapshot.take(assistant_snapshot.MODELS[kind], id, ctx.user_id)
+        copy = await assistant_snapshot.take(model_of(kind), id, ctx.user_id)
         if copy["count"] == 1 and not copy["has_file"]:
             undo = await remove(ctx.user, kind, id)
             return {"content": f'Deleted "{found["label"]}". The user can undo it.',
@@ -1425,6 +1432,45 @@ _TOOLS = {
 }
 
 
+# ----- item types added by the section modules (design 2026-11-18, the assistant in every section) ---
+
+
+@dataclass
+class Kind:
+    """An item type the assistant can change, delete and undo: how to find it (the route's 404 when
+    it isn't the user's), name it, link it, delete it (the route's delete) and put fields back
+    (through the route's update body)."""
+    model: str  # the table, for the delete snapshot
+    find: object  # async (user_id, id) -> row
+    label: object  # (row) -> str
+    link: object  # (row) -> str
+    delete: object  # async (id, user=) -> ...
+    restore: object  # async (ctx, id, before) -> None, or None
+    date_only: frozenset = frozenset()  # columns compared as YYYY-MM-DD; other datetimes as full ISO
+    read: object = None  # (row, keys) -> dict, when plain columns aren't enough
+
+
+KINDS: dict[str, Kind] = {}
+
+
+def register(tools: dict, kinds: dict) -> None:
+    _TOOLS.update(tools)
+    KINDS.update(kinds)
+
+
+def model_of(kind: str) -> str:
+    """The table a deletable kind lives in, for the delete snapshot."""
+    from app.os import assistant_snapshot
+
+    return KINDS[kind].model if kind in KINDS else assistant_snapshot.MODELS[kind]
+
+
+def _row_value(v, date_only: bool):
+    if isinstance(v, datetime):
+        return to_json(v)[:10] if date_only else _iso(v)
+    return float(v) if isinstance(v, Decimal) else v
+
+
 # ----- undoing an edit: the changed fields' old values, unless the item changed since ----------
 
 _EVENT_TIME = ("startAt", "endAt", "allDay", "date")
@@ -1474,6 +1520,10 @@ async def fields_now(kind: str, id: str, keys, ctx: Ctx) -> dict:
     elif kind == "health_profile":
         p = (await wellness._profile(ctx.user))["profile"]
         out = {k: p.get(k) for k in keys}
+    elif kind in KINDS:
+        k = KINDS[kind]
+        row = await k.find(ctx.user_id, id)
+        out = k.read(row, keys) if k.read else {key: _row_value(getattr(row, key), key in k.date_only) for key in keys}
     elif kind in _ROW_KINDS:
         model, finder = _ROW_KINDS[kind]
         row = await finder(ctx.user_id, id)
@@ -1531,10 +1581,12 @@ async def _restore_fields(undo: dict, ctx: Ctx) -> None:
         await people.update(id, _check(people.PersonUpdateBody, before), user=ctx.user)
     elif kind == "goal":
         await goals.update(id, _check(goals.UpdateBody, before), user=ctx.user)
+    elif kind in KINDS:
+        await KINDS[kind].restore(ctx, id, before)
 
 
 READ_TOOLS = frozenset({"get_options", "search", "get_agenda", "list_tasks", "get_money", "list_transactions", "list_debts", "get_health",
-                        "get_prayer_times", "get_dashboard"}) | assistant_journal.JOURNAL_TOOLS
+                        "get_prayer_times", "get_dashboard", "get_section"}) | assistant_journal.JOURNAL_TOOLS
 WRITE_TOOLS = frozenset(_TOOLS) - READ_TOOLS
 # What an import (a file from another AI) may run: reads, and tools that only add something new.
 IMPORT_TOOLS = (READ_TOOLS - assistant_journal.JOURNAL_TOOLS) | frozenset({
@@ -1573,9 +1625,11 @@ async def remove(user, kind: str, id: str) -> dict | None:
                 "note": remove_note, "shopping_item": shopping.remove_item, "food_log": wellness.remove_food, "weight": wellness.remove_weight,
                 "habit": habits.remove, "project": remove_project, "gift": remove_gift, "goal": goals.remove,
                 "important_date": important_dates.remove, "account": accounts.remove}
+    if kind in KINDS:
+        handlers[kind] = KINDS[kind].delete
     if kind not in handlers:
         return None
-    snapshot = await assistant_snapshot.take(assistant_snapshot.MODELS[kind], id, user.id)
+    snapshot = await assistant_snapshot.take(model_of(kind), id, user.id)
     await handlers[kind](id, user=user)
     # attached files are deleted from storage with it and can't come back: no Undo then
     return None if snapshot["has_file"] else {"op": "restore_snapshot", "snapshot": snapshot}
@@ -1665,4 +1719,11 @@ async def describe(ctx: Ctx, kind, id: str) -> dict:
     if kind == "important_date":
         d = await important_dates._find(ctx.user_id, id)
         return {"label": d.title, "link": f"/people?id={d.personId}" if d.personId else "/people"}
+    if kind in KINDS:
+        row = await KINDS[kind].find(ctx.user_id, id)
+        return {"label": KINDS[kind].label(row), "link": KINDS[kind].link(row)}
     raise ToolError(f'Cannot delete a "{_js_str(kind)}"')
+
+
+# the section modules register their tools and item types (they import this module's helpers)
+from app.os import assistant_sections  # noqa: E402
