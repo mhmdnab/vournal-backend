@@ -49,7 +49,9 @@ async def _seed(client):
         assert r.status_code in (200, 201), (path, r.status_code, r.text)
         return r.json()
 
-    await client.patch("/api/settings", json={"timezone": "Asia/Beirut", "aiEnabled": True, "assistantMode": "auto"})
+    await client.patch("/api/settings", json={"timezone": "Asia/Beirut", "aiEnabled": True, "assistantMode": "auto", "enabledSections": [
+        "calendar", "tasks", "projects", "finance", "goals", "habits", "maintenance", "documents", "shopping", "meals", "health", "notes",
+        "study", "work", "travel", "people", "reminders", "reports"]})
     await post("/api/tasks", {"title": "Dentist"})
     for title in ("Gym", "Call the bank"):
         await post("/api/tasks", {"title": title, "dueAt": "2026-11-12"})  # a Thursday
@@ -61,6 +63,13 @@ async def _seed(client):
     await client.put("/api/wellness/profile", json={"sex": "MALE", "birthDate": "1995-05-01", "heightCm": 178, "weightKg": 80,
                                                     "activityLevel": "MODERATE", "goal": "LOSE", "targetWeightKg": 76})
     await post("/api/notes", {"title": "Cleanup note", "content": INJECTION})
+    # the vournal life sections (design 2026-11-18)
+    await post("/api/budgets", {"amount": 300, "name": "Groceries"})
+    await post("/api/recurring-payments", {"name": "Internet", "amount": 30, "kind": "BILL", "rrule": "FREQ=MONTHLY"})
+    await post("/api/documents", {"name": "Passport", "type": "PASSPORT", "expiryDate": "2029-03-14"})
+    await post("/api/maintenance", {"title": "Car service", "area": "CAR", "rrule": "FREQ=MONTHLY;INTERVAL=6", "estimatedCost": 80})
+    await post("/api/study/courses", {"name": "Statistics", "code": "STA101"})
+    await post("/api/recipes", {"name": "Lasagne", "servings": 4})
 
 
 async def _run_case(client, case: dict, rounds: list, force_medium: bool) -> dict:
