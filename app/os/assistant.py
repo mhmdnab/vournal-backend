@@ -516,8 +516,15 @@ async def rate_reply(message_id: str, body: FeedbackBody, user=Depends(plus_user
 _STANDING = ("done", "running", "pending")
 
 
+class RetryBody(RuleBody):
+    """{alwaysAsk?: the app's chats, where every change waits as a card}."""
+
+    RULES = (("alwaysAsk", True, False, validators.bool_rules),)
+    alwaysAsk: object = None
+
+
 @router.post("/messages/{message_id}/retry")
-async def retry_reply(message_id: str, user=Depends(plus_user)):
+async def retry_reply(message_id: str, body: RetryBody | None = None, user=Depends(plus_user)):
     """The last reply, again: the turn it ended (your message and everything after it) is replaced
     by a fresh answer to the same words. Only when that reply changed nothing (or its changes were
     undone), and only if a new answer can be made now, so the old one is never lost for nothing."""
@@ -547,7 +554,7 @@ async def retry_reply(message_id: str, user=Depends(plus_user)):
     async with db.tx() as tx:
         await tx.assistantaction.delete_many(where={"id": {"in": [a.id for a in actions]}})
         await tx.assistantmessage.delete_many(where={"id": {"in": [r.id for r in turn]}})
-    return await send(user, words, conversation.id)
+    return await send(user, words, conversation.id, always_ask=bool(body and body.alwaysAsk is True))
 
 
 MAX_MESSAGE = 12_000

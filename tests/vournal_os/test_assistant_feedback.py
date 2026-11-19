@@ -101,3 +101,14 @@ class Retry(ChatBase):
         other = await self.signed_in()
         r = await other.post(f"/api/assistant/messages/{out['messages'][1]['id']}/retry")
         self.assertEqual(r.status_code, 404)
+
+
+class RetryAlwaysAsk(ChatBase):
+    async def test_the_apps_try_again_asks_before_every_change_too(self):
+        fm.script(fm.message(fm.text("Hmm")), fm.tools(("create_task", {"title": "Gym"})), fm.message(fm.text("Approve below.")))
+        first = await self.say("add gym")
+        r = await self.client.post(f"/api/assistant/messages/{first['messages'][1]['id']}/retry", json={"alwaysAsk": True})
+        self.assertEqual(r.status_code, 200, r.text)
+        reply = r.json()["messages"][-1]
+        self.assertEqual(reply["actions"][0]["status"], "pending")
+        self.assertEqual(await self.db.task.count(where={"userId": self.client.user.id}), 0)
