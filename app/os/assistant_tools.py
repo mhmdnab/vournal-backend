@@ -1660,6 +1660,10 @@ async def reverse(user, undo: dict, ctx: Ctx | None = None) -> None:
         await _remove_created(user, undo)
     elif undo["op"] == "restore_settings":
         await _restore_settings(user, undo)
+    elif undo["op"] == "undo_maintenance_done":
+        from app.os import assistant_home
+
+        await assistant_home.undo_done(user, undo)
     else:
         await debts.remove_payment(undo["debtId"], undo["paymentId"], user=user)
 
@@ -1726,4 +1730,4 @@ async def describe(ctx: Ctx, kind, id: str) -> dict:
 
 
 # the section modules register their tools and item types (they import this module's helpers)
-from app.os import assistant_sections, assistant_meals, assistant_money  # noqa: E402,F401
+from app.os import assistant_sections, assistant_meals, assistant_money, assistant_home  # noqa: E402,F401

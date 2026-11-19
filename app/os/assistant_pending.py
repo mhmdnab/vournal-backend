@@ -34,13 +34,15 @@ ENTITY = {
     "plan_meal": "meal_plan_entry", "update_meal_plan": "meal_plan_entry", "shopping_from_meal_plan": "shopping_item",
     "add_recipe": "recipe", "update_recipe": "recipe",
     "create_budget": "budget", "update_budget": "budget", "create_recurring_payment": "recurring_payment", "update_recurring_payment": "recurring_payment",
+    "add_document": "document", "update_document": "document", "add_maintenance_item": "maintenance_item", "update_maintenance_item": "maintenance_item",
 }
 # the item an edit or payment points at: (input field, kind for describe)
 _TARGET = {"update_task": ("id", "task"), "update_event": ("id", "event"), "update_transaction": ("id", "transaction"),
            "add_debt_payment": ("debt_id", "debt"), "update_habit": ("id", "habit"), "log_habit": ("id", "habit"),
            "update_project": ("id", "project"), "update_person": ("id", "person"), "add_gift": ("person_id", "person"),
            "update_goal": ("id", "goal"), "update_meal_plan": ("id", "meal_plan_entry"), "update_recipe": ("id", "recipe"),
-           "update_budget": ("id", "budget"), "update_recurring_payment": ("id", "recurring_payment")}
+           "update_budget": ("id", "budget"), "update_recurring_payment": ("id", "recurring_payment"),
+           "update_document": ("id", "document"), "update_maintenance_item": ("id", "maintenance_item")}
 
 
 def check_input(schema: dict, value: dict) -> str | None:
