@@ -148,11 +148,13 @@ async def undo_done(user, undo: dict) -> None:
         raise ToolError("It was deleted since — nothing to undo")
     now = {"lastDoneAt": _day(item.lastDoneAt), "nextDueAt": _day(item.nextDueAt), "isActive": item.isActive}
     before = undo["before"]
+    # another completion on that day or later still stands: the item keeps the dates it gave
+    still_done = await db.maintenancelog.count(where={"itemId": item.id, "userId": user.id, "id": {"not": log.id}, "doneAt": {"gte": log.doneAt}})
     async with db.tx() as tx:
         await tx.maintenancelog.delete(where={"id": log.id})
         if undo.get("transactionId"):
             await tx.transaction.delete_many(where={"id": undo["transactionId"], "userId": user.id})
-        if now == undo["after"]:
+        if now == undo["after"] and not still_done:
             await tx.maintenanceitem.update(where={"id": item.id}, data={
                 "lastDoneAt": dates.parse_date_only(before["lastDoneAt"]), "nextDueAt": dates.parse_date_only(before["nextDueAt"]),
                 "isActive": before["isActive"]})

@@ -78,6 +78,18 @@ class StudyTools(LifeBase):
         await self.undo(done)
         self.assertEqual(await self.db.assessment.count(where={"courseId": c["id"]}), 1)
 
+    async def test_delete_course_with_classes_asks_and_undo_brings_the_classes_back(self):
+        c = await self.course()
+        e = await self.post("/api/events", {"title": "Statistics class", "startAt": "2026-11-23T08:00:00.000Z", "endAt": "2026-11-23T09:30:00.000Z",
+                                            "allDay": False, "type": "CLASS", "courseId": c["id"], "rrule": "FREQ=WEEKLY;BYDAY=MO"})
+        a = await self.delete("course", c["id"], "Statistics")
+        self.assertEqual(a["status"], "pending")  # its weekly classes go with it: it asks
+        done = await self.approve(a)
+        self.assertIsNone(await self.db.event.find_unique(where={"id": e["id"]}))
+        await self.undo(done)
+        back = await self.db.event.find_unique(where={"id": e["id"]})
+        self.assertEqual((back.courseId, back.type, back.rrule), (c["id"], "CLASS", "FREQ=WEEKLY;BYDAY=MO"))
+
     async def test_delete_assessment(self):
         c = await self.course()
         x = await self.post("/api/study/assessments", {"courseId": c["id"], "title": "Quiz"})

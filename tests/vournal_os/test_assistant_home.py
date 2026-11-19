@@ -108,6 +108,17 @@ class HomeTools(LifeBase):
         self.assertEqual(await self.db.maintenancelog.count(where={"itemId": m["id"]}), 1)
         self.assertEqual(await self.db.transaction.count(where={"userId": self.uid}), 0)
 
+    async def test_done_twice_same_day_undo_first_keeps_it_done_today(self):
+        m = await self.item()
+        first = await self.act("update_maintenance_item", {"id": m["id"], "done": True, "cost": 50})
+        await self.act("update_maintenance_item", {"id": m["id"], "done": True})
+        twice = await self.db.maintenanceitem.find_unique(where={"id": m["id"]})
+        await self.undo(first)
+        row = await self.db.maintenanceitem.find_unique(where={"id": m["id"]})
+        self.assertEqual(await self.db.maintenancelog.count(where={"itemId": m["id"]}), 1)
+        self.assertEqual((row.lastDoneAt, row.nextDueAt), (twice.lastDoneAt, twice.nextDueAt))
+        self.assertEqual(await self.db.transaction.count(where={"userId": self.uid}), 0)
+
     async def test_done_with_fields_is_an_error(self):
         m = await self.item()
         self.assertIn("not both", await self.act_error("update_maintenance_item", {"id": m["id"], "done": True, "title": "X"}))

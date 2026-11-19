@@ -3,6 +3,7 @@ assessments (with grades) and study sessions. Study has no workspaces (ruling R3
 
 import re
 
+from app.db import db
 from app.os import assistant_sections, study
 from app.os import assistant_tools as t
 from app.os.assistant_tools import Kind, ToolError
@@ -123,6 +124,12 @@ async def _update_study_item(i: dict, ctx) -> dict:
 # ----- item types --------------------------------------------------------------------------
 
 
+async def _course_classes(user_id: str, id: str) -> list:
+    """The weekly CLASS events remove_course deletes with the course (by hand, not by foreign key)."""
+    rows = await db.event.find_many(where={"userId": user_id, "workspaceId": None, "courseId": id, "type": "CLASS"})
+    return [("Event", e.id) for e in rows]
+
+
 async def _restore_course(ctx, id: str, before: dict) -> None:
     await study.update_course(id, t._check(study.CourseUpdateBody, before), user=ctx.user)
 
@@ -137,7 +144,7 @@ async def _restore_session(ctx, id: str, before: dict) -> None:
 
 KINDS = {
     "course": Kind(model="Course", find=study.find_course, label=lambda r: r.name, link=lambda r: LINKS["course"](r.id),
-                   delete=study.remove_course, restore=_restore_course),
+                   delete=study.remove_course, restore=_restore_course, companions=_course_classes),
     "assessment": Kind(model="Assessment", find=study._find_assessment, label=lambda r: r.title, link=lambda r: LINKS["assessment"](r.id),
                        delete=study.remove_assessment, restore=_restore_assessment),
     "study_session": Kind(model="StudySession", find=study._find_session, label=lambda r: r.topic or f"{r.durationMinutes} min",

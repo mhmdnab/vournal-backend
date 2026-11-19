@@ -936,7 +936,7 @@ async def _delete_item(i: dict, ctx: Ctx) -> dict:
         # Auto deletes one plain item at once (with Undo); anything bigger still asks
         from app.os import assistant_snapshot
 
-        copy = await assistant_snapshot.take(model_of(kind), id, ctx.user_id)
+        copy = await snapshot_of(kind, id, ctx.user_id)
         if copy["count"] == 1 and not copy["has_file"]:
             undo = await remove(ctx.user, kind, id)
             return {"content": f'Deleted "{found["label"]}". The user can undo it.',
@@ -1460,6 +1460,7 @@ class Kind:
     restore: object  # async (ctx, id, before) -> None, or None
     date_only: frozenset = frozenset()  # columns compared as YYYY-MM-DD; other datetimes as full ISO
     read: object = None  # (row, keys) -> dict, when plain columns aren't enough
+    companions: object = None  # async (user_id, id) -> [(table, id)]: rows its delete removes outside the foreign keys
 
 
 KINDS: dict[str, Kind] = {}
@@ -1468,6 +1469,22 @@ KINDS: dict[str, Kind] = {}
 def register(tools: dict, kinds: dict) -> None:
     _TOOLS.update(tools)
     KINDS.update(kinds)
+
+
+async def snapshot_of(kind: str, id: str, user_id: str) -> dict:
+    """The copy a delete takes: the item with what the database removes with it, and the rows its
+    route deletes by hand (a course's weekly classes), restored after it."""
+    from app.os import assistant_snapshot
+
+    copy = await assistant_snapshot.take(model_of(kind), id, user_id)
+    k = KINDS.get(kind)
+    for model, other in (await k.companions(user_id, id) if k and k.companions else []):
+        extra = await assistant_snapshot.take(model, other, user_id)
+        restored = {(r["model"], r["row"].get("id")) for r in extra["rows"]}
+        copy = {"rows": copy["rows"] + extra["rows"],
+                "relinks": [x for x in copy["relinks"] if (x["model"], x["id"]) not in restored] + extra["relinks"],
+                "count": copy["count"] + extra["count"], "has_file": copy["has_file"] or extra["has_file"]}
+    return copy
 
 
 def model_of(kind: str) -> str:
@@ -1651,7 +1668,7 @@ async def remove(user, kind: str, id: str) -> dict | None:
         handlers[kind] = KINDS[kind].delete
     if kind not in handlers:
         return None
-    snapshot = await assistant_snapshot.take(model_of(kind), id, user.id)
+    snapshot = await snapshot_of(kind, id, user.id)
     await handlers[kind](id, user=user)
     # attached files are deleted from storage with it and can't come back: no Undo then
     return None if snapshot["has_file"] else {"op": "restore_snapshot", "snapshot": snapshot}
