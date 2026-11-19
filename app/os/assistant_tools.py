@@ -306,6 +306,8 @@ async def run(name: str, raw_input, ctx: Ctx) -> dict:
         if ctx.importing and name not in IMPORT_TOOLS:
             # the file is someone else's text: an import only reads and adds
             return {"content": "Error: an import only adds new things; it can't change, archive or delete what's there.", "isError": True}
+        if ctx.recording and name in RECORDING_ONLY and not RECORDING_ONLY[name](i):
+            return {"content": RECORDING_REFUSAL, "isError": True}
         if ctx.mode == "manual" and name not in READ_TOOLS and name != "delete_item":  # every write, the registered ones included
             from app.os.assistant_pending import defer
 
@@ -1601,7 +1603,18 @@ READ_TOOLS = frozenset({"get_options", "search", "get_agenda", "list_tasks", "ge
 IMPORT_TOOLS = (READ_TOOLS - assistant_journal.JOURNAL_TOOLS) | frozenset({
     "create_task", "create_event", "create_reminder", "add_transaction", "create_debt", "add_note", "add_shopping_item",
     "create_habit", "create_project", "add_gift", "add_important_date", "create_goal", "create_account",
+}) | frozenset({  # the vournal life sections' add tools (design 2026-11-18): a recipe from a ChatGPT chat becomes a recipe
+    "plan_meal", "add_recipe", "create_budget", "create_recurring_payment", "add_document", "add_maintenance_item", "create_trip",
+    "add_trip_item", "add_study_item",
 })
+# the section tools (design 2026-11-18): adding something new, and changing what's there
+NEW_ADD_TOOLS = frozenset({"plan_meal", "add_recipe", "create_budget", "create_recurring_payment", "add_document", "add_maintenance_item",
+                           "create_trip", "add_trip_item", "add_study_item"})
+NEW_CHANGE_TOOLS = frozenset({"update_meal_plan", "shopping_from_meal_plan", "update_recipe", "update_budget", "update_recurring_payment",
+                              "update_document", "update_maintenance_item", "update_trip", "update_trip_item", "update_study_item", "save_ritual"})
+# what a recording's AI actions step may do with them (ruling R6): "paid the rent", "serviced the car"
+RECORDING_ONLY = {"update_recurring_payment": lambda i: i.get("action") == "pay", "update_maintenance_item": lambda i: i.get("done") is True}
+RECORDING_REFUSAL = "Error: from a recording, only paying a recurring payment or marking maintenance done is possible."
 
 
 # ----- deleting (after the user confirms) and undoing ------------------------------------

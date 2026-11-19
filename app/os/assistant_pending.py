@@ -92,6 +92,8 @@ def pending_kind(name: str, i: dict) -> str:
         return "delete"
     if name == "update_task" and i.get("status") == "done":
         return "complete"
+    if (name == "update_recurring_payment" and i.get("action") == "pay") or (name == "update_maintenance_item" and i.get("done") is True):
+        return "complete"
     return "update" if name.startswith("update_") else "create"
 
 

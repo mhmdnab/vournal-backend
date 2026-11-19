@@ -35,6 +35,8 @@ SYSTEM = _DATA["system"]
 ASK_USER = _DATA["ask_user"]
 WITHDRAW = _DATA["withdraw_proposal"]
 EXCLUDED = frozenset({"create_task", "create_event", "create_reminder", "search_journal", "get_journal_entries"})
+# the vournal life section tools stay in the chat, except "paid the rent" and "serviced the car" (ruling R6, design 2026-11-18)
+EXCLUDED |= (assistant_tools.NEW_ADD_TOOLS | assistant_tools.NEW_CHANGE_TOOLS | {"get_section"}) - set(assistant_tools.RECORDING_ONLY)
 TOOLS_FOR_ENTRY = [t for t in assistant.TOOLS if t["name"] not in EXCLUDED] + [ASK_USER, WITHDRAW]
 MAX_ANSWERS = 3
 ASK_AGAIN_AFTER = timedelta(days=7)  # "Not now" on the consent sheet: offered again a week later
@@ -151,6 +153,7 @@ async def run_step(entry, *, spend: bool, answer: dict | None = None) -> None:
     now = datetime.now(timezone.utc)
     today = assistant_tools.local_day(now, tz)
     ctx = assistant_tools.Ctx(user, tz, today, "manual")
+    ctx.recording = True  # the section tools it may use are limited to paying and maintenance done
     block = await _entry_block(entry, user.id, ctx)  # also fills ctx.entry_people
     new_rows: list[dict] = []
     if not history:
