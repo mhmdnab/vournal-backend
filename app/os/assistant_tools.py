@@ -1726,4 +1726,4 @@ async def describe(ctx: Ctx, kind, id: str) -> dict:
 
 
 # the section modules register their tools and item types (they import this module's helpers)
-from app.os import assistant_sections  # noqa: E402
+from app.os import assistant_sections, assistant_meals  # noqa: E402,F401

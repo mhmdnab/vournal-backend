@@ -31,12 +31,14 @@ ENTITY = {
     "save_focus_mode": "focus_mode", "set_focus": "focus_mode",
     "update_habit": "habit", "log_habit": "habit_log", "create_project": "project", "update_project": "project",
     "update_person": "person", "add_gift": "gift", "add_important_date": "important_date", "create_goal": "goal", "update_goal": "goal",
+    "plan_meal": "meal_plan_entry", "update_meal_plan": "meal_plan_entry", "shopping_from_meal_plan": "shopping_item",
+    "add_recipe": "recipe", "update_recipe": "recipe",
 }
 # the item an edit or payment points at: (input field, kind for describe)
 _TARGET = {"update_task": ("id", "task"), "update_event": ("id", "event"), "update_transaction": ("id", "transaction"),
            "add_debt_payment": ("debt_id", "debt"), "update_habit": ("id", "habit"), "log_habit": ("id", "habit"),
            "update_project": ("id", "project"), "update_person": ("id", "person"), "add_gift": ("person_id", "person"),
-           "update_goal": ("id", "goal")}
+           "update_goal": ("id", "goal"), "update_meal_plan": ("id", "meal_plan_entry"), "update_recipe": ("id", "recipe")}
 
 
 def check_input(schema: dict, value: dict) -> str | None:
