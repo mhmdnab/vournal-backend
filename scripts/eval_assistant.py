@@ -98,8 +98,8 @@ async def main() -> int:
     rounds: list = []
     real_call = assistant._call
 
-    async def recording_call(client, round_, messages, effort):
-        res = await real_call(client, round_, messages, effort)
+    async def recording_call(client, round_, messages, effort, *args, **kwargs):
+        res = await real_call(client, round_, messages, effort, *args, **kwargs)
         rounds.append((res, effort))
         return res
 
