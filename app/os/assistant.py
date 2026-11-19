@@ -217,8 +217,10 @@ async def _call(client, round_: int, messages: list, effort: str, system: str = 
         max_tokens=8000,
         betas=[ai.FALLBACK_BETA],
         fallbacks="default",
-        cache_control={"type": "ephemeral"},
-        system=system,
+        cache_control={"type": "ephemeral"},  # the growing conversation
+        # its own breakpoint at the end of the fixed tools + system prompt, so a new conversation reads them
+        # from the cache instead of writing ~22k tokens again (2026-11-19)
+        system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
         tools=tools,
         **({"tool_choice": {"type": "none"}} if round_ == MAX_ROUNDS else {}),
         thinking={"type": "adaptive"},
