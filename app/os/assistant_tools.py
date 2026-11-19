@@ -604,6 +604,8 @@ async def _create_task(i: dict, ctx: Ctx) -> dict:
         plain["priority"] = i["priority"]
     if isinstance(i.get("notes"), str) and i["notes"].strip():
         plain["description"] = i["notes"].strip()
+    if i.get("life_area") in tasks.LIFE_AREAS:
+        plain["lifeArea"] = i["life_area"]
     t = await tasks.create(_check(tasks.CreateBody, plain), space=personal_space(ctx.user))
     return _done({"kind": "create", "entityType": "task", "entityId": t["id"], "label": t["title"], "link": f"/tasks?id={t['id']}",
                   "undo": {"op": "delete", "type": "task", "id": t["id"]}},
@@ -633,6 +635,8 @@ async def _update_task(i: dict, ctx: Ctx) -> dict:
         patch["title"] = i["title"].strip()
     if _is_priority(i.get("priority")):
         patch["priority"] = i["priority"]
+    if i.get("life_area") in tasks.LIFE_AREAS:
+        patch["lifeArea"] = i["life_area"]
     if i.get("status") == "in_progress":
         patch["status"] = "IN_PROGRESS"
     if i.get("status") == "todo" and current["status"] != "COMPLETED":
@@ -683,6 +687,8 @@ async def _create_event(i: dict, ctx: Ctx) -> dict:
                  "allDay": False, **({"timeAnchor": anchor} if anchor else {}), **series, **_extra(i)}
     else:
         plain = {"title": title, "date": date, "allDay": True, **series, **_extra(i)}
+    if i.get("meeting") is True:
+        plain["type"] = "MEETING"  # the work overview finds meetings by type
     e = await events.create(_check(events.CreateBody, plain), space=personal_space(ctx.user))
     return _done({"kind": "create", "entityType": "event", "entityId": e["id"], "label": e["title"], "link": f"/calendar?id={e['id']}&date={date}",
                   "undo": {"op": "delete", "type": "event", "id": e["id"]}},
@@ -1313,6 +1319,8 @@ async def _create_project(i: dict, ctx: Ctx) -> dict:
         plain["budget"] = i["budget"]
     if _text(i, "currency"):
         plain["currency"] = _text(i, "currency").upper()
+    if i.get("life_area") in tasks.LIFE_AREAS:
+        plain["lifeArea"] = i["life_area"]
     p = await projects.create(_check(projects.CreateBody, plain), space=personal_space(ctx.user))
     return _done({"kind": "create", "entityType": "project", "entityId": p["id"], "label": p["name"], "link": f"/projects?id={p['id']}",
                   "undo": {"op": "delete", "type": "project", "id": p["id"]}}, {"id": p["id"], "name": p["name"]})
@@ -1329,6 +1337,8 @@ async def _update_project(i: dict, ctx: Ctx) -> dict:
         plain["deadline"] = opt_date(i["deadline"])
     if isinstance(i.get("description"), str):
         plain["description"] = i["description"].strip() or None
+    if i.get("life_area") in tasks.LIFE_AREAS:
+        plain["lifeArea"] = i["life_area"]
     if not plain:
         raise ToolError("Nothing to change")
     before = await fields_now("project", id, plain, ctx)
@@ -1659,6 +1669,10 @@ async def reverse(user, undo: dict, ctx: Ctx | None = None) -> None:
         await _remove_created(user, undo)
     elif undo["op"] == "restore_settings":
         await _restore_settings(user, undo)
+    elif undo["op"] == "restore_ritual":
+        from app.os import assistant_rituals
+
+        await assistant_rituals.restore(user, undo)
     elif undo["op"] == "undo_maintenance_done":
         from app.os import assistant_home
 
@@ -1729,4 +1743,4 @@ async def describe(ctx: Ctx, kind, id: str) -> dict:
 
 
 # the section modules register their tools and item types (they import this module's helpers)
-from app.os import assistant_sections, assistant_meals, assistant_money, assistant_home, assistant_trips, assistant_study  # noqa: E402,F401
+from app.os import assistant_sections, assistant_meals, assistant_money, assistant_home, assistant_trips, assistant_study, assistant_rituals  # noqa: E402,F401

@@ -36,7 +36,7 @@ ENTITY = {
     "create_budget": "budget", "update_budget": "budget", "create_recurring_payment": "recurring_payment", "update_recurring_payment": "recurring_payment",
     "add_document": "document", "update_document": "document", "add_maintenance_item": "maintenance_item", "update_maintenance_item": "maintenance_item",
     "create_trip": "trip", "update_trip": "trip", "add_trip_item": "trip_item", "update_trip_item": "trip_item",
-    "add_study_item": "course", "update_study_item": "course",
+    "add_study_item": "course", "update_study_item": "course", "save_ritual": "ritual",
 }
 # the item an edit or payment points at: (input field, kind for describe)
 _TARGET = {"update_task": ("id", "task"), "update_event": ("id", "event"), "update_transaction": ("id", "transaction"),
