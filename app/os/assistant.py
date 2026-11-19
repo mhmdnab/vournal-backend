@@ -32,7 +32,7 @@ from app.os.assistant_consent import journal_allowed
 from app.os.assistant_journal import JOURNAL_TOOLS
 from app.os.assistant_effort import escalate, pick_effort
 from app.os.common import dates, validators
-from app.os.common.body import RuleBody
+from app.os.common.body import RuleBody, choice, text as text_rule
 from app.os.common.deps import plus_user
 from app.os.common.http import nest_error, nest_router
 from app.os.common.i18n import to_lang
@@ -138,9 +138,12 @@ def action_view(a) -> dict:
             "canUndo": a.status == "done" and a.undo is not None and not _expired(a)}
 
 
-def _view(m, actions) -> dict:
+def _view(m, actions, feedback: dict | None = None) -> dict:
+    """A message as the chat shows it; `feedback`: the person's ratings by message id (design 2026-11-19)."""
+    rated = (feedback or {}).get(m.id)
     return {"id": m.id, "role": "assistant" if m.role == "assistant" else "user", "text": m.text or "", "createdAt": m.createdAt,
-            "actions": [action_view(a) for a in actions if a.messageId == m.id]}
+            "actions": [action_view(a) for a in actions if a.messageId == m.id],
+            "feedback": {"rating": rated.rating, "comment": rated.comment} if rated else None}
 
 
 # history in the order it was written: two rows of one round can share a millisecond
@@ -179,8 +182,10 @@ async def get_conversation(id: str, user=Depends(plus_user)):
     messages = await db.assistantmessage.find_many(where={"conversationId": id, "hidden": False}, order=_IN_ORDER)
     actions = await db.assistantaction.find_many(where={"conversationId": id}, order=_IN_ORDER)
     turns = await db.assistantmessage.count(where={"conversationId": id})
+    rated = await db.assistantfeedback.find_many(where={"userId": user.id, "messageId": {"in": [m.id for m in messages]}})
+    feedback = {f.messageId: f for f in rated}
     return {"id": c.id, "title": c.title, "channel": c.channel, "lastMessageAt": c.lastMessageAt, "full": turns >= MAX_TURNS,
-            "messages": [_view(m, actions) for m in messages]}
+            "messages": [_view(m, actions, feedback) for m in messages]}
 
 
 @router.delete("/conversations/{id}")
@@ -465,6 +470,84 @@ async def undo(id: str, user=Depends(plus_user)):
     done = await _resolve(a.id, "undone", ("done",))
     await _note(a.conversationId, f'[The user pressed Undo: "{a.label}" ({a.kind}) was reversed.]')
     return action_view(done)
+
+
+# ----- message buttons (design 2026-11-19): a rating on a reply, and Try again -----------
+
+
+class FeedbackBody(RuleBody):
+    """{rating: "up" | "down" | null (takes it back), comment?: what went wrong, up to 1000 characters}."""
+
+    RULES = (
+        ("rating", True, False, choice(("up", "down"))),
+        ("comment", True, True, text_rule(1000)),
+    )
+    rating: object = None
+    comment: object = None
+
+
+async def _own_reply(user_id: str, message_id: str):
+    """A message in one of the person's chats (not an app recording's), or the route's 404."""
+    m = await db.assistantmessage.find_first(where={"id": message_id, "hidden": False,
+                                                    "conversation": {"is": {"userId": user_id, "entryId": None}}})
+    if m is None:
+        raise nest_error(404, "Message not found")
+    return m
+
+
+@router.put("/messages/{message_id}/feedback")
+async def rate_reply(message_id: str, body: FeedbackBody, user=Depends(plus_user)):
+    m = await _own_reply(user.id, message_id)
+    if m.role != "assistant":
+        raise nest_error(400, "Only vournal's replies can be rated")
+    if body.rating is None:
+        await db.assistantfeedback.delete_many(where={"messageId": m.id, "userId": user.id})
+        return {"rating": None, "comment": None}
+    comment = body.comment or None
+    row = await db.assistantfeedback.upsert(
+        where={"messageId_userId": {"messageId": m.id, "userId": user.id}},
+        data={"create": {"messageId": m.id, "userId": user.id, "rating": body.rating, "comment": comment},
+              "update": {"rating": body.rating, "comment": comment}},
+    )
+    return {"rating": row.rating, "comment": row.comment}
+
+
+# a change still standing (or waiting): trying again could make it twice
+_STANDING = ("done", "running", "pending")
+
+
+@router.post("/messages/{message_id}/retry")
+async def retry_reply(message_id: str, user=Depends(plus_user)):
+    """The last reply, again: the turn it ended (your message and everything after it) is replaced
+    by a fresh answer to the same words. Only when that reply changed nothing (or its changes were
+    undone), and only if a new answer can be made now, so the old one is never lost for nothing."""
+    m = await _own_reply(user.id, message_id)
+    if m.role != "assistant":
+        raise nest_error(400, "Only vournal's replies can be tried again")
+    rows = await db.assistantmessage.find_many(where={"conversationId": m.conversationId}, order=_IN_ORDER)
+    visible = [r for r in rows if not r.hidden]
+    if not visible or visible[-1].id != m.id:
+        raise nest_error(400, "Only the last reply can be tried again")
+    start = max((n for n, r in enumerate(rows) if r.role == "user" and not r.hidden and rows.index(m) > n), default=None)
+    if start is None:
+        raise nest_error(400, "Only the last reply can be tried again")
+    turn = rows[start:]
+    actions = await db.assistantaction.find_many(where={"messageId": {"in": [r.id for r in turn]}})
+    if any(a.status in _STANDING for a in actions):
+        raise nest_error(409, "This reply changed things. Undo them first, then try again.")
+    ai.throttle("assistant-chat", user.id)
+    s = await ensure_os_profile(user)
+    left = await ai.remaining(user.id, s.timezone)
+    conversation = await _owned(user.id, m.conversationId)
+    conv = {"id": conversation.id, "title": conversation.title}
+    state = "not_configured" if ai.client() is None else "disabled" if not s.aiEnabled else "limit" if left <= 0 else None
+    if state:
+        return {"status": state, "conversation": conv, "messages": [], "remainingThisMonth": left}
+    words = turn[0].text or ""
+    async with db.tx() as tx:
+        await tx.assistantaction.delete_many(where={"id": {"in": [a.id for a in actions]}})
+        await tx.assistantmessage.delete_many(where={"id": {"in": [r.id for r in turn]}})
+    return await send(user, words, conversation.id)
 
 
 MAX_MESSAGE = 12_000

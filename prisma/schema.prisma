@@ -148,6 +148,7 @@ model User {
   projectShares     ProjectShare[]
   assignedTasks     Task[]            @relation("TaskAssignee")
   assistantChats    AssistantConversation[]
+  assistantFeedback AssistantFeedback[]
   debts             Debt[]
   debtPayments      DebtPayment[]
   healthProfile     HealthProfile?
@@ -1760,8 +1761,26 @@ model AssistantMessage {
   text           String? // what the chat shows; null for tool rounds
   hidden         Boolean               @default(false) // tool rounds and notes (confirmed, undone)
   createdAt      DateTime              @default(now())
+  feedback       AssistantFeedback[]
 
   @@index([conversationId, createdAt])
+}
+
+// A thumbs up or down on an assistant reply (design 2026-11-19, message buttons), with an optional
+// note on what went wrong: one per person per reply, so the owner can see which answers miss.
+model AssistantFeedback {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messageId String
+  message   AssistantMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  rating    String // "up" | "down"
+  comment   String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([messageId, userId])
+  @@index([rating, createdAt])
 }
 
 // Something the assistant did (or wants to do: a deletion waiting for confirmation).
