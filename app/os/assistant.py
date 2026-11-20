@@ -516,6 +516,19 @@ async def rate_reply(message_id: str, body: FeedbackBody, user=Depends(plus_user
 _STANDING = ("done", "running", "pending")
 
 
+def _standing(a) -> bool:
+    """Still standing or waiting; a waiting card past its 24 hours is shown expired and blocks nothing."""
+    return a.status in _STANDING and not (a.status == "pending" and _expired(a))
+
+
+def _typed(row) -> bool:
+    """The turn's words are what the chat shows. An import part or report shows a label instead of
+    its real prompt, so trying it again would send the label (review 2026-11-20)."""
+    blocks = row.content if isinstance(row.content, list) else []
+    said = "".join(b.get("text", "") for b in blocks if isinstance(b, dict) and b.get("type") == "text")
+    return bool(row.text) and (said == row.text or said.endswith("\n" + row.text))
+
+
 class RetryBody(RuleBody):
     """{alwaysAsk?: the app's chats, where every change waits as a card}."""
 
@@ -528,9 +541,13 @@ async def retry_reply(message_id: str, body: RetryBody | None = None, user=Depen
     """The last reply, again: the turn it ended (your message and everything after it) is replaced
     by a fresh answer to the same words. Only when that reply changed nothing (or its changes were
     undone), and only if a new answer can be made now, so the old one is never lost for nothing."""
+    from app.os.assistant_import import import_running
+
     m = await _own_reply(user.id, message_id)
     if m.role != "assistant":
         raise nest_error(400, "Only vournal's replies can be tried again")
+    if import_running(m.conversationId):
+        raise nest_error(409, "This chat is importing a file. Wait for it to finish.")
     rows = await db.assistantmessage.find_many(where={"conversationId": m.conversationId}, order=_IN_ORDER)
     visible = [r for r in rows if not r.hidden]
     if not visible or visible[-1].id != m.id:
@@ -539,8 +556,10 @@ async def retry_reply(message_id: str, body: RetryBody | None = None, user=Depen
     if start is None:
         raise nest_error(400, "Only the last reply can be tried again")
     turn = rows[start:]
+    if not _typed(turn[0]):
+        raise nest_error(409, "An import's replies can't be tried again.")
     actions = await db.assistantaction.find_many(where={"messageId": {"in": [r.id for r in turn]}})
-    if any(a.status in _STANDING for a in actions):
+    if any(_standing(a) for a in actions):
         raise nest_error(409, "This reply changed things. Undo them first, then try again.")
     ai.throttle("assistant-chat", user.id)
     s = await ensure_os_profile(user)
@@ -553,7 +572,10 @@ async def retry_reply(message_id: str, body: RetryBody | None = None, user=Depen
     words = turn[0].text or ""
     async with db.tx() as tx:
         await tx.assistantaction.delete_many(where={"id": {"in": [a.id for a in actions]}})
-        await tx.assistantmessage.delete_many(where={"id": {"in": [r.id for r in turn]}})
+        gone = await tx.assistantmessage.delete_many(where={"id": {"in": [r.id for r in turn]}})
+        if gone != len(turn):
+            # a second tap (or another request) got there first: let that one answer, once
+            raise nest_error(409, "Already trying again.")
     return await send(user, words, conversation.id, always_ask=bool(body and body.alwaysAsk is True))
 
 

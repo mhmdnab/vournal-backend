@@ -112,3 +112,55 @@ class RetryAlwaysAsk(ChatBase):
         reply = r.json()["messages"][-1]
         self.assertEqual(reply["actions"][0]["status"], "pending")
         self.assertEqual(await self.db.task.count(where={"userId": self.client.user.id}), 0)
+
+
+class RetryGuards(ChatBase):
+    """Review fixes (2026-11-20): a double tap, import turns, and expired cards."""
+
+    async def visible(self, cid):
+        return [m["text"] for m in (await self.client.get(f"/api/assistant/conversations/{cid}")).json()["messages"]]
+
+    async def test_a_double_tap_tries_again_once(self):
+        import asyncio
+
+        fm.script(fm.message(fm.text("A1")), fm.message(fm.text("A2")), fm.message(fm.text("A3")))
+        first = await self.say("plan my week")
+        cid, old = first["conversation"]["id"], first["messages"][1]["id"]
+        before = first["remainingThisMonth"]
+        rs = await asyncio.gather(*[self.client.post(f"/api/assistant/messages/{old}/retry") for _ in range(2)])
+        self.assertEqual(sorted(r.status_code for r in rs), [200, 409], [r.text for r in rs])
+        self.assertEqual(await self.visible(cid), ["plan my week", "A2"])
+        ok = next(r for r in rs if r.status_code == 200).json()
+        self.assertEqual(ok["remainingThisMonth"], before - 1)
+
+    async def test_an_import_report_cant_be_tried_again(self):
+        from app.os import assistant
+
+        fm.script(fm.message(fm.text("Report: added 3 things")))
+        res = await assistant.send(self.client.user, "THE REAL REPORT PROMPT", None, display="Import report", importing=True)
+        cid, mid = res["conversation"]["id"], res["messages"][1]["id"]
+        r = await self.client.post(f"/api/assistant/messages/{mid}/retry")
+        self.assertEqual(r.status_code, 409, r.text)
+        self.assertEqual(await self.visible(cid), ["Import report", "Report: added 3 things"])
+
+    async def test_a_running_import_blocks_try_again(self):
+        from unittest.mock import patch
+
+        fm.script(fm.message(fm.text("A1")))
+        first = await self.say("plan my week")
+        with patch("app.os.assistant_import.import_running", lambda cid: True):
+            r = await self.client.post(f"/api/assistant/messages/{first['messages'][1]['id']}/retry")
+        self.assertEqual(r.status_code, 409, r.text)
+
+    async def test_an_expired_waiting_card_doesnt_block_try_again(self):
+        from datetime import datetime, timedelta, timezone
+
+        await self.client.patch("/api/settings", json={"assistantMode": "manual"})
+        fm.script(fm.tools(("create_task", {"title": "Gym"})), fm.message(fm.text("Approve below.")), fm.message(fm.text("Fresh")))
+        out = await self.say("add gym")
+        reply = out["messages"][1]
+        self.assertEqual(reply["actions"][0]["status"], "pending")
+        await self.db.assistantaction.update(where={"id": reply["actions"][0]["id"]}, data={"createdAt": datetime.now(timezone.utc) - timedelta(hours=25)})
+        r = await self.client.post(f"/api/assistant/messages/{reply['id']}/retry")
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()["messages"][-1]["text"], "Fresh")
