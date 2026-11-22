@@ -243,3 +243,57 @@ class TheStep(EntryActionsBase):
         await self.record()
         web = await self.signed_in(self.user)
         self.assertEqual((await web.get("/api/assistant/conversations")).json()["items"], [])
+
+
+class TasksAndEventsOnTheList(EntryActionsBase):
+    """Recordings that finish, move or restate something already on the list (2026-11-22): extraction
+    sees the open tasks and events, and a to-do that duplicates an item the step changes comes off
+    the card before it is shown."""
+
+    async def task(self, title, days=0):
+        from app.os import assistant_tools as tools
+
+        today = datetime.now(timezone.utc).date()
+        ctx = tools.Ctx(self.user, "UTC", today.isoformat(), "auto")
+        out = await tools.run("create_task", {"title": title, "date": (today + timedelta(days=days)).isoformat()}, ctx)
+        return out["action"]["entityId"]
+
+    def known(self):
+        from app import main
+
+        return main.extract.call_args.kwargs["known"]
+
+    async def test_extraction_sees_open_tasks_for_plus_with_ai_actions(self):
+        await self.task("Call mom", days=1)
+        fm.script(fm.message(fm.text("ok")))
+        await self.record()
+        self.assertTrue(any(line.startswith("Call mom (due ") for line in self.known()["onList"]))
+
+    async def test_no_list_when_ai_actions_are_off(self):
+        await self.task("Call mom")
+        await self.allow(False)
+        await self.record()
+        self.assertEqual(self.known().get("onList") or [], [])
+
+    async def test_moving_a_task_drops_the_duplicate_todo(self):
+        task_id = await self.task("Call mom")
+        later = (datetime.now(timezone.utc).date() + timedelta(days=3)).isoformat()
+        fm.script(fm.tools(("update_task", {"id": task_id, "date": later})), fm.message(fm.text("Moved.")))
+        entry = await self.record("push the call with mom to later this week")
+        self.assertEqual(entry.proposal["result"]["todos"], [])
+        self.assertEqual([t["text"] for t in entry.proposal["droppedTodos"]], ["Call mom"])
+
+    async def test_a_named_drop_without_a_change_keeps_the_todo(self):
+        task_id = await self.task("Call mom")
+        fm.script(fm.tools(("drop_todo", {"todo": 0, "item_id": task_id})), fm.message(fm.text("ok")))
+        entry = await self.record("call mom")
+        self.assertEqual([t["text"] for t in entry.proposal["result"]["todos"]], ["Call mom"])
+        self.assertNotIn("droppedTodos", entry.proposal)
+
+    async def test_only_the_duplicate_comes_off(self):
+        self.result = {**RESULT, "todos": [{"text": "Call mom", "dueDate": None, "time": None},
+                                           {"text": "Buy flowers", "dueDate": None, "time": None}]}
+        task_id = await self.task("Call mom")
+        fm.script(fm.tools(("update_task", {"id": task_id, "status": "done"})), fm.message(fm.text("Done.")))
+        entry = await self.record("called mom, need to buy flowers")
+        self.assertEqual([t["text"] for t in entry.proposal["result"]["todos"]], ["Buy flowers"])

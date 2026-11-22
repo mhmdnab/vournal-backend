@@ -368,6 +368,15 @@ async def process_transcript(
     # reuses an existing record for the same person/theme — including across scripts
     # (بلال -> Bilal) — instead of minting a near-duplicate.
     known = await known_names(db, user_id)
+    if review and user is not None:
+        # What's already on their list (open tasks, nearby events), when the AI actions step can
+        # change it: a to-do they finish, move or only mention again is that item, not a new one.
+        from app import entry_actions
+
+        try:
+            known["onList"] = await entry_actions.on_their_list(user)
+        except Exception:  # noqa: BLE001 — extraction runs without it
+            log.exception("Reading the list failed for entry %s", entry_id)
 
     extract_fn = extract_merged if use_merged else extract
     now = datetime.now(tz)

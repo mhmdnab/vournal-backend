@@ -8,7 +8,8 @@ entry takes one request of the shared monthly AI allowance; answering its questi
 
 To-dos stay with extraction, so the step has no tool that creates tasks, events or reminders.
 People the entry found but who don't exist yet are offered as "proposal-person:<index>"; Save
-creates them first and swaps in their ids."""
+creates them first and swaps in their ids. An extracted to-do that is really an existing task or
+event the step changes ("push the haircut to Friday") comes off the card (_drop_todos)."""
 
 import json
 import logging
@@ -27,6 +28,7 @@ from app.os.assistant_pending import PERSON_PLACEHOLDER
 from app.os.common import dates
 from app.os.common.i18n import to_lang
 from app.os.profile import ensure_os_profile
+from app.task_intelligence import _fold
 
 log = logging.getLogger("vournal.entries")
 
@@ -34,14 +36,17 @@ _DATA = json.loads((Path(__file__).parent / "os" / "data" / "entry_actions.json"
 SYSTEM = _DATA["system"]
 ASK_USER = _DATA["ask_user"]
 WITHDRAW = _DATA["withdraw_proposal"]
+DROP_TODO = _DATA["drop_todo"]
 EXCLUDED = frozenset({"create_task", "create_event", "create_reminder", "search_journal", "get_journal_entries"})
 # the vournal life section tools stay in the chat, except "paid the rent" and "serviced the car" (ruling R6, design 2026-11-18)
 EXCLUDED |= (assistant_tools.NEW_ADD_TOOLS | assistant_tools.NEW_CHANGE_TOOLS | {"get_section"}) - set(assistant_tools.RECORDING_ONLY)
-TOOLS_FOR_ENTRY = [t for t in assistant.TOOLS if t["name"] not in EXCLUDED] + [ASK_USER, WITHDRAW]
+TOOLS_FOR_ENTRY = [t for t in assistant.TOOLS if t["name"] not in EXCLUDED] + [ASK_USER, WITHDRAW, DROP_TODO]
 MAX_ANSWERS = 3
 ASK_AGAIN_AFTER = timedelta(days=7)  # "Not now" on the consent sheet: offered again a week later
 ASKED = "Asked the user. Stop now; their answer comes back as the next message."
 WITHDRAWN = "Withdrawn: it is off the card."
+DROPPED = "Noted: that to-do comes off the card along with your change to the item."
+LISTED_KINDS = ("task", "event")  # the existing items an extracted to-do can turn out to be
 
 
 async def _set_proposal(entry_id: str, **changes) -> dict:
@@ -76,7 +81,7 @@ async def after_extraction(entry_id: str) -> None:
 async def _entry_block(entry, user_id: str, ctx: assistant_tools.Ctx) -> str:
     result = entry.proposal["result"]
     lines = ["<entry>", f"Transcript: {entry.rawTranscript}"]
-    todos = [t["text"] for t in result.get("todos", [])]
+    todos = [f"[{n}] {t['text']}" for n, t in enumerate(result.get("todos", []))]
     lines.append("To-dos already found (handled; never add them again): " + ("; ".join(todos) if todos else "none"))
     lines.append("People in this entry:" if result.get("people") else "People in this entry: none")
     for index, name in enumerate(result.get("people", [])):
@@ -88,12 +93,13 @@ async def _entry_block(entry, user_id: str, ctx: assistant_tools.Ctx) -> str:
             ctx.entry_people[placeholder] = name
             lines.append(f'[{index}] {name} (new: use "{placeholder}" as their id)')
     lines.append("</entry>")
-    lines.append(await _their_items(user_id))
+    lines.append(await _their_items(user_id, ctx))
     return "\n".join(lines)
 
 
-async def _their_items(user_id: str) -> str:
-    """The user's habits, projects and goals, so the step can act on them without searching."""
+async def _their_items(user_id: str, ctx: assistant_tools.Ctx) -> str:
+    """The user's habits, projects, goals, open tasks and nearby events, so the step can act on them
+    without searching ("sent it", "push it to Thursday", "we cancelled" change one of these)."""
     habits = await db.habit.find_many(where={"userId": user_id, "isArchived": False}, order={"sortOrder": "asc"}, take=40)
     projects = await db.project.find_many(where={"userId": user_id, "workspaceId": None, "status": {"in": ["PLANNING", "ACTIVE", "ON_HOLD"]}}, take=40)
     goals = await db.goal.find_many(where={"userId": user_id, "status": {"in": ["ACTIVE", "PAUSED"]}}, take=40)
@@ -105,8 +111,92 @@ async def _their_items(user_id: str) -> str:
     lines = ["<their_items>", "Habits:" if habits else "Habits: none", *map(habit, habits)]
     lines += ["Projects:" if projects else "Projects: none", *(f"- {p.name} (id {p.id}, {p.status.lower()})" for p in projects)]
     lines += ["Goals:" if goals else "Goals: none", *(f"- {g.name} (id {g.id})" for g in goals)]
+    lines += await _tasks_and_events(ctx)
     lines.append("</their_items>")
     return "\n".join(lines)
+
+
+async def _read(tool: str, i: dict, ctx: assistant_tools.Ctx):
+    """A read tool's JSON as data, or None (refused, failed, or cut off for being too long)."""
+    out = await assistant_tools.run(tool, i, ctx)
+    if out.get("isError"):
+        return None
+    try:
+        return json.loads(out["content"])
+    except ValueError:
+        return None
+
+
+async def _open_tasks_and_events(ctx: assistant_tools.Ctx) -> tuple[list, list]:
+    """Open tasks (the app's to-dos too, as list_tasks shows them) and calendar events from yesterday
+    to two weeks ahead."""
+    today = datetime.fromisoformat(ctx.today).date()
+    tasks = ((await _read("list_tasks", {"status": "open", "limit": 30}, ctx)) or {}).get("items", [])[:30]
+    agenda = await _read("get_agenda", {"from": (today - timedelta(days=1)).isoformat(),
+                                        "to": (today + timedelta(days=14)).isoformat()}, ctx) or []
+    return tasks, [e for e in agenda if e.get("type") == "event"][:20]
+
+
+async def on_their_list(user) -> list[str]:
+    """For extraction: the open tasks and events this step would see, as "title (when)" lines, so a
+    to-do already there isn't extracted again. Empty when the step can't run for the user (not Plus,
+    AI actions off): a move or a "done" would then change nothing, so extraction keeps its to-do."""
+    if effective_plan(user) != "plus" or ai.client() is None:
+        return []
+    s = await ensure_os_profile(user)
+    if not s.aiEnabled:
+        return []
+    tz = dates.valid_zone(s.timezone)
+    ctx = assistant_tools.Ctx(user, tz, assistant_tools.local_day(datetime.now(timezone.utc), tz), "manual")
+    tasks, events = await _open_tasks_and_events(ctx)
+    return ([t["title"] + (f" (due {t['due']})" if t.get("due") else "") for t in tasks]
+            + [f"{e['title']} ({e['start']}{', all day' if e.get('allDay') else ''})" for e in events])
+
+
+async def _tasks_and_events(ctx: assistant_tools.Ctx) -> list[str]:
+    """The open tasks and events (see _open_tasks_and_events) with ids and when; an event that has
+    ended says so."""
+    tasks, events = await _open_tasks_and_events(ctx)
+    now = f"{ctx.today} {assistant_tools.local_time(datetime.now(timezone.utc), ctx.tz)}"
+
+    def task(t) -> str:
+        return f"- {t['title']} (id {t['id']}{', due ' + t['due'] if t.get('due') else ''})"
+
+    def event(e) -> str:
+        if e.get("allDay"):
+            return f"- {e['title']} (id {e['id']}, {e['start']}, all day)"
+        end = e["end"][11:] if e["end"][:10] == e["start"][:10] else e["end"]
+        return f"- {e['title']} (id {e['id']}, {e['start']} to {end}{', already over' if e['end'] < now else ''})"
+
+    return ["Open tasks:" if tasks else "Open tasks: none", *map(task, tasks),
+            "Events, yesterday to two weeks ahead:" if events else "Events, yesterday to two weeks ahead: none", *map(event, events)]
+
+
+async def _drop_todos(entry_id: str, drafts: list[dict], named: list[tuple[int, str]], ctx: assistant_tools.Ctx) -> None:
+    """Takes off the card extraction's to-dos that are an existing task or event this run changes
+    (moves, finishes, cancels): the ones the step named with drop_todo for that item, and any whose
+    text is that item's title. A drop needs the change itself, so a to-do is never lost to a guess.
+
+    Only before the card is first shown (the entry isn't DONE yet: the app shows the card and Save
+    accepts it only once it is). After that the app holds the to-dos by index and keeps the user's
+    ticks and edits across a re-run (an answer, consent, "unask"), so they never change then."""
+    changed = {d["entityId"] for d in drafts if d.get("entityType") in LISTED_KINDS and d.get("entityId")}
+    if not changed:
+        return
+    entry = await db.entry.find_unique(where={"id": entry_id})
+    proposal = entry.proposal or {}
+    result = proposal.get("result") or {}
+    todos = result.get("todos") or []
+    if entry.status == "DONE" or not todos:
+        return
+    drop = {n for n, item in named if item in changed and 0 <= n < len(todos)}
+    tasks, events = await _open_tasks_and_events(ctx)
+    titles = {_fold(x["title"]) for x in [*tasks, *events] if x.get("id") in changed and x.get("title")}
+    drop |= {n for n, t in enumerate(todos) if _fold(str(t.get("text") or "")) in titles}
+    if not drop:
+        return
+    await _set_proposal(entry_id, result={**result, "todos": [t for n, t in enumerate(todos) if n not in drop]},
+                        droppedTodos=[*(proposal.get("droppedTodos") or []), *(todos[n] for n in sorted(drop))])
 
 
 def _merged(messages: list[dict]) -> list[dict]:
@@ -170,6 +260,7 @@ async def run_step(entry, *, spend: bool, answer: dict | None = None) -> None:
     drafts: list[dict] = []
     first_position = await db.assistantaction.count(where={"entryId": entry.id})  # after what the card already has
     withdrawn: set[str] = set()
+    named: list[tuple[int, str]] = []  # drop_todo: (to-do number, the existing item's id)
     question = None
     last_row = None
     effort = pick_effort(entry.rawTranscript or "", False)
@@ -189,6 +280,12 @@ async def run_step(entry, *, spend: bool, answer: dict | None = None) -> None:
                     target = str((use.get("input") or {}).get("id") or "").removeprefix("pending:")
                     withdrawn.add(target)
                     results.append({"type": "tool_result", "tool_use_id": use["id"], "content": WITHDRAWN})
+                    continue
+                if use["name"] == "drop_todo":
+                    i = use.get("input") if isinstance(use.get("input"), dict) else {}
+                    if isinstance(i.get("todo"), int) and isinstance(i.get("item_id"), str):
+                        named.append((i["todo"], i["item_id"]))
+                    results.append({"type": "tool_result", "tool_use_id": use["id"], "content": DROPPED})
                     continue
                 if use["name"] == "ask_user":
                     i = use.get("input") if isinstance(use.get("input"), dict) else {}
@@ -221,6 +318,10 @@ async def run_step(entry, *, spend: bool, answer: dict | None = None) -> None:
     # a draft it withdrew in this same run never reaches the card
     drafts = [d for d in drafts if d["id"] not in withdrawn and (not d.get("call") or _same(d["call"]) not in kept)]
     await assistant._save_actions(user.id, conversation.id, last_row.id, drafts, entry_id=entry.id, withdrawn=withdrawn)
+    try:
+        await _drop_todos(entry.id, drafts, named, ctx)
+    except Exception:  # noqa: BLE001 — the card keeps the to-do, as before
+        log.exception("Dropping duplicate to-dos failed for entry %s", entry.id)
     answers = (entry.proposal or {}).get("answers", 0) + (1 if answer else 0)
     await _set_proposal(entry.id, question=question, answers=answers or None, skipped=None)
     await db.assistantconversation.update(where={"id": conversation.id}, data={"lastMessageAt": datetime.now(timezone.utc)})

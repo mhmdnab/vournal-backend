@@ -1,5 +1,5 @@
 {
-  "_doc": "The test account every case runs against (scripts/eval_entry_actions.py seeds it, then deletes it). Plus, Asia/Beirut, USD, AI actions on. Case expectations refer to these items as @kind:Name.",
+  "_doc": "The test account every case runs against (scripts/eval_entry_actions.py seeds it, then deletes it). Plus, Asia/Beirut, USD, AI actions on. Case expectations refer to these items as @kind:Name. Tasks are due relative to today (dueDays); events start relative to now (startMinutesFromNow, clamped to today) or on a later day (startDays + time).",
   "timezone": "Asia/Beirut",
   "currency": "USD",
   "people": [
@@ -87,6 +87,89 @@
       "person": "Rami",
       "amount": 50,
       "title": "Concert tickets"
+    }
+  ],
+  "tasks": [
+    {
+      "key": "Invoice",
+      "title": "Send the invoice to Rami",
+      "dueDays": 0
+    },
+    {
+      "key": "Insurance",
+      "title": "Renew car insurance",
+      "dueDays": 0
+    },
+    {
+      "key": "Dentist call",
+      "title": "Call the dentist",
+      "dueDays": 1
+    },
+    {
+      "key": "Report",
+      "title": "Finish the quarterly report",
+      "dueDays": 2
+    },
+    {
+      "key": "Gift",
+      "title": "Buy a birthday gift for Sara",
+      "dueDays": 3
+    },
+    {
+      "key": "Electricity",
+      "title": "Pay the electricity bill",
+      "dueDays": -2
+    },
+    {
+      "key": "Tap",
+      "title": "Fix the bathroom tap"
+    },
+    {
+      "key": "Landlord email",
+      "title": "Email the landlord",
+      "dueDays": 0
+    },
+    {
+      "key": "Accountant email",
+      "title": "Email the accountant",
+      "dueDays": 0
+    }
+  ],
+  "events": [
+    {
+      "key": "Standup",
+      "title": "Team standup",
+      "startMinutesFromNow": -300,
+      "durationMinutes": 20,
+      "meeting": true
+    },
+    {
+      "key": "Bilal",
+      "title": "Meeting with Bilal",
+      "startMinutesFromNow": -150,
+      "durationMinutes": 45,
+      "meeting": true
+    },
+    {
+      "key": "Acme",
+      "title": "Client call with Acme",
+      "startMinutesFromNow": 180,
+      "durationMinutes": 30,
+      "meeting": true
+    },
+    {
+      "key": "Dentist appointment",
+      "title": "Dentist appointment",
+      "startDays": 1,
+      "time": "10:00",
+      "durationMinutes": 45
+    },
+    {
+      "key": "Dinner",
+      "title": "Dinner with Nour",
+      "startDays": 2,
+      "time": "20:00",
+      "durationMinutes": 120
     }
   ]
 }

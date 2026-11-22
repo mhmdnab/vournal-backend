@@ -45,11 +45,13 @@ PRICES = {"claude-sonnet-5-5": (2.0, 10.0), "claude-sonnet-5": (2.0, 10.0)}
 TEXT_FIELDS = ("title", "name", "notes", "description", "occasion", "who")
 CALLS: contextvars.ContextVar[list] = contextvars.ContextVar("calls")
 CASE: contextvars.ContextVar[dict] = contextvars.ContextVar("case")
+NIGHT: contextvars.ContextVar[bool] = contextvars.ContextVar("night", default=False)
 
 
 def _args():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--variant", default="baseline", help="output folder: baseline or v<N>")
+    p.add_argument("--flow", default="entry-actions", help="hill-climb folder under .claude/hillclimb/")
     p.add_argument("--reps", type=int, default=1)
     p.add_argument("--concurrency", type=int, default=4)
     p.add_argument("--timeout-s", type=float, default=240.0, help="hard wall-clock ceiling per case")
@@ -87,26 +89,47 @@ def _gate(approve: bool) -> None:
 # ----- dates and text --------------------------------------------------------------------
 
 
+DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
+
+
 def _fold(text) -> str:
-    text = unicodedata.normalize("NFKC", str(text or "")).casefold()
-    text = "".join(ch for ch in text if not ("ً" <= ch <= "ٟ" or ch in "ٰـ"))
+    # Arabic-Indic digits count as digits; apostrophes don't change a word (za'atar = zaatar)
+    text = unicodedata.normalize("NFKC", str(text or "")).casefold().translate(DIGITS)
+    text = "".join(ch for ch in text if not ("ً" <= ch <= "ٟ" or ch in "ٰـ'’`"))
     return " ".join(text.split())
 
 
+WEEKDAYS = ("MO", "TU", "WE", "TH", "FR", "SA", "SU")
+
+
 def _day_token(token: str, today: date) -> str:
-    """{today} / {yesterday} / {today-N} -> YYYY-MM-DD; anything else unchanged."""
+    """{today} / {yesterday} / {today-N} / {today+N} / {weekday:TH} (the next Thursday after today) /
+    {weekday+7:TH} (the one after that) -> YYYY-MM-DD; anything else unchanged."""
     if token == "{today}":
         return today.isoformat()
     if token == "{yesterday}":
         return (today - timedelta(days=1)).isoformat()
     if token.startswith("{today-") and token.endswith("}"):
         return (today - timedelta(days=int(token[7:-1]))).isoformat()
+    if token.startswith("{today+") and token.endswith("}"):
+        return (today + timedelta(days=int(token[7:-1]))).isoformat()
+    if token.startswith("{weekday") and token.endswith("}"):
+        head, day = token[1:-1].split(":")
+        ahead = (WEEKDAYS.index(day) - today.weekday()) % 7 or 7
+        return (today + timedelta(days=ahead + (7 if head == "weekday+7" else 0))).isoformat()
     return token
+
+
+def _night_days(today: date) -> tuple[str, ...]:
+    """Before 05:00 local, "this morning" / "today" in a recording can fairly mean yesterday."""
+    return (today.isoformat(), (today - timedelta(days=1)).isoformat()) if NIGHT.get() else (today.isoformat(),)
 
 
 def _date_ok(expected: str, got, today: date) -> bool:
     if not isinstance(got, str):
         return False
+    if expected == "{today}" and got[:10] in _night_days(today):
+        return True
     for option in expected.split("|"):
         option = _day_token(option, today)
         if option.startswith("*"):
@@ -169,7 +192,7 @@ def _matches(exp: dict, prop: dict, refs: dict, today: date) -> bool:
         elif _fold(value) != _fold(want):
             return False
     # unstated: today's date, the user's currency
-    if "date" not in exp.get("fields", {}) and got.get("date") not in (None, "", today.isoformat()) and prop["tool"] in ("add_transaction", "log_habit"):
+    if "date" not in exp.get("fields", {}) and got.get("date") not in (None, "", *_night_days(today)) and prop["tool"] in ("add_transaction", "log_habit"):
         return False
     if prop["tool"] == "add_transaction" and "currency" not in exp.get("fields", {}) and got.get("currency") not in (None, "", FIXTURE["currency"]):
         return False
@@ -180,7 +203,8 @@ def _matches(exp: dict, prop: dict, refs: dict, today: date) -> bool:
     return True
 
 
-def grade(case: dict, proposed: list[dict], asked: bool, wants: bool, refs: dict, today: date, intent: str = "journal") -> tuple[dict, dict]:
+def grade(case: dict, proposed: list[dict], asked: bool, wants: bool, refs: dict, today: date, intent: str = "journal",
+          todos: list | None = None) -> tuple[dict, dict]:
     expect = case["expect"]
     left = list(proposed)
     matched, missing = [], []
@@ -198,11 +222,16 @@ def grade(case: dict, proposed: list[dict], asked: bool, wants: bool, refs: dict
     recall = len(matched) / n_exp if n_exp else 1.0
     counted = len(matched) + len(extra)
     precision = len(matched) / counted if counted else 1.0
-    ok = not missing and not extra and asked_ok
+    # "newTodos": 0 - finishing, moving or cancelling something already on the list (or a plan already there)
+    # must not also add it as a new to-do on the review card (2026-11-22)
+    todos_ok = "newTodos" not in expect or len(todos or []) <= expect["newTodos"]
+    ok = not missing and not extra and asked_ok and todos_ok
     scores = {"pass": 1.0 if ok else 0.0, "recall": recall, "precision": precision,
-              "gate": 1.0 if wants == expect["wantsActions"] else 0.0, "asked": 1.0 if asked_ok else 0.0,
+              # wantsActions null: either answer is right (e.g. "my meetings went well" - nothing to change either way)
+              "gate": 1.0 if expect["wantsActions"] is None or wants == expect["wantsActions"] else 0.0, "asked": 1.0 if asked_ok else 0.0,
               # Ask vournal (design 2026-11-17): journal / ask / both; a case without expectIntent is a journal entry
-              "intent": 1.0 if intent == expect.get("expectIntent", "journal") else 0.0}
+              "intent": 1.0 if intent == expect.get("expectIntent", "journal") else 0.0,
+              "todos": 1.0 if todos_ok else 0.0}
     detail = {"missing": missing, "extra": [{"tool": p["tool"], "input": p["input"]} for p in extra]}
     return scores, detail
 
@@ -264,7 +293,8 @@ def _fake_extract(mode: str):
         case = CASE.get()
         result = {"summary": transcript[:200], "mood": {"score": 3, "label": "neutral", "emotions": []}, "todos": [],
                   "topics": [], "people": _fake_people(case), "places": [],
-                  "wantsActions": case["expect"]["wantsActions"] if mode == "oracle" else bool(case["expect"]["actions"]),
+                  "wantsActions": (case["expect"]["wantsActions"] if case["expect"]["wantsActions"] is not None else bool(case["expect"]["actions"]))
+                  if mode == "oracle" else bool(case["expect"]["actions"]),
                   "journalSuggested": True,
                   "intent": case["expect"].get("expectIntent", "journal") if mode == "oracle" else "journal"}
         return result, {"inTokens": 0, "outTokens": 0}
@@ -385,6 +415,27 @@ async def _seed(db) -> tuple:
     for d in FIXTURE["debts"]:
         refs[f"@debt:{d['key']}"] = await make("create_debt", {"direction": d["direction"].lower(), "who": d["person"], "amount": d["amount"],
                                                               "title": d["title"], "person_id": refs[f"@person:{d['person']}"]})
+    # tasks and events (2026-11-22): "I finished X", "move my meeting", "my meetings went well"
+    for t in FIXTURE.get("tasks", []):
+        data = {"title": t["title"], **({"date": (today + timedelta(days=t["dueDays"])).isoformat()} if "dueDays" in t else {})}
+        refs[f"@task:{t['key']}"] = await make("create_task", data)
+    now = datetime.now(ZoneInfo(tz))
+    for e in FIXTURE.get("events", []):
+        if "startMinutesFromNow" in e:
+            # today, relative to now: clamped inside today so "earlier today" and "later today" stay true late at night
+            day_start = now.replace(hour=0, minute=5, second=0, microsecond=0)
+            day_end = now.replace(hour=23, minute=0, second=0, microsecond=0)
+            start = min(max(now + timedelta(minutes=e["startMinutesFromNow"]), day_start), day_end)
+            if e["startMinutesFromNow"] < 0:
+                start = min(start, now - timedelta(minutes=e["durationMinutes"] + 1))
+                if start.date() != today:
+                    print(f"  note: '{e['title']}' can't both start today and have ended by now", flush=True)
+                    start = day_start
+            when = {"date": start.date().isoformat(), "time": start.strftime("%H:%M")}
+        else:
+            when = {"date": (today + timedelta(days=e["startDays"])).isoformat(), "time": e["time"]}
+        refs[f"@event:{e['key']}"] = await make("create_event", {"title": e["title"], **when, "duration_minutes": e["durationMinutes"],
+                                                                **({"meeting": True} if e.get("meeting") else {})})
     return user, refs, today
 
 
@@ -436,7 +487,9 @@ async def _run_one(db, case: dict, rep: int, user, refs: dict, today: date, out:
     proposed = _proposed(waiting, people)
     asked = bool(proposal.get("question"))
     wants = bool(result.get("wantsActions"))
-    scores, detail = grade(case, proposed, asked, wants, refs, today, intent=result.get("intent") or "journal")
+    local = datetime.now(ZoneInfo(FIXTURE["timezone"]))
+    NIGHT.set(local.date() == today and local.hour < 5)
+    scores, detail = grade(case, proposed, asked, wants, refs, today, intent=result.get("intent") or "journal", todos=result.get("todos", []))
     conversation = await db.assistantconversation.find_first(where={"entryId": entry.id})
     history = await db.assistantmessage.find_many(where={"conversationId": conversation.id}, order=[{"createdAt": "asc"}, {"id": "asc"}]) if conversation else []
     truncated = any(c.get("stop_reason") == "max_tokens" for c in calls)
@@ -449,7 +502,8 @@ async def _run_one(db, case: dict, rep: int, user, refs: dict, today: date, out:
         "status": "truncated" if truncated else "ok", "stop_reason": (calls[-1].get("stop_reason") if calls else None),
         "grade": scores, "latency_s": latency, "tool_calls": tool_calls, "questions": 1 if asked else 0,
         "model": models[0] if models else (calls[0].get("model") if calls else None), "usage": usage,
-        "meta": {"cost_usd": _cost(calls), "calls": calls, "refs": refs, "today": today.isoformat(), "wantsActions": wants, "question": proposal.get("question"),
+        "meta": {"cost_usd": _cost(calls), "calls": calls, "refs": refs, "today": today.isoformat(), "night": NIGHT.get(), "todos": result.get("todos", []),
+                 "wantsActions": wants, "question": proposal.get("question"),
                  "proposed": [{"tool": p["tool"], "input": p["input"]} for p in proposed], "people": people, **detail},
     }
     (out / "traces").mkdir(parents=True, exist_ok=True)
@@ -485,7 +539,9 @@ def _write_state() -> None:
 
 
 async def main() -> None:
+    global FLOW
     args = _args()
+    FLOW = ROOT / ".claude" / "hillclimb" / args.flow
     if args.approve_harness:
         _gate(True)
         return
