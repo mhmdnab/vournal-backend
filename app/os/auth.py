@@ -119,6 +119,8 @@ def web_user_out(user, settings) -> dict:
         "createdAt": user.createdAt,
         "plan": effective_plan(user),
         **plan_details(user),
+        # asked to be emailed when web checkout opens (it waits on Paddle's verification)
+        "webCheckoutNotify": settings is not None and settings.webCheckoutNotifyAt is not None,
     }
 
 

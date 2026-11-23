@@ -110,6 +110,20 @@ async def send_trial_ending(to: str, ends_at) -> bool:
     return await _send(to, f"Your free vournal Plus ends on {day}", html, "\n\n".join(lines))
 
 
+async def send_web_checkout_open(to: str) -> bool:
+    """To the accounts that asked on life.vournal.app to hear when web checkout opens."""
+    lines = [
+        "You asked us to tell you when vournal Plus could be bought on the web. It can now.",
+        "Sign in at https://life.vournal.app and start your free month: nothing is charged for the "
+        "first month, then it's $9.99 a month until you cancel.",
+        "If you'd rather not, there's nothing to do. We won't email you about this again.",
+    ]
+    html = "".join(f"<p>{line}</p>" for line in lines).replace(
+        "https://life.vournal.app", '<a href="https://life.vournal.app">life.vournal.app</a>'
+    )
+    return await _send(to, "vournal Plus is now on the web", html, "\n\n".join(lines))
+
+
 def _esc(value: str) -> str:
     import html
 

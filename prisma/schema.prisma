@@ -739,6 +739,9 @@ model UserSettings {
   spendingPlan        Json?
   // prayer times: { "cityId": "beirut", "lat": 33.89, "lng": 35.50, "method": "MuslimWorldLeague", "madhab": "shafi" }
   prayerSettings      Json?
+  // asked to be emailed when web checkout opens (owner 2026-11-23: Paddle verification pending);
+  // cleared once that email is delivered (scripts/email_web_checkout_waitlist.py)
+  webCheckoutNotifyAt DateTime?
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
 }

@@ -8,7 +8,7 @@ import re
 from datetime import datetime, timezone
 
 from fastapi import Depends, Response
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 
 from app import security
 from app.auth import delete_account
@@ -46,6 +46,11 @@ class UpdateMeBody(BaseModel):
         return v
 
 
+class NotifyBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    on: StrictBool
+
+
 class DeleteBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     # An account with a password confirms with it; one without (Apple/Google only)
@@ -68,6 +73,20 @@ async def update_me(body: UpdateMeBody, user=Depends(plus_user)):
     if "avatarColor" in body.model_fields_set:
         data["avatarColor"] = body.avatarColor
     settings = await db.usersettings.update(where={"userId": user.id}, data=data)
+    return web_user_out(user, settings)
+
+
+@router.put("/me/web-checkout-notify")
+async def web_checkout_notify(body: NotifyBody, user=Depends(web_user)):
+    """Email me when web checkout opens (owner 2026-11-23: it waits on Paddle's verification).
+    Open without Plus: it's what a free account asks for. Asking again keeps the first time."""
+    settings = await ensure_os_profile(user)
+    if body.on and settings.webCheckoutNotifyAt is None:
+        settings = await db.usersettings.update(
+            where={"userId": user.id}, data={"webCheckoutNotifyAt": datetime.now(timezone.utc)}
+        )
+    elif not body.on and settings.webCheckoutNotifyAt is not None:
+        settings = await db.usersettings.update(where={"userId": user.id}, data={"webCheckoutNotifyAt": None})
     return web_user_out(user, settings)
 
 
