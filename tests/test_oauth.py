@@ -418,6 +418,7 @@ class OAuth(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(mfa.decrypt(user.appleRefreshToken), "apple-rt")
             self.assertTrue(calls[0][0].endswith("/auth/token"))
             self.assertEqual(calls[0][1]["code"], "one-time-code")
+            self.assertNotIn("redirect_uri", calls[0][1])  # the app's codes have none
             secret = jwt.decode(calls[0][1]["client_secret"], options={"verify_signature": False}, audience=APPLE)
             self.assertEqual((secret["iss"], secret["sub"]), ("TEAM", "app.vournal.mobile"))
 
@@ -455,6 +456,8 @@ class OAuth(unittest.IsolatedAsyncioTestCase):
             )
             self.assertEqual(signed.status_code, 200, signed.text)
             self.assertEqual((calls[0][1]["code"], calls[0][1]["client_id"]), ("web-code", "app.vournal.web"))
+            # Apple refuses a website's code (400) without the return URL the sign-in used
+            self.assertEqual(calls[0][1]["redirect_uri"], "https://life.vournal.app/login")
             secret = jwt.decode(calls[0][1]["client_secret"], options={"verify_signature": False}, audience=APPLE)
             self.assertEqual(secret["sub"], "app.vournal.web")
             user = await self.db.user.find_unique(where={"email": self.address})

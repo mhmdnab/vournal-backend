@@ -70,6 +70,12 @@ def _bundle_id() -> str:
     return APP_BUNDLE_ID
 
 
+def _web_redirect_uri() -> str:
+    """The dashboard's Sign in with Apple return URL (its NEXT_PUBLIC_APPLE_REDIRECT_URI,
+    which defaults to the site's /login)."""
+    return os.environ.get("APPLE_WEB_REDIRECT_URI", "").strip() or "https://life.vournal.app/login"
+
+
 def _audiences(provider: Provider) -> list[str]:
     """Who a token may be issued to. Apple always includes the app itself: OAUTH_APPLE_AUDIENCES
     adds the website's Services ID, and listing only that once locked the app out (2026-11-24)."""
@@ -169,16 +175,12 @@ async def exchange_apple_code(code: str, client_id: str | None = None) -> str | 
         if secret is None:
             log.error("Sign in with Apple key isn't configured; no token to revoke later.")
             return None
+        form = {"client_id": issued_to, "client_secret": secret, "code": code, "grant_type": "authorization_code"}
+        if issued_to != _bundle_id():
+            # A website's code: Apple wants the return URL its sign-in used, or answers 400.
+            form["redirect_uri"] = _web_redirect_uri()
         async with httpx.AsyncClient(timeout=10) as client:
-            response = await client.post(
-                f"{APPLE_ISSUER}/auth/token",
-                data={
-                    "client_id": issued_to,
-                    "client_secret": secret,
-                    "code": code,
-                    "grant_type": "authorization_code",
-                },
-            )
+            response = await client.post(f"{APPLE_ISSUER}/auth/token", data=form)
             response.raise_for_status()
         refresh = response.json().get("refresh_token")
         if not refresh:
