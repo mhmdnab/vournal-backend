@@ -112,9 +112,12 @@ async def finance_autolog() -> None:
 
 
 async def plus_trial_reminders() -> None:
+    from app.free_month_reminders import send_free_month_reminders
     from app.trial_reminders import send_trial_reminders
 
-    await send_trial_reminders(datetime.now(timezone.utc))
+    now = datetime.now(timezone.utc)
+    await send_trial_reminders(now)
+    await send_free_month_reminders(now)
 
 
 async def refresh_market_rates() -> None:

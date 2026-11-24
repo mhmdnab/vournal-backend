@@ -38,6 +38,7 @@ from pydantic import BaseModel
 from app.auth import _user_out, get_current_user
 from app.db import db
 from app.entitlements import account_token_for, grant_plus, revoke_plus
+from app.free_month_reminders import is_apple_free_trial, record_auto_renew, record_free_month
 from app.schemas import UserOut
 
 log = logging.getLogger("vournal.billing.apple")
@@ -67,6 +68,8 @@ class AppleNotification:
     subtype: Optional[str]
     transaction: Any  # JWSTransactionDecodedPayload, or None (e.g. TEST)
     grace_expires_ms: Optional[int]
+    # from the renewal info: will the subscription renew (None when Apple didn't say)
+    auto_renew: Optional[bool] = None
 
 
 def _local_database() -> bool:
@@ -129,7 +132,7 @@ def decode_notification(signed_payload: str) -> AppleNotification:
     def decode(verifier: SignedDataVerifier) -> AppleNotification:
         body = verifier.verify_and_decode_notification(signed_payload)
         data = body.data
-        transaction = grace = None
+        transaction = grace = auto_renew = None
         if data is not None and data.signedTransactionInfo:
             transaction = verifier.verify_and_decode_signed_transaction(
                 data.signedTransactionInfo
@@ -137,11 +140,14 @@ def decode_notification(signed_payload: str) -> AppleNotification:
         if data is not None and data.signedRenewalInfo:
             renewal = verifier.verify_and_decode_renewal_info(data.signedRenewalInfo)
             grace = renewal.gracePeriodExpiresDate
+            status = getattr(renewal, "rawAutoRenewStatus", None)
+            auto_renew = None if status is None else status == 1
         return AppleNotification(
             type=body.rawNotificationType or "",
             subtype=body.rawSubtype,
             transaction=transaction,
             grace_expires_ms=grace,
+            auto_renew=auto_renew,
         )
 
     return _first_valid(decode)
@@ -217,6 +223,8 @@ async def submit_transaction(body: SignedTransactionIn, current=Depends(get_curr
             transaction.originalTransactionId,
             purchased_at=_when(getattr(transaction, "purchaseDate", None)),
         )
+        if is_apple_free_trial(transaction):
+            await record_free_month(current.id, _when(transaction.expiresDate))
     log.info("Apple purchase verified for user %s", current.id)
     return _user_out(await db.user.find_unique(where={"id": current.id}))
 
@@ -255,5 +263,10 @@ async def notifications(body: SignedNotificationIn):
             db, user.id, "apple", transaction.originalTransactionId,
             refunded=note.type in {"REFUND", "REVOKE"},
         )
+    # for the email before a free month ends (app/free_month_reminders.py)
+    if note.type in _GRANTS and is_apple_free_trial(transaction):
+        await record_free_month(user.id, _when(transaction.expiresDate), note.auto_renew)
+    elif note.auto_renew is not None and note.type not in _REVOKES:
+        await record_auto_renew(user.id, note.auto_renew)
     log.info("Apple notification %s handled for user %s", note.type, user.id)
     return {"ok": True}

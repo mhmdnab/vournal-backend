@@ -93,6 +93,12 @@ model User {
   // it also means "has had a trial". The reminder email a week before is sent once.
   trialEndsAt         DateTime?
   trialReminderSentAt DateTime?
+  // A store's free month (9t): when the Apple introductory offer or Paddle trial ends,
+  // whether it will renew (null = not told, treated as yes), and when the reminder 3 days
+  // before went out (cleared when a new free month is recorded).
+  planIntroEndsAt         DateTime?
+  planAutoRenew           Boolean?
+  planIntroReminderSentAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt @default(now())
 

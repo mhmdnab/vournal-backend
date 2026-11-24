@@ -34,6 +34,7 @@ from fastapi import APIRouter, HTTPException, Request
 from app import email as mailer
 from app.db import db
 from app.entitlements import grant_plus, revoke_plus
+from app.free_month_reminders import record_auto_renew, record_free_month
 
 log = logging.getLogger("vournal.billing.paddle")
 
@@ -115,6 +116,12 @@ async def webhook(request: Request):
         # Only a confirmed account: anyone can register with someone else's email.
         if user is not None and (signed_in or user.emailVerifiedAt or user.paddleSubscriptionId == sub_id):
             await grant_plus(db, user.id, expires, "paddle", sub_id)
+            # the email before a free month ends (app/free_month_reminders.py)
+            cancelling = (data.get("scheduled_change") or {}).get("action") == "cancel"
+            if status == "trialing":
+                await record_free_month(user.id, expires, not cancelling)
+            else:
+                await record_auto_renew(user.id, not cancelling)
         elif email:
             first_notice = (
                 await db.pendinggrant.find_unique(where={"externalId": sub_id}) is None
