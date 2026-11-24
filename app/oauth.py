@@ -62,16 +62,22 @@ class ProviderSignIn(BaseModel):
     timezone: str | None = Field(default=None, max_length=64)
 
 
+APP_BUNDLE_ID = "app.vournal.mobile"
+
+
 def _bundle_id() -> str:
-    return _audiences("apple")[0] if _audiences("apple") else "app.vournal.mobile"
+    """The iPhone app's client id: what its Apple tokens are issued to."""
+    return APP_BUNDLE_ID
 
 
 def _audiences(provider: Provider) -> list[str]:
-    raw = (
-        os.environ.get("OAUTH_APPLE_AUDIENCES", "app.vournal.mobile")
-        if provider == "apple"
-        else os.environ.get("GOOGLE_OAUTH_CLIENT_IDS", "")
-    )
+    """Who a token may be issued to. Apple always includes the app itself: OAUTH_APPLE_AUDIENCES
+    adds the website's Services ID, and listing only that once locked the app out (2026-11-24)."""
+    if provider == "apple":
+        extra = os.environ.get("OAUTH_APPLE_AUDIENCES", "")
+        listed = [value.strip() for value in extra.split(",") if value.strip()]
+        return [APP_BUNDLE_ID, *(value for value in listed if value != APP_BUNDLE_ID)]
+    raw = os.environ.get("GOOGLE_OAUTH_CLIENT_IDS", "")
     return [value.strip() for value in raw.split(",") if value.strip()]
 
 

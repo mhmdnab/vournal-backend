@@ -120,6 +120,20 @@ class OAuth(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(response.status_code, 401, name)
         self.assertIsNone(await self.db.user.find_unique(where={"email": self.address}))
 
+    async def test_app_apple_sign_in_works_when_only_the_web_id_is_configured(self):
+        # Production lists the website's Services ID for the dashboard; that must not lock the app out
+        # (owner 2026-11-24: Apple sign-in worked on the web, failed in the app).
+        from app import oauth
+
+        with patch.dict(os.environ, {"OAUTH_APPLE_AUDIENCES": "app.vournal.web"}):
+            response = await self._apple()
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(oauth._bundle_id(), "app.vournal.mobile")
+            web = await self._apple(token(aud="app.vournal.web", sub=self.subject))
+            self.assertEqual(web.status_code, 200, web.text)
+            stranger = await self._apple(token(aud="com.someone.else", sub=self.subject))
+            self.assertEqual(stranger.status_code, 401)
+
     async def test_a_google_token_can_not_sign_in_as_apple(self):
         response = await self._apple(token(iss=GOOGLE, sub=self.subject, email=self.address, email_verified=True))
         self.assertEqual(response.status_code, 401)
